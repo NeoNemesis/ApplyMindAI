@@ -1,6 +1,5 @@
 <a name="top"></a>
 <div align="center">
-<img src="./assets/laboro.png" width="340" >
 
 
 # AIHawk – the first Jobs Applier AI Agent
