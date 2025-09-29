@@ -21,7 +21,7 @@ class StyleManager:
         """
         Retrieve the available styles from the styles directory.
         Returns:
-            Dict[str, Tuple[str, str]]: A dictionary mapping style names to their file names and author links.
+            Dict[str, Tuple[str, str]]: A dictionary mapping style names to their file names.
         """
         styles_to_files = {}
         if not self.styles_directory:
@@ -38,12 +38,9 @@ class StyleManager:
                     logging.debug(f"First line of file {file_path.name}: {first_line}")
                     if first_line.startswith("/*") and first_line.endswith("*/"):
                         content = first_line[2:-2].strip()
-                        if "$" in content:
-                            style_name, author_link = content.split("$", 1)
-                            style_name = style_name.strip()
-                            author_link = author_link.strip()
-                            styles_to_files[style_name] = (file_path.name, author_link)
-                            logging.info(f"Added style: {style_name} by {author_link}")
+                        style_name = content.strip()
+                        styles_to_files[style_name] = (file_path.name, "")
+                        logging.info(f"Added style: {style_name}")
         except FileNotFoundError:
             logging.error(f"Directory {self.styles_directory} not found.")
         except PermissionError:
@@ -56,11 +53,11 @@ class StyleManager:
         """
         Format the style choices for user presentation.
         Args:
-            styles_to_files (Dict[str, Tuple[str, str]]): A dictionary mapping style names to their file names and author links.
+            styles_to_files (Dict[str, Tuple[str, str]]): A dictionary mapping style names to their file names.
         Returns:
             List[str]: A list of formatted style choices.
         """
-        return [f"{style_name} (style author -> {author_link})" for style_name, (file_name, author_link) in styles_to_files.items()]
+        return [f"{style_name}" for style_name, (file_name, _) in styles_to_files.items()]
 
     def set_selected_style(self, selected_style: str):
         """
