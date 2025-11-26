@@ -23,6 +23,7 @@ from src.utils.constants import (
     WORK_PREFERENCES_YAML,
 )
 from src.email_sender import EmailSender
+from src.user_preferences import UserPreferences
 
 # ✅ INTEGRATED: Import new refactored modules
 try:
@@ -732,8 +733,19 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
             # 2. NYTT HIERARKISKT SYSTEM - Välj modell och mall
             from src.libs.resume_and_cover_builder.model_manager import ModelAwareResumeSystem
 
-            # ✅ FIX: Fråga endast om val saknas eller användaren vill ändra
-            if "selected_model" not in parameters or "selected_template" not in parameters:
+            # ✅ FIX: Ladda sparade preferenser först
+            saved_model = UserPreferences.get("selected_model")
+            saved_template = UserPreferences.get("selected_template")
+
+            if saved_model and saved_template:
+                # Använd sparade preferenser
+                parameters["selected_model"] = saved_model
+                parameters["selected_template"] = saved_template
+                print(f"\n♻️  Använder sparade inställningar:")
+                print(f"   Modell: {saved_model}")
+                print(f"   Mall: {saved_template}")
+            elif "selected_model" not in parameters or "selected_template" not in parameters:
+                # Fråga användaren första gången
                 print("\n🎨 VÄLJER CV-MODELL OCH MALL...")
                 print("=" * 50)
 
@@ -747,21 +759,26 @@ def handle_inquiries(selected_actions: List[str], parameters: dict, llm_api_key:
                     logger.error("Modell eller mall inte vald")
                     return
 
-                # Lägg till val i parameters för senare användning
+                # Spara valen permanent
+                UserPreferences.set("selected_model", selected_model)
+                UserPreferences.set("selected_template", selected_template)
+
                 parameters["selected_model"] = selected_model
                 parameters["selected_template"] = selected_template
 
                 print(f"✅ Vald modell: {selected_model}")
                 print(f"✅ Vald mall: {selected_template}")
+                print(f"💾 Inställningar sparade för framtida användning!")
             else:
-                # ✅ Återanvänd tidigare val
+                # Återanvänd från parameters (om det finns)
                 print(f"\n♻️  Använder tidigare val:")
                 print(f"   Modell: {parameters['selected_model']}")
                 print(f"   Mall: {parameters['selected_template']}")
             
             # 3. Kör vald funktion med modell-medvetenhet
             if "⚙️  Change CV Model/Template Settings" == selected_actions:
-                # ✅ Rensa tidigare val så användaren kan välja igen
+                # ✅ Rensa sparade preferenser
+                UserPreferences.clear()
                 if "selected_model" in parameters:
                     del parameters["selected_model"]
                 if "selected_template" in parameters:

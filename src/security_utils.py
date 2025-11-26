@@ -9,6 +9,22 @@ from typing import Optional
 from urllib.parse import urlparse
 from loguru import logger
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Load .env from project root
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+        logger.debug(f"✅ Loaded environment variables from {env_path}")
+    else:
+        load_dotenv()  # Try to load from default locations
+        logger.debug("Looking for .env file in current directory")
+except ImportError:
+    logger.warning("python-dotenv not installed. Using system environment variables only.")
+except Exception as e:
+    logger.warning(f"Could not load .env file: {e}")
+
 
 class SecurityValidator:
     """Validates and sanitizes user inputs for security."""

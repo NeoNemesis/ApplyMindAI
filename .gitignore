@@ -76,10 +76,10 @@ documents/
 pdfs/
 *.pdf
 
-# Test files
-test_*
-*_test.py
-tests/
+# Test files (old pattern - now we WANT to track tests/)
+# test_*
+# *_test.py
+# tests/
 
 # Backup files
 *.bak

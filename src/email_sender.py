@@ -144,9 +144,14 @@ class EmailSender:
         try:
             # Create message
             msg = MIMEMultipart()
-            msg['From'] = f"{self.config['sender_name']} <{self.config['email']}>"
+
+            # 🔒 SECURITY FIX: Sanitize all header fields
+            safe_sender_name = self._sanitize_email_field(self.config['sender_name'])
+            safe_position_title = self._sanitize_email_field(position_title)
+
+            msg['From'] = f"{safe_sender_name} <{self.config['email']}>"
             msg['To'] = recipient_email
-            msg['Subject'] = f"Ansökan till {position_title} - {self.config['sender_name']}"
+            msg['Subject'] = f"Ansökan till {safe_position_title} - {safe_sender_name}"
             
             # Create email body
             body = self._create_email_body(company_name, position_title, custom_message)
@@ -156,17 +161,21 @@ class EmailSender:
             if resume_path.exists():
                 with open(resume_path, 'rb') as file:
                     resume_attachment = MIMEApplication(file.read(), _subtype='pdf')
-                    resume_attachment.add_header('Content-Disposition', 
-                                               f'attachment; filename="CV_{self.config["sender_name"].replace(" ", "_")}.pdf"')
+                    # 🔒 SECURITY FIX: Sanitize sender_name in attachment filename
+                    safe_filename = self._sanitize_email_field(self.config["sender_name"]).replace(" ", "_")
+                    resume_attachment.add_header('Content-Disposition',
+                                               f'attachment; filename="CV_{safe_filename}.pdf"')
                     msg.attach(resume_attachment)
                 logger.info(f"Resume attached: {resume_path}")
-            
+
             # Attach cover letter
             if cover_letter_path.exists():
                 with open(cover_letter_path, 'rb') as file:
                     cover_attachment = MIMEApplication(file.read(), _subtype='pdf')
-                    cover_attachment.add_header('Content-Disposition', 
-                                              f'attachment; filename="Personligt_brev_{self.config["sender_name"].replace(" ", "_")}.pdf"')
+                    # 🔒 SECURITY FIX: Sanitize sender_name in attachment filename
+                    safe_filename = self._sanitize_email_field(self.config["sender_name"]).replace(" ", "_")
+                    cover_attachment.add_header('Content-Disposition',
+                                              f'attachment; filename="Personligt_brev_{safe_filename}.pdf"')
                     msg.attach(cover_attachment)
                 logger.info(f"Cover letter attached: {cover_letter_path}")
             
@@ -183,24 +192,62 @@ class EmailSender:
             logger.error(f"Failed to send job application email: {e}")
             return False
     
+    def _sanitize_email_field(self, text: str) -> str:
+        """
+        Sanitize text to prevent email header injection.
+
+        Removes newlines, carriage returns, and other dangerous characters
+        that could be used to inject additional email headers.
+
+        Args:
+            text: Input text to sanitize
+
+        Returns:
+            Sanitized text safe for use in email headers and body
+        """
+        if not text:
+            return ""
+
+        # Remove newlines, carriage returns, and null bytes
+        dangerous_chars = ['\n', '\r', '\0', '\x0b', '\x0c']
+        sanitized = text
+        for char in dangerous_chars:
+            sanitized = sanitized.replace(char, ' ')
+
+        # Remove consecutive spaces
+        while '  ' in sanitized:
+            sanitized = sanitized.replace('  ', ' ')
+
+        return sanitized.strip()
+
     def _create_email_body(self, company_name: str, position_title: str, custom_message: Optional[str] = None) -> str:
-        """Create professional email body for job application."""
-        
+        """
+        Create professional email body for job application.
+
+        SECURITY: Sanitizes all user inputs to prevent header injection attacks.
+        """
+        # 🔒 SECURITY FIX: Sanitize inputs to prevent email header injection
+        safe_company_name = self._sanitize_email_field(company_name)
+        safe_position_title = self._sanitize_email_field(position_title)
+        safe_sender_name = self._sanitize_email_field(self.config['sender_name'])
+
         base_message = f"""Hej,
 
-Jag skickar med denna ansökan till tjänsten som {position_title} på {company_name}.
+Jag skickar med denna ansökan till tjänsten som {safe_position_title} på {safe_company_name}.
 
 Bifogat finner ni mitt CV och personliga brev som är anpassade för denna specifika tjänst. Mina kvalifikationer och erfarenheter matchar väl de krav som ställs för rollen.
 
-Jag ser fram emot att höra från er och möjligheten att diskutera hur jag kan bidra till {company_name}.
+Jag ser fram emot att höra från er och möjligheten att diskutera hur jag kan bidra till {safe_company_name}.
 
 Med vänliga hälsningar,
-{self.config['sender_name']}
+{safe_sender_name}
 {self.config['email']}"""
 
         if custom_message:
-            base_message += f"\n\nTillägg:\n{custom_message}"
-        
+            # Sanitize custom message but preserve intentional line breaks
+            safe_custom_message = custom_message.replace('\r', '').strip()
+            base_message += f"\n\nTillägg:\n{safe_custom_message}"
+
         return base_message
     
     def send_bulk_applications(self, applications: List[Dict]) -> Dict[str, bool]:
