@@ -14,7 +14,7 @@ from pathlib import Path
 from langchain_core.prompt_values import StringPromptValue
 from langchain_core.runnables import RunnablePassthrough
 from langchain_text_splitters import TokenTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from src.libs.resume_and_cover_builder.config import global_config
 from langchain_community.document_loaders import TextLoader
@@ -99,9 +99,9 @@ class LLMParser:
         """
         if not self.vectorstore:
             raise ValueError("Vectorstore not initialized. Run extract_job_description first.")
-        
+
         retriever = self.vectorstore.as_retriever()
-        retrieved_docs = retriever.get_relevant_documents(query)[:top_k]
+        retrieved_docs = retriever.invoke(query)[:top_k]
         context = "\n\n".join(doc.page_content for doc in retrieved_docs)
         logger.debug(f"Context retrieved for query '{query}': {context[:200]}...")  # Log the first 200 characters
         return context

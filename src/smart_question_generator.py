@@ -3,7 +3,7 @@ Smart Question Generator
 Analyserar jobbeskrivning och genererar relevanta frågor för CV-anpassning
 """
 
-import openai
+from openai import OpenAI
 from typing import List, Dict, Optional
 from loguru import logger
 import json
@@ -15,7 +15,7 @@ class SmartQuestionGenerator:
     def __init__(self, api_key: str):
         """Initialisera med OpenAI API-nyckel"""
         self.api_key = api_key
-        openai.api_key = api_key
+        self.client = OpenAI(api_key=api_key)
 
     def analyze_job_and_generate_questions(
         self,
@@ -78,7 +78,7 @@ OUTPUT FORMAT (JSON):
 Generate the questions:"""
 
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
