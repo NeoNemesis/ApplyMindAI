@@ -8,6 +8,12 @@ data_folder/plain_text_resume.yaml
 data_folder/work_preferences.yaml
 data_folder/output/
 data_folder/log/
+data_folder/processed_jobs.txt
+data_folder/tracker_status.json
+data_folder/profile.png
+data_folder/reference_cv.txt
+data_folder/reference_cover_letter.txt
+data_folder/reference_cover_letter.pdf
 
 # Python
 __pycache__/
