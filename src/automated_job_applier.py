@@ -1,5 +1,5 @@
 """
-JobCraftAI - Automated job application workflow that combines scraping, document generation, and email sending.
+ApplyMind AI - Automated job application workflow that combines scraping, document generation, and email sending.
 Built by Victor Vilches - Combining data engineering expertise with intelligent automation.
 """
 import yaml
@@ -17,8 +17,8 @@ from src.utils.chrome_utils import init_browser
 import base64
 
 
-class JobCraftAI:
-    """JobCraftAI - Intelligent job application automation system."""
+class ApplyMindAI:
+    """ApplyMind AI - Intelligent job application automation system."""
     
     def __init__(self, 
                  data_folder: Path,
@@ -26,7 +26,7 @@ class JobCraftAI:
                  email_config_path: Optional[Path] = None,
                  job_scraper_config_path: Optional[Path] = None):
         """
-        Initialize JobCraftAI - The intelligent job application system.
+        Initialize ApplyMind AI - The intelligent job application system.
         
         Args:
             data_folder: Path to data folder containing resume and preferences
@@ -362,10 +362,10 @@ class JobCraftAI:
 
 # CLI interface
 def main():
-    """Main CLI interface for JobCraftAI."""
+    """Main CLI interface for ApplyMind AI."""
     import argparse
     
-    parser = argparse.ArgumentParser(description="JobCraftAI - Intelligent Job Application System")
+    parser = argparse.ArgumentParser(description="ApplyMind AI - Intelligent Job Application System")
     parser.add_argument("--data-folder", type=Path, default=Path("data_folder"),
                        help="Path to data folder")
     parser.add_argument("--max-applications", type=int, default=10,
@@ -382,14 +382,14 @@ def main():
     
     llm_api_key = secrets['llm_api_key']
     
-    # Create JobCraftAI instance
-    jobcraft = JobCraftAI(
+    # Create ApplyMind AI instance
+    applier = ApplyMindAI(
         data_folder=args.data_folder,
         llm_api_key=llm_api_key
     )
     
     # Run process
-    stats = jobcraft.run_automated_application_process(max_applications=args.max_applications)
+    stats = applier.run_automated_application_process(max_applications=args.max_applications)
     
     print("\n=== FINAL STATISTICS ===")
     for key, value in stats.items():

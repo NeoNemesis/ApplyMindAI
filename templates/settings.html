@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Inställningar — ApplyMind AI{% endblock %}
+{% block page_title %}Inställningar{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Left: Model selection -->
+  <div class="col-lg-7">
+    <form action="/settings/save" method="POST" id="settings-form">
+
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-robot"></i> AI-leverantör &amp; Modell
+        </div>
+
+        <input type="hidden" name="provider" id="sel-provider" value="{{ model_cfg.provider }}">
+        <input type="hidden" name="model"    id="sel-model"    value="{{ model_cfg.model }}">
+
+        <!-- Provider grid -->
+        <div class="row g-2 mb-4">
+          {% for pid, pinfo in provider_info.items() %}
+          <div class="col-6">
+            <div class="provider-sel-card {% if model_cfg.provider == pid %}active{% endif %}"
+                 onclick="selectProvider('{{ pid }}')" style="
+                   background:var(--bg-input); border:2px solid var(--border);
+                   border-radius:10px; padding:12px 14px; cursor:pointer;
+                   transition:.15s; display:flex; align-items:center; gap:10px;">
+              <span style="font-size:1.4rem">{{ pinfo.icon }}</span>
+              <div>
+                <div class="fw-semibold small">{{ pinfo.label }}</div>
+                {% if pinfo.free %}
+                  <span style="font-size:.68rem; background:rgba(74,229,74,.2); color:var(--green);
+                               padding:1px 6px; border-radius:20px;">Gratis</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Models per provider -->
+        {% for pid, models in available_models.items() %}
+        <div class="model-group mb-3" id="models-{{ pid }}"
+             style="display:{% if model_cfg.provider == pid %}block{% else %}none{% endif %}">
+          <label class="form-label small mb-2">Modell för {{ provider_info[pid].label }}:</label>
+          {% for m in models %}
+          <div class="model-row {% if model_cfg.model == m.id %}selected{% endif %}"
+               onclick="selectModel('{{ m.id }}', this)"
+               style="display:flex; align-items:center; gap:10px; padding:9px 12px;
+                      border-radius:8px; cursor:pointer; border:1px solid var(--border);
+                      background:var(--bg-input); margin-bottom:5px; transition:.15s;">
+            <input type="radio" name="_model_radio" value="{{ m.id }}"
+                   {% if model_cfg.model == m.id %}checked{% endif %}
+                   style="accent-color:var(--green);">
+            <span class="flex-grow-1 small">{{ m.label }}</span>
+            {% if m.recommended %}
+              <span style="font-size:.68rem; background:rgba(74,229,74,.2); color:var(--green);
+                           padding:1px 7px; border-radius:20px;">Rekommenderad</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+
+        <!-- API Key -->
+        <div id="api-key-block" {% if model_cfg.provider == 'ollama' %}style="display:none"{% endif %}>
+          <hr class="section-divider">
+          <label class="form-label">
+            <i class="bi bi-key me-1"></i>API-nyckel
+            <span class="text-muted small" id="key-label">({{ provider_info[model_cfg.provider].label }})</span>
+          </label>
+          <input type="password" name="api_key" id="api-key" class="form-control"
+                 placeholder="Klistra in ny nyckel för att byta (lämna tomt = behåll befintlig)">
+          <small class="text-muted d-block mt-1">
+            Nuvarande nyckel: {{ '✅ Konfigurerad' if env.get(provider_info[model_cfg.provider].env_key or 'X') else '❌ Ej konfigurerad' }}
+          </small>
+          <a id="key-link" href="{{ provider_info[model_cfg.provider].key_url }}"
+             target="_blank" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Hämta ny API-nyckel
+          </a>
+        </div>
+
+        <div id="ollama-box" style="display:{% if model_cfg.provider == 'ollama' %}block{% else %}none{% endif %}">
+          <hr class="section-divider">
+          <div class="card"><div class="card-body">
+            <p class="mb-1 fw-semibold text-green"><i class="bi bi-pc-display me-2"></i>Ollama — lokal AI (ingen kostnad)</p>
+            <ol class="text-muted small mb-0">
+              <li>Ladda ner: <a href="https://ollama.com/" target="_blank" class="text-green">ollama.com</a></li>
+              <li>Kör i terminal: <code>ollama pull llama3.2</code></li>
+              <li>Starta Ollama (kör i bakgrunden)</li>
+            </ol>
+          </div></div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button type="submit" class="btn btn-green">
+            <i class="bi bi-floppy me-2"></i>Spara inställningar
+          </button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Right: Comparison table + status -->
+  <div class="col-lg-5">
+
+    <!-- Current model badge -->
+    <div class="form-section mb-3">
+      <div class="form-section-title"><i class="bi bi-check2-circle"></i> Aktiv modell</div>
+      <div class="d-flex align-items-center gap-3">
+        <div style="font-size:2rem">{{ provider_info[model_cfg.provider].icon }}</div>
+        <div>
+          <div class="fw-bold">{{ provider_info[model_cfg.provider].label }}</div>
+          <code style="color:var(--green)">{{ model_cfg.model }}</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison table -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-table"></i> Jämförelse</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr><th>Leverantör</th><th>Kostnad</th><th>Kvalitet</th><th>Snabbhet</th></tr>
+          </thead>
+          <tbody class="small">
+            <tr {% if model_cfg.provider == 'openai' %}class="table-active"{% endif %}>
+              <td>🟢 OpenAI</td><td>$</td><td>⭐⭐⭐⭐⭐</td><td>Snabb</td>
+            </tr>
+            <tr {% if model_cfg.provider == 'anthropic' %}class="table-active"{% endif %}>
+              <td>🟠 Claude</td><td>$$</td><td>⭐⭐⭐⭐⭐</td><td>Snabb</td>
+            </tr>
+            <tr {% if model_cfg.provider == 'google' %}class="table-active"{% endif %}>
+              <td>🔵 Gemini</td><td>Gratis*</td><td>⭐⭐⭐⭐</td><td>Snabb</td>
+            </tr>
+            <tr {% if model_cfg.provider == 'ollama' %}class="table-active"{% endif %}>
+              <td>🟣 Ollama</td><td>Gratis</td><td>⭐⭐⭐</td><td>Långsam*</td>
+            </tr>
+          </tbody>
+        </table>
+        <small class="text-muted d-block mt-1">* Gemini gratis upp till rate-limits. Ollama beror på din dator.</small>
+      </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-link-45deg"></i> Snabblänkar</div>
+      <div class="d-flex flex-column gap-2">
+        <a href="https://platform.openai.com/api-keys" target="_blank" class="btn btn-sm btn-outline-secondary">
+          🟢 OpenAI API-nycklar
+        </a>
+        <a href="https://console.anthropic.com/" target="_blank" class="btn btn-sm btn-outline-secondary">
+          🟠 Anthropic Console
+        </a>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="btn btn-sm btn-outline-secondary">
+          🔵 Google AI Studio (gratis)
+        </a>
+        <a href="https://ollama.com/" target="_blank" class="btn btn-sm btn-outline-secondary">
+          🟣 Ollama (lokal AI)
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROVIDER_INFO = {{ provider_info | tojson }};
+
+function selectProvider(pid) {
+  document.getElementById('sel-provider').value = pid;
+
+  // Cards visual
+  document.querySelectorAll('.provider-sel-card').forEach(c => {
+    c.style.borderColor = 'var(--border)';
+    c.style.background  = 'var(--bg-input)';
+  });
+  event.currentTarget.style.borderColor = 'var(--green)';
+  event.currentTarget.style.background  = 'var(--green-glow)';
+
+  // Model groups
+  document.querySelectorAll('.model-group').forEach(g => g.style.display = 'none');
+  const mg = document.getElementById('models-' + pid);
+  if (mg) { mg.style.display = 'block'; }
+
+  // API key / ollama
+  const apiBlock   = document.getElementById('api-key-block');
+  const ollamaBox  = document.getElementById('ollama-box');
+  const keyLabel   = document.getElementById('key-label');
+  const keyLink    = document.getElementById('key-link');
+  if (pid === 'ollama') {
+    apiBlock.style.display  = 'none';
+    ollamaBox.style.display = 'block';
+  } else {
+    apiBlock.style.display  = 'block';
+    ollamaBox.style.display = 'none';
+    const pinfo = PROVIDER_INFO[pid];
+    if (pinfo && keyLabel) keyLabel.textContent = '(' + pinfo.label + ')';
+    if (pinfo && keyLink)  keyLink.href = pinfo.key_url;
+  }
+}
+
+function selectModel(modelId, el) {
+  const group = el.closest('.model-group');
+  group.querySelectorAll('.model-row').forEach(r => r.style.background = 'var(--bg-input)');
+  el.style.background = 'var(--green-glow)';
+  document.getElementById('sel-model').value = modelId;
+}
+</script>
+{% endblock %}

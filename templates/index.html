@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ApplyMind AI{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Hero Banner -->
+<div class="hero-banner mt-2">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="hero-title">
+        {% if t.dash_welcome is defined %}{{ t.dash_welcome }}{% else %}Välkommen tillbaka{% endif %}
+      </h1>
+      <p class="hero-subtitle">
+        <i class="bi bi-calendar3 me-1"></i>
+        <span id="today-date"></span>
+        <script>
+          document.getElementById('today-date').textContent = new Date().toLocaleDateString('sv-SE', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+        </script>
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/search" class="btn btn-green btn-sm">
+        <i class="bi bi-search me-1"></i>
+        {% if t.dash_new_search is defined %}{{ t.dash_new_search }}{% else %}Ny sökning{% endif %}
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-3">
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon"><i class="bi bi-briefcase-fill"></i></div>
+      <div>
+        <div class="stat-value">{{ stats.total_folders }}</div>
+        <div class="stat-label">
+          {% if t.dash_total is defined %}{{ t.dash_total }}{% else %}Ansökningar totalt{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon-teal">
+        <i class="bi bi-file-earmark-text-fill"></i>
+      </div>
+      <div>
+        <div class="stat-value">{{ stats.jobs_with_letter }}</div>
+        <div class="stat-label">
+          {% if t.dash_with_letter is defined %}{{ t.dash_with_letter }}{% else %}Med personligt brev{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon-blue">
+        <i class="bi bi-cpu-fill"></i>
+      </div>
+      <div>
+        <div class="stat-value">{{ stats.total_calls }}</div>
+        <div class="stat-label">
+          {% if t.dash_ai_calls is defined %}{{ t.dash_ai_calls }}{% else %}AI-anrop{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon stat-icon-yellow">
+        <i class="bi bi-currency-dollar"></i>
+      </div>
+      <div>
+        <div class="stat-value">${{ "%.2f"|format(stats.total_cost) }}</div>
+        <div class="stat-label">
+          {% if t.dash_ai_cost is defined %}{{ t.dash_ai_cost }}{% else %}AI-kostnad totalt{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Quick actions row -->
+<div class="d-flex flex-wrap gap-2 mb-4">
+  <a href="/search" class="btn btn-green">
+    <i class="bi bi-search me-2"></i>
+    {% if t.dash_quickstart is defined %}{{ t.dash_quickstart }}{% else %}Sök nya jobb{% endif %}
+  </a>
+  <a href="/cv" class="btn btn-outline-green">
+    <i class="bi bi-person-vcard me-2"></i>
+    {% if t.dash_edit_cv is defined %}{{ t.dash_edit_cv }}{% else %}Redigera CV{% endif %}
+  </a>
+  <a href="/cover-letter" class="btn btn-outline-green">
+    <i class="bi bi-file-earmark-text me-2"></i>
+    {% if t.dash_edit_letter is defined %}{{ t.dash_edit_letter }}{% else %}Redigera personligt brev{% endif %}
+  </a>
+  <a href="/jobs" class="btn btn-outline-secondary">
+    <i class="bi bi-briefcase me-2"></i>
+    {% if t.dash_view_all is defined %}{{ t.dash_view_all }}{% else %}Visa alla ansökningar{% endif %}
+  </a>
+  <a href="/tracker" class="btn btn-outline-secondary">
+    <i class="bi bi-kanban me-2"></i>Jobbspårare
+  </a>
+</div>
+
+<!-- Recent jobs -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>
+      <i class="bi bi-clock-history me-2 text-green"></i>
+      {% if t.dash_recent is defined %}{{ t.dash_recent }}{% else %}Senaste ansökningar{% endif %}
+    </span>
+    <a href="/jobs" class="btn btn-sm btn-outline-green">
+      {% if t.dash_view_all is defined %}{{ t.dash_view_all }}{% else %}Visa alla{% endif %}
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if recent_jobs %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>{% if t.dash_col_title is defined %}{{ t.dash_col_title }}{% else %}Titel{% endif %}</th>
+            <th>{% if t.dash_col_company is defined %}{{ t.dash_col_company }}{% else %}Företag{% endif %}</th>
+            <th>{% if t.dash_col_location is defined %}{{ t.dash_col_location }}{% else %}Plats{% endif %}</th>
+            <th>{% if t.dash_col_date is defined %}{{ t.dash_col_date }}{% else %}Datum{% endif %}</th>
+            <th>{% if t.dash_col_docs is defined %}{{ t.dash_col_docs }}{% else %}Dokument{% endif %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in recent_jobs %}
+          <tr>
+            <td class="fw-medium">{{ job.title[:45] }}{% if job.title|length > 45 %}…{% endif %}</td>
+            <td>{{ job.company }}</td>
+            <td><small class="text-muted">{{ job.location }}</small></td>
+            <td><small class="text-muted">{{ job.date }}</small></td>
+            <td>
+              {% if job.has_letter %}
+                <span class="badge-letter"><i class="bi bi-file-earmark-check me-1"></i>CV + Brev</span>
+              {% elif job.has_cv %}
+                <span class="badge-no-letter"><i class="bi bi-file-earmark me-1"></i>Bara CV</span>
+              {% else %}
+                <span class="badge-status-pending">Pågående</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                {% if job.cv_file %}
+                  <a href="/download/{{ job.folder }}/{{ job.cv_file }}"
+                     class="btn btn-sm btn-outline-green" title="Ladda ner CV">
+                    <i class="bi bi-download"></i>
+                  </a>
+                {% endif %}
+                {% if job.url %}
+                  <a href="{{ job.url }}" target="_blank"
+                     class="btn btn-sm btn-outline-secondary" title="Öppna jobb">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="p-5 text-center text-muted">
+        <i class="bi bi-inbox fs-1 d-block mb-3" style="opacity:0.3;"></i>
+        <p class="mb-2">Inga ansökningar ännu.</p>
+        <a href="/search" class="btn btn-green btn-sm">
+          <i class="bi bi-search me-1"></i>Sök ditt första jobb
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

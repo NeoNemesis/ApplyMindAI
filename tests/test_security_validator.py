@@ -164,7 +164,7 @@ class TestSecurePasswordManager:
     def test_get_api_key_from_env(self, monkeypatch):
         """Test retrieving API key from environment variable"""
         test_key = "sk-test-key-12345"
-        monkeypatch.setenv("JOBCRAFT_API_KEY", test_key)
+        monkeypatch.setenv("APPLYMIND_API_KEY", test_key)
 
         retrieved_key = SecurePasswordManager.get_api_key()
         assert retrieved_key == test_key
@@ -172,21 +172,21 @@ class TestSecurePasswordManager:
     def test_get_smtp_password_from_env(self, monkeypatch):
         """Test retrieving SMTP password from environment variable"""
         test_password = "test-password-123"
-        monkeypatch.setenv("JOBCRAFT_SMTP_PASSWORD", test_password)
+        monkeypatch.setenv("APPLYMIND_SMTP_PASSWORD", test_password)
 
         retrieved_password = SecurePasswordManager.get_smtp_password()
         assert retrieved_password == test_password
 
     def test_missing_api_key_returns_none(self, monkeypatch):
         """Test that missing API key returns None gracefully"""
-        monkeypatch.delenv("JOBCRAFT_API_KEY", raising=False)
+        monkeypatch.delenv("APPLYMIND_API_KEY", raising=False)
 
         retrieved_key = SecurePasswordManager.get_api_key()
         assert retrieved_key is None
 
     def test_missing_smtp_password_returns_none(self, monkeypatch):
         """Test that missing SMTP password returns None gracefully"""
-        monkeypatch.delenv("JOBCRAFT_SMTP_PASSWORD", raising=False)
+        monkeypatch.delenv("APPLYMIND_SMTP_PASSWORD", raising=False)
 
         retrieved_password = SecurePasswordManager.get_smtp_password()
         assert retrieved_password is None

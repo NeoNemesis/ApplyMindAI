@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}Sök Jobb — ApplyMind AI{% endblock %}
+{% block page_title %}Sök Jobb{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 text-green">
+    <i class="bi bi-search me-2"></i>Jobbsökning
+  </h5>
+  {% if search_state.running %}
+    <span class="badge bg-warning text-dark fs-6 pulse">
+      <i class="bi bi-hourglass-split me-1"></i>Sökning pågår...
+    </span>
+  {% endif %}
+</div>
+
+<div class="row g-4">
+
+  <!-- Left: Search form -->
+  <div class="col-lg-5">
+    <form id="search-form">
+
+      <!-- CV Design Picker — TOP of left column -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-palette"></i> CV-design för generering
+        </div>
+
+        {# Determine current selection from env or default #}
+        {% set current_design = current_cv_design if current_cv_design is defined else 'design_01_minimal' %}
+
+        {% set design_list = [
+          ('design_01_minimal',       'Minimal',       '📄'),
+          ('design_02_classic',       'Klassisk',      '📋'),
+          ('design_03_modern_green',  'Modern Grön',   '🟢'),
+          ('design_04_dark_executive','Dark Executive','🖤'),
+          ('design_05_nordic_blue',   'Nordic Blue',   '🔵'),
+          ('design_06_creative_sidebar','Creative',    '🎨'),
+          ('design_07_tech_modern',   'Tech Modern',   '💻'),
+          ('design_08_timeline',      'Timeline',      '📅'),
+          ('design_09_infographic',   'Infografik',    '📊'),
+          ('design_10_premium_gold',  'Premium Gold',  '✨')
+        ] %}
+
+        <div class="design-picker-scroll" id="design-picker">
+          {% for design_key, design_label, design_icon in design_list %}
+          <div class="design-card {% if current_design == design_key %}selected{% endif %}"
+               data-design="{{ design_key }}"
+               onclick="selectDesign('{{ design_key }}')">
+            {# Try preview image; fall back to icon placeholder #}
+            {% set preview_src = '/static/previews/' ~ design_key ~ '.png' %}
+            <div class="design-thumb-placeholder" id="thumb-wrap-{{ design_key }}">
+              <img src="{{ preview_src }}"
+                   alt="{{ design_label }}"
+                   class="design-thumb"
+                   style="display:none;"
+                   onload="this.style.display='block';this.parentElement.style.background='none';this.parentElement.style.border='none';"
+                   onerror="this.remove();">
+              <span class="thumb-icon">{{ design_icon }}</span>
+            </div>
+            <div class="design-name">{{ design_label }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <input type="hidden" name="cv_design" id="cv-design-input" value="{{ current_design }}">
+        <small class="text-muted d-block mt-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Valt design används för alla CV och personliga brev i sökningen.
+          <span class="tag-pill ms-1" id="selected-design-label">{{ current_design }}</span>
+        </small>
+      </div>
+
+      <!-- Plattformar -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-globe"></i> Jobbplattformar
+        </div>
+        <div class="d-flex flex-column gap-2">
+
+          <label class="platform-card {% if not prefs or 'indeed' not in (prefs.get('locations',[])|string) %}selected{% endif %}">
+            <input type="checkbox" name="platforms" value="indeed" checked>
+            <div>
+              <div class="fw-semibold">Indeed</div>
+              <small class="text-muted">se.indeed.com — Bäst för svenska jobb</small>
+            </div>
+          </label>
+
+          <label class="platform-card">
+            <input type="checkbox" name="platforms" value="linkedin">
+            <div>
+              <div class="fw-semibold">LinkedIn</div>
+              <small class="text-muted">linkedin.com — Kräver inloggning</small>
+            </div>
+          </label>
+
+          <label class="platform-card">
+            <input type="checkbox" name="platforms" value="af">
+            <div>
+              <div class="fw-semibold">Arbetsförmedlingen</div>
+              <small class="text-muted">af.se — Svenska statliga jobb</small>
+            </div>
+          </label>
+
+          <label class="platform-card">
+            <input type="checkbox" name="platforms" value="jobtech" checked>
+            <div>
+              <div class="fw-semibold">Jobtech <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.65rem">GRATIS API</span></div>
+              <small class="text-muted">Sveriges officiella jobbdatabas — ingen inloggning</small>
+            </div>
+          </label>
+
+        </div>
+      </div>
+
+      <!-- Platser -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-geo-alt"></i> Sökplatser
+        </div>
+        <label class="form-label">Städer / regioner (kommaseparerat)</label>
+        <input type="text" name="locations" class="form-control"
+          value="{{ (prefs.get('locations', ['Uppsala']) | join(', ')) if prefs else 'Uppsala' }}"
+          placeholder="Uppsala, Stockholm, Remote">
+        <small class="text-muted mt-1 d-block">T.ex. <code>Uppsala, Stockholm, Remote</code></small>
+      </div>
+
+      <!-- Jobbtitlar -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-tags"></i> Jobbtitlar / sökord
+        </div>
+        <label class="form-label">En titel per rad</label>
+        <textarea name="positions" class="form-control" rows="5"
+          placeholder="Software Engineer&#10;Systemutvecklare&#10;IT Support&#10;DevOps Engineer">{% if prefs and prefs.get('positions') %}{% for p in prefs.get('positions', []) %}{{ p }}
+{% endfor %}{% endif %}</textarea>
+        <small class="text-muted mt-1 d-block">
+          Lämna tomt för att använda standardkategorier från AI-agenten
+        </small>
+      </div>
+
+      <!-- Arbetsform -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-house-heart"></i> Arbetsform
+        </div>
+        <div class="d-flex gap-3 flex-wrap">
+          <label class="d-flex align-items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="remote" class="form-check-input"
+              {% if not prefs or prefs.get('remote', True) %}checked{% endif %}
+              style="accent-color: var(--green); width:16px;height:16px;">
+            <span>Distans</span>
+          </label>
+          <label class="d-flex align-items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="hybrid" class="form-check-input"
+              {% if not prefs or prefs.get('hybrid', True) %}checked{% endif %}
+              style="accent-color: var(--green); width:16px;height:16px;">
+            <span>Hybrid</span>
+          </label>
+          <label class="d-flex align-items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="onsite" class="form-check-input"
+              {% if not prefs or prefs.get('onsite', True) %}checked{% endif %}
+              style="accent-color: var(--green); width:16px;height:16px;">
+            <span>På plats</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Antal jobb -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-list-ol"></i> Antal jobb att söka
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% for n, label in [(5,'5 – Snabbt'),(10,'10 – Rekommenderat'),(20,'20 – Omfattande'),(30,'30 – Maximum')] %}
+          <label class="platform-card flex-grow-1 {% if n == 10 %}selected{% endif %}"
+                 style="min-width: 120px;">
+            <input type="radio" name="max_jobs" value="{{ n }}"
+              {% if n == 10 %}checked{% endif %}
+              style="accent-color: var(--green);">
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Start button -->
+      <button type="button" id="start-btn" class="btn btn-green btn-lg w-100"
+              onclick="startSearch('search-form')"
+              {% if search_state.running %}disabled{% endif %}>
+        {% if search_state.running %}
+          <span class="spinner-border spinner-border-sm me-2"></span>Sökning pågår...
+        {% else %}
+          <i class="bi bi-search me-2"></i>Starta sökning
+        {% endif %}
+      </button>
+
+      <small class="text-muted d-block mt-2 text-center">
+        AI:n hittar jobb, genererar anpassade CV och personliga brev automatiskt.
+      </small>
+
+    </form>
+  </div>
+
+  <!-- Right: Terminal + Found jobs -->
+  <div class="col-lg-7">
+
+    <!-- Tabs -->
+    <ul class="nav nav-pills mb-3" id="right-tabs">
+      <li class="nav-item">
+        <button class="nav-link active" onclick="switchTab('terminal-pane','found-pane',this)">
+          <i class="bi bi-terminal me-1"></i>Live output
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" onclick="switchTab('found-pane','terminal-pane',this)">
+          <i class="bi bi-list-ul me-1"></i>Hittade jobb
+          <span class="badge ms-1" id="found-count" style="background:var(--green-glow);color:var(--green)">…</span>
+        </button>
+      </li>
+    </ul>
+
+    <!-- Terminal pane -->
+    <div id="terminal-pane">
+
+    <!-- Per-job document generation progress -->
+    <div id="job-progress" style="display:none;margin-bottom:12px;">
+      <div class="d-flex justify-content-between mb-1">
+        <small class="text-muted">Genererar dokument...</small>
+        <small class="text-green" id="job-progress-text"></small>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div id="job-progress-bar" style="height:100%;width:0%;background:var(--green);transition:width .4s ease;border-radius:3px;"></div>
+      </div>
+    </div>
+
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-terminal me-2 text-green"></i>Live output</span>
+        <button class="btn btn-sm btn-outline-secondary"
+                onclick="document.getElementById('terminal').innerHTML=''">
+          <i class="bi bi-trash"></i> Rensa
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div class="terminal" id="terminal">
+Välkommen till ApplyMind AI!
+
+Konfigurera sökinställningarna till vänster och
+klicka på "Starta sökning" för att börja.
+
+Tips:
+  • Indeed är snabbast och kräver ingen inloggning
+  • LinkedIn ger tillgång till fler jobb men är långsammare
+  • AI:n genererar ett unikt CV + personligt brev per jobb
+  • Alla dokument sparas i data_folder/output/job_master/
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /terminal-pane -->
+
+    <!-- Found jobs pane -->
+    <div id="found-pane" style="display:none">
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <span><i class="bi bi-list-ul me-2 text-green"></i>Hittade jobb</span>
+          <button class="btn btn-sm btn-outline-green" onclick="loadFoundJobs()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Uppdatera
+          </button>
+        </div>
+        <div class="card-body p-0" style="max-height:420px;overflow-y:auto">
+          <div id="found-jobs-list">
+            <div class="p-3 text-center text-muted">
+              <span class="spinner-border spinner-border-sm me-2"></span>Laddar...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info cards -->
+    <div class="row g-2 mt-2">
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <i class="bi bi-robot fs-4 text-green mb-1"></i>
+          <div class="fw-semibold small">AI-anpassat</div>
+          <div class="text-muted" style="font-size:0.75rem">Varje CV anpassas till det specifika jobbet</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <i class="bi bi-translate fs-4 text-green mb-1"></i>
+          <div class="fw-semibold small">Språkdetektering</div>
+          <div class="text-muted" style="font-size:0.75rem">Svenska eller engelska automatiskt</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center p-3">
+          <i class="bi bi-shield-check fs-4 text-green mb-1"></i>
+          <div class="fw-semibold small">Dubblettskydd</div>
+          <div class="text-muted" style="font-size:0.75rem">Samma jobb söks aldrig två gånger</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// -------------------------------------------------------
+// Design picker
+// -------------------------------------------------------
+const DESIGN_LABELS = {
+  design_01_minimal:        'Minimal',
+  design_02_classic:        'Klassisk',
+  design_03_modern_green:   'Modern Grön',
+  design_04_dark_executive: 'Dark Executive',
+  design_05_nordic_blue:    'Nordic Blue',
+  design_06_creative_sidebar:'Creative',
+  design_07_tech_modern:    'Tech Modern',
+  design_08_timeline:       'Timeline',
+  design_09_infographic:    'Infografik',
+  design_10_premium_gold:   'Premium Gold',
+};
+
+function selectDesign(key) {
+  document.querySelectorAll('#design-picker .design-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.design === key);
+  });
+  document.getElementById('cv-design-input').value = key;
+  const label = document.getElementById('selected-design-label');
+  if (label) label.textContent = DESIGN_LABELS[key] || key;
+}
+
+// -------------------------------------------------------
+// Radio buttons for max_jobs
+// -------------------------------------------------------
+document.querySelectorAll('input[name="max_jobs"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    document.querySelectorAll('input[name="max_jobs"]').forEach(r => {
+      r.closest('.platform-card').classList.toggle('selected', r.checked);
+    });
+  });
+});
+
+// -------------------------------------------------------
+// Tab switching
+// -------------------------------------------------------
+function switchTab(showId, hideId, btn) {
+  document.getElementById(showId).style.display = 'block';
+  document.getElementById(hideId).style.display = 'none';
+  document.querySelectorAll('#right-tabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (showId === 'found-pane') loadFoundJobs();
+}
+
+// -------------------------------------------------------
+// Found jobs
+// -------------------------------------------------------
+function loadFoundJobs() {
+  fetch('/api/found-jobs')
+    .then(r => r.json())
+    .then(jobs => {
+      const el  = document.getElementById('found-jobs-list');
+      const cnt = document.getElementById('found-count');
+      if (cnt) cnt.textContent = jobs.length;
+
+      if (!jobs.length) {
+        el.innerHTML = '<div class="p-4 text-center text-muted"><i class="bi bi-inbox fs-3 d-block mb-2"></i>Inga jobb hittade ännu.<br>Kör en sökning för att hitta jobb!</div>';
+        return;
+      }
+
+      el.innerHTML = jobs.map(j => `
+        <div class="d-flex align-items-center gap-2 px-3 py-2" style="border-bottom:1px solid var(--border)">
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-medium text-truncate small">${j.title}</div>
+            <div class="text-muted" style="font-size:.75rem">${j.company} · ${j.location}</div>
+          </div>
+          <div class="d-flex gap-1 flex-shrink-0">
+            ${j.processed
+              ? '<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:rgba(74,229,74,.15);color:#4AE54A">CV klar</span>'
+              : '<span style="font-size:.7rem;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.08);color:#888">Ej sökt</span>'
+            }
+            ${j.url ? `<a href="${j.url}" target="_blank" class="btn btn-sm btn-outline-secondary" style="padding:1px 6px;font-size:.75rem" title="Öppna jobbannons"><i class="bi bi-box-arrow-up-right"></i></a>` : ''}
+          </div>
+        </div>`).join('');
+    });
+}
+
+// Load count on page load
+fetch('/api/found-jobs').then(r => r.json()).then(j => {
+  const c = document.getElementById('found-count');
+  if (c) c.textContent = j.length;
+});
+</script>
+{% endblock %}

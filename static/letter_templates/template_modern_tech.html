@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #fff;
+    color: #111;
+    font-size: 10pt;
+    line-height: 1.6;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 0;
+    position: relative;
+  }
+
+  /* ── Top banner ── */
+  .top-banner {
+    background: #111;
+    padding: 22px 28px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sender-name {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+
+  .sender-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    color: #4AE54A;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  .contact-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+  }
+
+  .contact-pill {
+    background: rgba(74,229,74,0.15);
+    border: 1px solid rgba(74,229,74,0.4);
+    color: #4AE54A;
+    font-size: 8pt;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Job bar ── */
+  .job-bar {
+    background: #4AE54A;
+    padding: 8px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .job-bar .role {
+    font-size: 9.5pt;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: 0.3px;
+  }
+
+  .job-bar .date-str {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8pt;
+    color: #111;
+  }
+
+  /* ── Body ── */
+  .body {
+    padding: 22px 28px 28px;
+  }
+
+  p {
+    margin-bottom: 12px;
+    color: #222;
+  }
+
+  /* ── Skills chips ── */
+  .skills-section {
+    margin: 16px 0;
+  }
+
+  .skills-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    color: #888;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .skills-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .skill-chip {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 8.5pt;
+    font-family: 'JetBrains Mono', monospace;
+    color: #333;
+  }
+
+  /* ── Impact numbers ── */
+  .impact-row {
+    display: flex;
+    gap: 16px;
+    margin: 16px 0;
+  }
+
+  .impact-card {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+
+  .impact-number {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #4AE54A;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .impact-label {
+    font-size: 7.5pt;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Closing ── */
+  .closing {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #eee;
+  }
+
+  .sig-name {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #111;
+    margin-top: 12px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    background: #111;
+    padding: 8px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5pt;
+    color: #4AE54A;
+  }
+
+  .footer-link {
+    font-size: 7.5pt;
+    color: #555;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Top banner -->
+  <div class="top-banner">
+    <div>
+      <div class="sender-name">{{CANDIDATE_NAME}}</div>
+      <div class="sender-tag">// {{CANDIDATE_TITLE}}</div>
+    </div>
+    <div class="contact-pills">
+      <div class="contact-pill">{{CANDIDATE_EMAIL}}</div>
+      <div class="contact-pill">{{CANDIDATE_PHONE}}</div>
+      <div class="contact-pill">{{CANDIDATE_LOCATION}}</div>
+    </div>
+  </div>
+
+  <!-- Job bar -->
+  <div class="job-bar">
+    <div class="role">{{COMPANY_NAME}} — {{JOB_TITLE}}</div>
+    <div class="date-str">{{DATE}}</div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <p>Hej,</p>
+
+    <p>{{OPENING_PARAGRAPH}}</p>
+
+    <!-- Skills -->
+    <div class="skills-section">
+      <div class="skills-label">Teknisk stack & kompetenser</div>
+      <div class="skills-chips">
+        <div class="skill-chip">{{SKILL_1}}</div>
+        <div class="skill-chip">{{SKILL_2}}</div>
+        <div class="skill-chip">{{SKILL_3}}</div>
+        <div class="skill-chip">{{SKILL_4}}</div>
+        <div class="skill-chip">{{SKILL_5}}</div>
+        <div class="skill-chip">{{SKILL_6}}</div>
+      </div>
+    </div>
+
+    <p>{{EXPERIENCE_PARAGRAPH}}</p>
+
+    <!-- Impact numbers -->
+    <div class="impact-row">
+      <div class="impact-card">
+        <div class="impact-number">{{IMPACT_NUMBER_1}}</div>
+        <div class="impact-label">{{IMPACT_LABEL_1}}</div>
+      </div>
+      <div class="impact-card">
+        <div class="impact-number">{{IMPACT_NUMBER_2}}</div>
+        <div class="impact-label">{{IMPACT_LABEL_2}}</div>
+      </div>
+      <div class="impact-card">
+        <div class="impact-number">{{IMPACT_NUMBER_3}}</div>
+        <div class="impact-label">{{IMPACT_LABEL_3}}</div>
+      </div>
+    </div>
+
+    <p>{{WHY_COMPANY_PARAGRAPH}}</p>
+
+    <!-- Closing -->
+    <div class="closing">
+      <p>Jag ser fram emot att höra från er om möjligheten att bidra till {{COMPANY_NAME}}:s tekniska team.</p>
+      <p>Med vänliga hälsningar,</p>
+      <div class="sig-name">{{CANDIDATE_NAME}}</div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-brand">applymind.ai</div>
+    <div class="footer-link">{{CANDIDATE_LINKEDIN}}</div>
+  </div>
+
+</div>
+</body>
+</html>

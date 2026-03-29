@@ -1,5 +1,5 @@
 """
-Command modules for JobCraftAI
+Command modules for ApplyMind AI
 Each command represents a user action from the main menu
 """
 from .base_command import BaseCommand

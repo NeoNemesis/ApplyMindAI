@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block title %}Mina Ansökningar — ApplyMind AI{% endblock %}
+{% block page_title %}Mina Ansökningar{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0 text-green">
+    <i class="bi bi-briefcase me-2"></i>
+    Alla ansökningar
+    <span class="badge ms-2" style="background:var(--green-glow);color:var(--green);font-size:0.8rem;" id="job-count-badge">
+      {{ jobs|length }}
+    </span>
+  </h5>
+  <div class="d-flex gap-2">
+    <input type="text" id="search-filter" class="form-control form-control-sm"
+           placeholder="Filtrera jobb..." style="width:200px;"
+           oninput="filterJobs(this.value)">
+    <a href="/search" class="btn btn-green btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Sök fler
+    </a>
+  </div>
+</div>
+
+{% if jobs %}
+
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" id="jobs-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Titel</th>
+            <th>Företag</th>
+            <th>Plats</th>
+            <th>Datum</th>
+            <th>Dokument</th>
+            <th class="text-center">ATS</th>
+            <th class="text-center">Åtgärder</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr class="job-row" data-search="{{ (job.title + ' ' + job.company + ' ' + job.location)|lower }}"
+              data-folder="{{ job.folder }}">
+            <td class="text-muted small">{{ loop.index }}</td>
+            <td>
+              <span class="fw-medium">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}</span>
+            </td>
+            <td>{{ job.company }}</td>
+            <td><small class="text-muted">{{ job.location }}</small></td>
+            <td><small class="text-muted">{{ job.date }}</small></td>
+            <td>
+              {% if job.has_letter %}
+                <span class="badge-letter"><i class="bi bi-check2 me-1"></i>CV + Brev</span>
+              {% elif job.has_cv %}
+                <span class="badge-no-letter">Bara CV</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-center" style="min-width:80px;">
+              <span class="ats-badge" id="ats-{{ loop.index }}"
+                    data-folder="{{ job.folder }}"
+                    data-title="{{ job.title }}"
+                    data-company="{{ job.company }}"
+                    onclick="openAtsModal('{{ job.folder }}', '{{ job.title|replace("'","") }}', '{{ job.company|replace("'","") }}')"
+                    title="Klicka för ATS-analys">
+                <span class="ats-badge-inner ats-unknown">
+                  <i class="bi bi-graph-up-arrow"></i>
+                </span>
+              </span>
+            </td>
+            <td>
+              <div class="d-flex gap-1 justify-content-center flex-wrap">
+
+                {% if job.cv_file %}
+                  <button class="btn btn-sm btn-outline-green"
+                          onclick="previewPdf('{{ job.folder }}', '{{ job.cv_file }}')"
+                          title="Förhandsgranska CV">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  <a href="/download/{{ job.folder }}/{{ job.cv_file }}"
+                     class="btn btn-sm btn-outline-secondary" title="Ladda ner CV">
+                    <i class="bi bi-file-person"></i>
+                  </a>
+                {% endif %}
+
+                {% if job.letter_file %}
+                  <button class="btn btn-sm btn-outline-green"
+                          onclick="previewPdf('{{ job.folder }}', '{{ job.letter_file }}')"
+                          title="Förhandsgranska personligt brev">
+                    <i class="bi bi-file-earmark-text"></i>
+                  </button>
+                  <a href="/download/{{ job.folder }}/{{ job.letter_file }}"
+                     class="btn btn-sm btn-outline-secondary" title="Ladda ner personligt brev">
+                    <i class="bi bi-download"></i>
+                  </a>
+                {% endif %}
+
+                {% if job.url %}
+                  <a href="{{ job.url }}" target="_blank" rel="noopener"
+                     class="btn btn-sm btn-outline-secondary" title="Öppna jobbannnons">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                {% endif %}
+
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% else %}
+  <div class="card">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+      <h5>Inga ansökningar ännu</h5>
+      <p>Gå till <a href="/search" class="text-green">Sök Jobb</a> för att börja.</p>
+    </div>
+  </div>
+{% endif %}
+
+<!-- PDF Preview Modal -->
+<div class="modal fade" id="pdf-modal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border-color:var(--border);">
+      <div class="modal-header" style="border-color:var(--border);">
+        <h5 class="modal-title text-green">
+          <i class="bi bi-file-pdf me-2"></i>Förhandsgranskning
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                onclick="document.getElementById('pdf-iframe').src=''"></button>
+      </div>
+      <div class="modal-body p-0">
+        <iframe id="pdf-iframe" src="" width="100%" height="680px"
+                style="border:none;" title="PDF Preview"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ATS Score Modal -->
+<div class="modal fade" id="ats-modal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h6 class="modal-title text-green mb-0">
+            <i class="bi bi-graph-up-arrow me-2"></i>ATS-poänganalys
+          </h6>
+          <small id="ats-modal-subtitle" class="text-muted"></small>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="ats-modal-body">
+        <!-- Filled by JS -->
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Stäng</button>
+        <button type="button" class="btn btn-green btn-sm" id="ats-regenerate-btn" style="display:none;"
+                onclick="generateAts(true)">
+          <i class="bi bi-arrow-clockwise me-1"></i>Uppdatera analys
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Filter ──────────────────────────────────────────────
+function filterJobs(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('.job-row').forEach(row => {
+    const text = row.dataset.search || '';
+    row.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+// ── PDF Preview ──────────────────────────────────────────
+function previewPdf(folder, filename) {
+  document.getElementById('pdf-iframe').src = `/view/${folder}/${filename}`;
+  new bootstrap.Modal(document.getElementById('pdf-modal')).show();
+}
+
+// ── ATS ──────────────────────────────────────────────────
+let _atsFolder = '';
+let _atsTitle  = '';
+let _atsCompany = '';
+
+function scoreColor(score) {
+  if (score >= 75) return '#4AE54A';
+  if (score >= 50) return '#ffcc02';
+  return '#ff7070';
+}
+
+function scoreLabel(score) {
+  if (score >= 75) return 'Bra matchning';
+  if (score >= 50) return 'Delvis matchning';
+  return 'Låg matchning';
+}
+
+function renderAtsBadge(folder, score) {
+  const badges = document.querySelectorAll(`.ats-badge[data-folder="${folder}"]`);
+  badges.forEach(badge => {
+    const color = scoreColor(score);
+    badge.querySelector('.ats-badge-inner').className = 'ats-badge-inner';
+    badge.querySelector('.ats-badge-inner').style.cssText =
+      `background:${color}22;color:${color};border:1px solid ${color}44;
+       border-radius:6px;padding:2px 7px;font-size:0.75rem;font-weight:700;cursor:pointer;`;
+    badge.querySelector('.ats-badge-inner').textContent = score + '%';
+  });
+}
+
+function openAtsModal(folder, title, company) {
+  _atsFolder  = folder;
+  _atsTitle   = title;
+  _atsCompany = company;
+  document.getElementById('ats-modal-subtitle').textContent = title + (company ? ' — ' + company : '');
+  document.getElementById('ats-regenerate-btn').style.display = 'none';
+
+  const body = document.getElementById('ats-modal-body');
+  body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success"></div><p class="mt-2 text-muted small">Kontrollerar cache...</p></div>';
+
+  const modal = new bootstrap.Modal(document.getElementById('ats-modal'));
+  modal.show();
+
+  // Try cache first
+  fetch(`/api/ats-score/${encodeURIComponent(folder)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        renderAtsResult(data);
+      } else {
+        showAtsGenerate();
+      }
+    })
+    .catch(() => showAtsGenerate());
+}
+
+function showAtsGenerate() {
+  document.getElementById('ats-modal-body').innerHTML = `
+    <div class="text-center py-4">
+      <i class="bi bi-graph-up-arrow fs-1 text-muted d-block mb-3" style="opacity:0.4;"></i>
+      <p class="text-muted mb-3">Ingen ATS-analys gjord ännu för detta jobb.</p>
+      <button class="btn btn-green" onclick="generateAts(false)">
+        <i class="bi bi-cpu me-2"></i>Analysera med AI
+      </button>
+    </div>`;
+}
+
+function generateAts(force) {
+  const body = document.getElementById('ats-modal-body');
+  body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-success"></div><p class="mt-2 text-muted small">AI analyserar matchningen...</p></div>';
+  document.getElementById('ats-regenerate-btn').style.display = 'none';
+
+  fetch('/api/ats-score/generate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({folder: _atsFolder, force: !!force})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      renderAtsResult(data);
+      renderAtsBadge(_atsFolder, data.score);
+    } else if (data.no_description) {
+      body.innerHTML = `
+        <div class="text-center py-4">
+          <i class="bi bi-info-circle fs-2 text-warning d-block mb-2"></i>
+          <p class="text-muted">Ingen jobbeskrivning sparad för detta jobb.</p>
+          <p class="text-muted small">Kommande jobb sparas automatiskt — du kan analysera dem direkt.</p>
+        </div>`;
+    } else {
+      body.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle me-2"></i>${data.error || 'Okänt fel'}</div>`;
+    }
+  })
+  .catch(e => {
+    body.innerHTML = `<div class="alert alert-danger m-3">Nätverksfel: ${e}</div>`;
+  });
+}
+
+function renderAtsResult(data) {
+  const score = data.score || 0;
+  const color = scoreColor(score);
+  const label = scoreLabel(score);
+
+  const matched = (data.matched_skills || []).map(s =>
+    `<span class="badge me-1 mb-1" style="background:rgba(74,229,74,0.15);color:#4AE54A;font-size:0.75rem;">${s}</span>`
+  ).join('');
+
+  const missing = (data.missing_skills || []).map(s =>
+    `<span class="badge me-1 mb-1" style="background:rgba(255,112,112,0.15);color:#ff7070;font-size:0.75rem;">${s}</span>`
+  ).join('');
+
+  const recs = (data.recommendations || []).map(r =>
+    `<li class="mb-1"><small>${r}</small></li>`
+  ).join('');
+
+  document.getElementById('ats-modal-body').innerHTML = `
+    <!-- Score ring -->
+    <div class="text-center mb-4">
+      <div style="display:inline-flex;align-items:center;justify-content:center;
+                  width:90px;height:90px;border-radius:50%;
+                  border:4px solid ${color};background:${color}18;">
+        <div>
+          <div style="font-size:1.6rem;font-weight:800;color:${color};line-height:1;">${score}</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);">/ 100</div>
+        </div>
+      </div>
+      <div style="color:${color};font-weight:600;margin-top:6px;">${label}</div>
+      ${data.summary ? `<p class="text-muted small mt-1 mb-0">${data.summary}</p>` : ''}
+    </div>
+
+    <div class="row g-3">
+      <!-- Matched skills -->
+      <div class="col-md-6">
+        <div style="background:#1e1e1e;border-radius:8px;padding:12px;">
+          <div style="font-size:0.75rem;font-weight:600;color:#4AE54A;margin-bottom:8px;">
+            <i class="bi bi-check-circle me-1"></i>Matchande kompetenser
+          </div>
+          ${matched || '<small class="text-muted">Inga identifierade</small>'}
+        </div>
+      </div>
+      <!-- Missing skills -->
+      <div class="col-md-6">
+        <div style="background:#1e1e1e;border-radius:8px;padding:12px;">
+          <div style="font-size:0.75rem;font-weight:600;color:#ff7070;margin-bottom:8px;">
+            <i class="bi bi-x-circle me-1"></i>Saknade kompetenser
+          </div>
+          ${missing || '<small class="text-muted">Inga identifierade</small>'}
+        </div>
+      </div>
+    </div>
+
+    ${recs ? `
+    <div style="background:#1e1e1e;border-radius:8px;padding:12px;margin-top:12px;">
+      <div style="font-size:0.75rem;font-weight:600;color:#64b5f6;margin-bottom:8px;">
+        <i class="bi bi-lightbulb me-1"></i>Förbättringsförslag
+      </div>
+      <ul class="mb-0 ps-3 text-muted">${recs}</ul>
+    </div>` : ''}`;
+
+  document.getElementById('ats-regenerate-btn').style.display = 'inline-flex';
+}
+
+// Load cached ATS scores on page load
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.ats-badge[data-folder]').forEach(badge => {
+    const folder = badge.dataset.folder;
+    fetch(`/api/ats-score/${encodeURIComponent(folder)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok && data.score !== undefined) {
+          renderAtsBadge(folder, data.score);
+        }
+      })
+      .catch(() => {});
+  });
+});
+</script>
+
+<style>
+.ats-badge { cursor: pointer; }
+.ats-badge-inner.ats-unknown {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ats-badge-inner.ats-unknown:hover {
+  background: rgba(74,229,74,0.08);
+  color: var(--green);
+  border-color: var(--green);
+}
+</style>
+{% endblock %}

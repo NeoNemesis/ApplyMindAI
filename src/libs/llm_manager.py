@@ -17,7 +17,7 @@ from langchain_core.prompt_values import StringPromptValue
 from langchain_core.prompts import ChatPromptTemplate
 from Levenshtein import distance
 
-# Prompts handled locally in JobCraftAI
+# Prompts handled locally in ApplyMind AI
 from config import JOB_SUITABILITY_SCORE
 from src.utils.constants import (
     AVAILABILITY,

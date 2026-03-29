@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV – Anna Lindström</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Lato', sans-serif;
+    background: #FAFAF7;
+    color: #1a1a2e;
+    font-size: 12.5px;
+    line-height: 1.65;
+    width: 794px;
+    min-height: 1123px;
+    margin: 0 auto;
+  }
+
+  .cv-wrapper {
+    width: 794px;
+    min-height: 1123px;
+    background: #FAFAF7;
+    padding: 0 0 56px 0;
+  }
+
+  /* ============================
+     HEADER
+  ============================ */
+  .header {
+    padding: 48px 60px 36px 60px;
+    text-align: center;
+    position: relative;
+  }
+
+  /* Top ornamental line */
+  .header::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(to right, transparent, #C9A84C, transparent);
+    margin-bottom: 28px;
+  }
+
+  .header-ornament-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .ornament-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #C9A84C);
+  }
+
+  .ornament-line.right {
+    background: linear-gradient(to left, transparent, #C9A84C);
+  }
+
+  .ornament-diamond {
+    color: #C9A84C;
+    font-size: 14px;
+  }
+
+  .header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a1a2e;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+
+  .header .title {
+    font-family: 'Lato', sans-serif;
+    font-size: 12px;
+    font-weight: 300;
+    color: #888888;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .header-ornament-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  /* Contact footer row */
+  .contact-row {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: #666666;
+  }
+
+  .contact-item {
+    padding: 0 16px;
+    border-right: 1px solid #d4c4a0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .contact-item:last-child {
+    border-right: none;
+  }
+
+  /* Gold separator */
+  .gold-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 60px;
+    margin: 24px 0;
+  }
+
+  .gold-divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #C9A84C, transparent);
+  }
+
+  .gold-divider-ornament {
+    color: #C9A84C;
+    font-size: 10px;
+    letter-spacing: 3px;
+  }
+
+  /* ============================
+     BODY
+  ============================ */
+  .body-content {
+    padding: 0 60px;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 30px;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title-text {
+    letter-spacing: 0.5px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, #C9A84C, transparent);
+  }
+
+  .section-gold-accent {
+    color: #C9A84C;
+    font-size: 12px;
+  }
+
+  /* Summary */
+  .summary-box {
+    padding: 16px 20px;
+    background: #f5f0e8;
+    border-top: 2px solid #C9A84C;
+    border-bottom: 1px solid #e8dfc8;
+  }
+
+  .summary-text {
+    font-size: 12.5px;
+    color: #333333;
+    line-height: 1.8;
+    font-weight: 300;
+    font-style: italic;
+    text-align: justify;
+  }
+
+  /* Experience */
+  .exp-item {
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #ece8de;
+  }
+
+  .exp-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .exp-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+  }
+
+  .exp-date {
+    font-size: 11px;
+    color: #C9A84C;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .exp-company {
+    font-size: 12px;
+    color: #888888;
+    font-weight: 300;
+    font-style: italic;
+    margin-bottom: 7px;
+  }
+
+  .exp-bullets {
+    list-style: none;
+    padding-left: 0;
+  }
+
+  .exp-bullets li {
+    font-size: 12px;
+    color: #444444;
+    line-height: 1.65;
+    margin-bottom: 4px;
+    padding-left: 18px;
+    position: relative;
+    font-weight: 300;
+  }
+
+  .exp-bullets li::before {
+    content: '◆';
+    position: absolute;
+    left: 0;
+    color: #C9A84C;
+    font-size: 7px;
+    top: 4px;
+  }
+
+  /* Education */
+  .edu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: #f5f0e8;
+    border: 1px solid #e8dfc8;
+    border-left: 3px solid #C9A84C;
+  }
+
+  .edu-degree {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 2px;
+  }
+
+  .edu-school {
+    font-size: 12px;
+    color: #888888;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+  .edu-date {
+    font-size: 11px;
+    color: #C9A84C;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* Three columns for skills */
+  .skills-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .skill-tag {
+    background: #f5f0e8;
+    border: 1px solid #d4c4a0;
+    color: #1a1a2e;
+    font-size: 11.5px;
+    font-weight: 400;
+    padding: 6px 12px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .skill-tag::before {
+    content: '◆';
+    color: #C9A84C;
+    font-size: 6px;
+    flex-shrink: 0;
+  }
+
+  /* Languages */
+  .lang-row {
+    display: flex;
+    gap: 32px;
+  }
+
+  .lang-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #f5f0e8;
+    border: 1px solid #d4c4a0;
+  }
+
+  .lang-diamond {
+    color: #C9A84C;
+    font-size: 8px;
+  }
+
+  .lang-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+  }
+
+  .lang-sep {
+    color: #d4c4a0;
+    font-size: 10px;
+  }
+
+  .lang-level {
+    font-size: 11px;
+    color: #888888;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+  /* Bottom ornament */
+  .footer-ornament {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 36px;
+    color: #C9A84C;
+    font-size: 10px;
+    letter-spacing: 4px;
+    opacity: 0.6;
+  }
+
+  .footer-ornament-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, #C9A84C, transparent);
+  }
+
+  @media print {
+    body { background: #FAFAF7; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cv-wrapper { padding-bottom: 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  <div class="header">
+    <div class="header-ornament-top">
+      <div class="ornament-line"></div>
+      <div class="ornament-diamond">◆ ◆ ◆</div>
+      <div class="ornament-line right"></div>
+    </div>
+
+    <h1>Anna Lindström</h1>
+    <div class="title">Systemutvecklare</div>
+
+    <div class="header-ornament-bottom">
+      <div class="ornament-line"></div>
+      <div class="ornament-diamond">◆</div>
+      <div class="ornament-line right"></div>
+    </div>
+
+    <div class="contact-row">
+      <span class="contact-item">anna@email.com</span>
+      <span class="contact-item">+46 70 123 45 67</span>
+      <span class="contact-item">Uppsala</span>
+      <span class="contact-item">linkedin.com/in/annalindstrom</span>
+      <span class="contact-item">github.com/annalindstrom</span>
+    </div>
+  </div>
+
+  <div class="gold-divider">
+    <div class="gold-divider-line"></div>
+    <div class="gold-divider-ornament">◆ ◆ ◆</div>
+    <div class="gold-divider-line"></div>
+  </div>
+
+  <div class="body-content">
+
+    <div class="section">
+      <div class="section-title">
+        <span class="section-gold-accent">◆</span>
+        <span class="section-title-text">Professionell Profil</span>
+      </div>
+      <div class="summary-box">
+        <p class="summary-text">Engagerad systemutvecklare med 4+ års erfarenhet av fullstack-utveckling. Specialiserad i Python, React och molnarkitektur. Drivs av att bygga skalbara, vältestad mjukvara och samarbeta i tvärfunktionella team för att leverera verklig och mätbar affärsnytta.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span class="section-gold-accent">◆</span>
+        <span class="section-title-text">Yrkeserfarenhet</span>
+      </div>
+
+      <div class="exp-item">
+        <div class="exp-header">
+          <div class="exp-title">Senior Systemutvecklare</div>
+          <div class="exp-date">2022 – Nu</div>
+        </div>
+        <div class="exp-company">TechCorp AB, Stockholm</div>
+        <ul class="exp-bullets">
+          <li>Ledde design och implementation av microservices-arkitektur för affärskritiska system</li>
+          <li>Förbättrade systemprestanda med 40% genom strategisk databasoptimering och cachning</li>
+          <li>Mentorerade juniorutvecklare och bidrog till teknisk roadmap och arkitekturbeslut</li>
+        </ul>
+      </div>
+
+      <div class="exp-item">
+        <div class="exp-header">
+          <div class="exp-title">Systemutvecklare</div>
+          <div class="exp-date">2020 – 2022</div>
+        </div>
+        <div class="exp-company">Startupbolaget AB, Uppsala</div>
+        <ul class="exp-bullets">
+          <li>Byggde React-baserad frontend för SaaS-produkt med tusentals aktiva användare</li>
+          <li>Implementerade och underhöll CI/CD-pipeline med GitHub Actions och Docker</li>
+          <li>Tät samverkan med produktteam och UX-designers i agila sprintar</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span class="section-gold-accent">◆</span>
+        <span class="section-title-text">Utbildning</span>
+      </div>
+      <div class="edu-item">
+        <div>
+          <div class="edu-degree">Kandidatexamen i Datateknik</div>
+          <div class="edu-school">Uppsala Universitet</div>
+        </div>
+        <div class="edu-date">2016 – 2020</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span class="section-gold-accent">◆</span>
+        <span class="section-title-text">Tekniska Kompetenser</span>
+      </div>
+      <div class="skills-grid">
+        <span class="skill-tag">Python</span>
+        <span class="skill-tag">JavaScript</span>
+        <span class="skill-tag">React</span>
+        <span class="skill-tag">Node.js</span>
+        <span class="skill-tag">SQL</span>
+        <span class="skill-tag">Docker</span>
+        <span class="skill-tag">AWS</span>
+        <span class="skill-tag">Git</span>
+        <span class="skill-tag">Linux</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        <span class="section-gold-accent">◆</span>
+        <span class="section-title-text">Språkkunskaper</span>
+      </div>
+      <div class="lang-row">
+        <div class="lang-item">
+          <span class="lang-diamond">◆</span>
+          <span class="lang-name">Svenska</span>
+          <span class="lang-sep">|</span>
+          <span class="lang-level">Modersmål</span>
+        </div>
+        <div class="lang-item">
+          <span class="lang-diamond">◆</span>
+          <span class="lang-name">Engelska</span>
+          <span class="lang-sep">|</span>
+          <span class="lang-level">Flytande</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-ornament">
+      <div class="footer-ornament-line"></div>
+      ◆ ◆ ◆
+      <div class="footer-ornament-line"></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

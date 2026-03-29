@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Personligt Brev — ApplyMind AI{% endblock %}
+{% block page_title %}Personligt Brev{% endblock %}
+
+{% block content %}
+<form action="/cover-letter/save" method="POST">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 text-green">
+      <i class="bi bi-file-earmark-text me-2"></i>Personligt brev-editor
+    </h5>
+    <div class="d-flex gap-2">
+      <a href="/cover-letter/templates" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-palette me-1"></i>Välj design
+      </a>
+      <button type="submit" class="btn btn-green">
+        <i class="bi bi-floppy me-2"></i>Spara
+      </button>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Left: Template letter -->
+    <div class="col-lg-6">
+      <div class="form-section h-100">
+        <div class="form-section-title">
+          <i class="bi bi-file-earmark-text"></i>
+          Brevmall (används av AI som grund)
+        </div>
+        <p class="text-muted small mb-3">
+          Det här brevet används som stilmall av AI:n. Den anpassar det sedan
+          automatiskt till varje specifikt jobb.
+        </p>
+        <textarea name="content" class="form-control" rows="22"
+          placeholder="Skriv ditt personliga brev här...&#10;&#10;AI:n kommer anpassa det till varje enskilt jobb.">{{ content }}</textarea>
+      </div>
+    </div>
+
+    <!-- Right: AI profile -->
+    <div class="col-lg-6">
+      <div class="form-section h-100">
+        <div class="form-section-title">
+          <i class="bi bi-robot"></i>
+          AI-profil (vad AI:n vet om dig)
+        </div>
+        <p class="text-muted small mb-3">
+          Den här texten ger AI:n djupare förståelse för vem du är, dina styrkor
+          och vad du söker. Ju mer detaljerad, desto bättre och mer personliga brev.
+        </p>
+        <textarea name="profile" class="form-control" rows="22"
+          placeholder="Beskriv dig själv noggrant:&#10;- Din bakgrund&#10;- Dina styrkor&#10;- Vad du söker i ett jobb&#10;- Dina ambitioner&#10;- Vad som motiverar dig...">{{ profile }}</textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tips -->
+  <div class="card mt-3">
+    <div class="card-body">
+      <h6 class="text-green mb-2"><i class="bi bi-lightbulb me-2"></i>Tips för bättre personliga brev</h6>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <div class="d-flex gap-2 align-items-start">
+            <i class="bi bi-check-circle-fill text-green mt-1 flex-shrink-0"></i>
+            <small class="text-muted">Skriv brevet på <strong class="text-white">svenska</strong> för svenska jobb — AI:n matchar automatiskt språket.</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="d-flex gap-2 align-items-start">
+            <i class="bi bi-check-circle-fill text-green mt-1 flex-shrink-0"></i>
+            <small class="text-muted">Nämn dina <strong class="text-white">specifika tekniker</strong> (t.ex. Python, .NET, Linux) i AI-profilen.</small>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="d-flex gap-2 align-items-start">
+            <i class="bi bi-check-circle-fill text-green mt-1 flex-shrink-0"></i>
+            <small class="text-muted">Beskriv <strong class="text-white">varför</strong> du söker jobbet, inte bara vad du kan göra.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end mt-3 mb-4">
+    <button type="submit" class="btn btn-green btn-lg">
+      <i class="bi bi-floppy me-2"></i>Spara personligt brev
+    </button>
+  </div>
+
+</form>
+{% endblock %}

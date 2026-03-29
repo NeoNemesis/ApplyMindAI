@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV – Anna Lindström</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: #ffffff;
+    color: #1a1a1a;
+    font-size: 13px;
+    line-height: 1.6;
+    width: 794px;
+    min-height: 1123px;
+    margin: 0 auto;
+  }
+
+  .cv-wrapper {
+    width: 794px;
+    min-height: 1123px;
+    background: #ffffff;
+    padding: 0 0 48px 0;
+  }
+
+  /* TOP HEADER */
+  .header {
+    background: linear-gradient(135deg, #7C3AED 0%, #5b21b6 100%);
+    padding: 36px 52px;
+    color: #ffffff;
+    margin-bottom: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    bottom: -60px;
+    right: 80px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+  }
+
+  .header-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+  }
+
+  .header h1 {
+    font-size: 30px;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+
+  .header .title {
+    font-size: 13px;
+    color: #d8b4fe;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  .header-contact {
+    text-align: right;
+  }
+
+  .header-contact div {
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 4px;
+    font-weight: 400;
+  }
+
+  /* BODY */
+  .body-content {
+    padding: 0 52px;
+  }
+
+  /* Section title */
+  .section-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #7C3AED;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title .title-line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(to right, #7C3AED, transparent);
+    border-radius: 1px;
+  }
+
+  .section {
+    margin-bottom: 30px;
+  }
+
+  /* Summary */
+  .summary-card {
+    background: #faf5ff;
+    border-radius: 8px;
+    padding: 16px 20px;
+    border-left: 4px solid #7C3AED;
+  }
+
+  .summary-text {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.75;
+  }
+
+  /* TIMELINE */
+  .timeline {
+    position: relative;
+    padding-left: 0;
+  }
+
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 80px 28px 1fr;
+    gap: 0 0;
+    margin-bottom: 20px;
+    align-items: stretch;
+    min-height: 70px;
+  }
+
+  .timeline-item:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Year label column */
+  .timeline-year {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-right: 8px;
+    padding-top: 4px;
+  }
+
+  .year-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #7C3AED;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.1;
+    flex-shrink: 0;
+  }
+
+  /* Line column */
+  .timeline-line-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 52px;
+  }
+
+  .timeline-line {
+    flex: 1;
+    width: 2px;
+    background: linear-gradient(to bottom, #a78bfa, transparent);
+    border-radius: 1px;
+  }
+
+  /* Card column */
+  .timeline-card {
+    background: #ffffff;
+    box-shadow: 0 2px 12px rgba(124,58,237,0.1);
+    border-radius: 8px;
+    padding: 14px 18px;
+    border: 1px solid #ede9fe;
+    margin-left: 12px;
+  }
+
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2px;
+  }
+
+  .exp-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .exp-badge {
+    background: #ede9fe;
+    color: #7C3AED;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .exp-company {
+    font-size: 11px;
+    color: #7C3AED;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .exp-desc {
+    font-size: 11.5px;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+
+  /* Education */
+  .edu-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #faf5ff;
+    border-radius: 8px;
+    padding: 14px 20px;
+    border: 1px solid #ede9fe;
+  }
+
+  .edu-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #7C3AED;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .edu-degree {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .edu-school {
+    font-size: 12px;
+    color: #7C3AED;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  .edu-date {
+    margin-left: auto;
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 600;
+  }
+
+  /* Two column */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  /* Skills */
+  .skills-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .skill-tag {
+    background: #ede9fe;
+    color: #7C3AED;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+
+  /* Languages */
+  .lang-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 12.5px;
+  }
+
+  .lang-item:last-child { border-bottom: none; }
+  .lang-name { font-weight: 700; color: #1f2937; }
+  .lang-level { color: #9ca3af; }
+
+  @media print {
+    body { margin: 0; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .timeline-card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <h1>Anna Lindström</h1>
+        <div class="title">Systemutvecklare</div>
+      </div>
+      <div class="header-contact">
+        <div>anna@email.com</div>
+        <div>+46 70 123 45 67</div>
+        <div>Uppsala</div>
+        <div>linkedin.com/in/annalindstrom</div>
+        <div>github.com/annalindstrom</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body-content">
+
+    <div class="section">
+      <div class="section-title">Om mig <div class="title-line"></div></div>
+      <div class="summary-card">
+        <p class="summary-text">Engagerad systemutvecklare med 4+ års erfarenhet av fullstack-utveckling. Specialiserad i Python, React och molnarkitektur. Brinner för skalbar, vältestad mjukvara och tvärfunktionellt teamarbete för att leverera reell affärsnytta.</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Erfarenhet <div class="title-line"></div></div>
+      <div class="timeline">
+
+        <div class="timeline-item">
+          <div class="timeline-year">
+            <div class="year-circle">2022<br>Nu</div>
+          </div>
+          <div class="timeline-line-col">
+            <div class="timeline-line"></div>
+          </div>
+          <div class="timeline-card">
+            <div class="exp-header">
+              <div class="exp-title">Senior Systemutvecklare</div>
+              <div class="exp-badge">2022 – Nu</div>
+            </div>
+            <div class="exp-company">TechCorp AB</div>
+            <div class="exp-desc">Ledde implementation av microservices-arkitektur. Förbättrade systemprestanda med 40% via databasoptimering. Mentorerade juniorutvecklare och drev teknisk roadmap.</div>
+          </div>
+        </div>
+
+        <div class="timeline-item">
+          <div class="timeline-year">
+            <div class="year-circle">2020<br>2022</div>
+          </div>
+          <div class="timeline-line-col">
+            <div class="timeline-line"></div>
+          </div>
+          <div class="timeline-card">
+            <div class="exp-header">
+              <div class="exp-title">Systemutvecklare</div>
+              <div class="exp-badge">2020 – 2022</div>
+            </div>
+            <div class="exp-company">Startupbolaget AB</div>
+            <div class="exp-desc">Byggde React-frontend för SaaS-produkt. Implementerade CI/CD-pipeline med GitHub Actions och Docker. Agilt samarbete med produktteam och designers.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Utbildning <div class="title-line"></div></div>
+      <div class="edu-card">
+        <div class="edu-icon">🎓</div>
+        <div>
+          <div class="edu-degree">Kandidatexamen i Datateknik</div>
+          <div class="edu-school">Uppsala Universitet</div>
+        </div>
+        <div class="edu-date">2016 – 2020</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="section">
+        <div class="section-title">Kompetenser <div class="title-line"></div></div>
+        <div class="skills-wrap">
+          <span class="skill-tag">Python</span>
+          <span class="skill-tag">JavaScript</span>
+          <span class="skill-tag">React</span>
+          <span class="skill-tag">Node.js</span>
+          <span class="skill-tag">SQL</span>
+          <span class="skill-tag">Docker</span>
+          <span class="skill-tag">AWS</span>
+          <span class="skill-tag">Git</span>
+          <span class="skill-tag">Linux</span>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-title">Språk <div class="title-line"></div></div>
+        <div class="lang-item">
+          <span class="lang-name">Svenska</span>
+          <span class="lang-level">Modersmål</span>
+        </div>
+        <div class="lang-item">
+          <span class="lang-name">Engelska</span>
+          <span class="lang-level">Flytande</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

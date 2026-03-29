@@ -166,15 +166,15 @@ class TheHubScraper(JobScraperBase):
             requests.Timeout: If request exceeds 10-second timeout
             requests.RequestException: For other HTTP errors
         """
-        try:
-            # SSRF Protection: Validate URL before scraping
-            SecurityValidator.validate_job_url(job_url)
+        # SSRF Protection: Validate URL before scraping (outside try to preserve error message)
+        SecurityValidator.validate_job_url(job_url)
 
+        try:
             # ✅ FIX #1: Add timeout to prevent infinite hangs
             # Framework Rule: requests library best practice - always set timeout
             # Impact: Prevents application hang on slow/unresponsive servers
             response = requests.get(job_url, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.text, 'html.parser')
 
             # Extract job details with proper None handling (Python idiom)
             title_elem = soup.find('h1', class_='job-title')
@@ -189,19 +189,22 @@ class TheHubScraper(JobScraperBase):
             description_elem = soup.find('div', class_='job-description')
             description = description_elem.text.strip() if description_elem else "N/A"
 
+            requirements_elem = soup.find('div', class_='job-requirements')
+            requirements = requirements_elem.text.strip() if requirements_elem else ""
+
             return JobListing(
                 title=title,
                 company=company,
                 location=location,
                 description=description,
-                requirements="",
+                requirements=requirements,
                 url=job_url,
                 platform=self.platform_name
             )
 
         except requests.Timeout as e:
             logger.error(f"Request timeout (10s) scraping TheHub job {job_url}: {e}")
-            raise ValueError(f"Job page failed to load within timeout: {job_url}") from e
+            raise ValueError(f"Job page timed out after 10 seconds: {job_url}") from e
         except requests.RequestException as e:
             logger.error(f"HTTP error scraping TheHub job {job_url}: {e}")
             raise ValueError(f"Failed to fetch job page: {job_url}") from e
@@ -230,41 +233,53 @@ class ArbetsformedlingenScraper(JobScraperBase):
             requests.Timeout: If request exceeds 10-second timeout
             requests.RequestException: For other HTTP errors
         """
-        try:
-            # SSRF Protection: Validate URL before scraping
-            SecurityValidator.validate_job_url(job_url)
+        # SSRF Protection: Validate URL before scraping (outside try to preserve error message)
+        SecurityValidator.validate_job_url(job_url)
 
+        try:
             # ✅ FIX #1: Add timeout to prevent infinite hangs
             # Framework Rule: requests library best practice - always set timeout
             # Impact: Prevents application hang on slow/unresponsive servers
             response = requests.get(job_url, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
+            soup = BeautifulSoup(response.text, 'html.parser')
 
             # Extract title with proper None handling (Python idiom)
-            title_elem = soup.find('h1')
+            title_elem = soup.find('h1', class_='job-title') or soup.find('h1')
             title = title_elem.text.strip() if title_elem else "N/A"
-            company = soup.find('p', string=lambda text: text and 'Arbetsgivare:' in text)
-            company = company.text.replace('Arbetsgivare:', '').strip() if company else "N/A"
 
-            location = soup.find('p', string=lambda text: text and 'Ort:' in text)
-            location = location.text.replace('Ort:', '').strip() if location else "N/A"
+            company_elem = soup.find('div', class_='company-name')
+            if company_elem:
+                company = company_elem.text.strip()
+            else:
+                company_p = soup.find('p', string=lambda text: text and 'Arbetsgivare:' in text)
+                company = company_p.text.replace('Arbetsgivare:', '').strip() if company_p else "N/A"
+
+            location_elem = soup.find('div', class_='job-location')
+            if location_elem:
+                location = location_elem.text.strip()
+            else:
+                location_p = soup.find('p', string=lambda text: text and 'Ort:' in text)
+                location = location_p.text.replace('Ort:', '').strip() if location_p else "N/A"
 
             description_div = soup.find('div', class_='job-description') or soup.find('div', {'id': 'job-description'})
             description = description_div.text.strip() if description_div else "N/A"
+
+            requirements_elem = soup.find('div', class_='job-requirements')
+            requirements = requirements_elem.text.strip() if requirements_elem else ""
 
             return JobListing(
                 title=title,
                 company=company,
                 location=location,
                 description=description,
-                requirements="",
+                requirements=requirements,
                 url=job_url,
                 platform=self.platform_name
             )
 
         except requests.Timeout as e:
             logger.error(f"Request timeout (10s) scraping Arbetsförmedlingen job {job_url}: {e}")
-            raise ValueError(f"Job page failed to load within timeout: {job_url}") from e
+            raise ValueError(f"Job page timed out after 10 seconds: {job_url}") from e
         except requests.RequestException as e:
             logger.error(f"HTTP error scraping Arbetsförmedlingen job {job_url}: {e}")
             raise ValueError(f"Failed to fetch job page: {job_url}") from e

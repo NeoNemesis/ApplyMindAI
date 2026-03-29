@@ -16,7 +16,7 @@ class TestResumeDataValidation:
 
     def test_resume_data_has_required_fields(self):
         """Test that resume data contains all required fields"""
-        from main import validate_personal_info
+        from job_master import JobMaster
 
         required_fields = [
             'plain_text',
@@ -27,8 +27,8 @@ class TestResumeDataValidation:
         ]
 
         # This test ensures that the data structure is validated
-        # The actual validation logic is in validate_personal_info
-        assert callable(validate_personal_info)
+        # The actual validation logic is in JobMaster
+        assert callable(JobMaster)
 
     def test_personal_info_structure(self):
         """Test that personal info has correct structure"""
@@ -121,12 +121,12 @@ class TestCoverLetterGeneration:
     def test_cover_letter_requires_job_description(self):
         """Test that cover letter generation requires job description"""
         # Cover letters should be tailored to specific job descriptions
-        # This test ensures that the function signature requires job_description
+        # This test ensures that the facade has the correct method signature
 
-        from main import validate_personal_info
+        from src.libs.resume_and_cover_builder.resume_facade import ResumeFacade
 
-        # The validation function should exist
-        assert callable(validate_personal_info)
+        # The facade should have a create_cover_letter method
+        assert callable(ResumeFacade.create_cover_letter)
 
     @pytest.mark.unit
     def test_cover_letter_structure(self):

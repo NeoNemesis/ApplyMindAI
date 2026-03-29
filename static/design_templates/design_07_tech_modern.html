@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV – Anna Lindström</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fira Code', 'Courier New', monospace;
+    background: #0a0e27;
+    color: #c8d0e7;
+    font-size: 12px;
+    line-height: 1.6;
+    width: 794px;
+    min-height: 1123px;
+    margin: 0 auto;
+  }
+
+  .cv-wrapper {
+    width: 794px;
+    min-height: 1123px;
+    background: #0a0e27;
+    padding: 48px 52px 48px 52px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Background grid decoration */
+  .cv-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 36px;
+    position: relative;
+  }
+
+  .header-prompt {
+    font-size: 11px;
+    color: #555e7a;
+    margin-bottom: 4px;
+  }
+
+  .header h1 {
+    font-size: 30px;
+    font-weight: 700;
+    color: #00FF41;
+    letter-spacing: 1px;
+    text-shadow: 0 0 20px rgba(0,255,65,0.4);
+    margin-bottom: 4px;
+  }
+
+  .header .title {
+    font-size: 13px;
+    color: #7ee787;
+    font-weight: 400;
+    margin-bottom: 16px;
+  }
+
+  .header-divider {
+    font-size: 10px;
+    color: #00FF41;
+    opacity: 0.4;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+  }
+
+  .contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 0;
+    font-size: 11px;
+    color: #7d8ab0;
+  }
+
+  .contact-item {
+    color: #8be9fd;
+  }
+
+  .contact-sep {
+    color: #555e7a;
+    margin: 0 8px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 26px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #00FF41;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  .section-title .comment {
+    color: #555e7a;
+    font-weight: 400;
+  }
+
+  /* Summary */
+  .summary-box {
+    background: #0d1130;
+    border: 1px solid #1a2040;
+    border-left: 3px solid #00FF41;
+    padding: 14px 16px;
+  }
+
+  .summary-comment {
+    color: #555e7a;
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .summary-text {
+    color: #a8b4cf;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  /* Experience */
+  .exp-item {
+    background: #0d1130;
+    border: 1px solid #1a2040;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .exp-item::before {
+    content: '▶';
+    position: absolute;
+    left: -16px;
+    top: 14px;
+    color: #00FF41;
+    font-size: 8px;
+    opacity: 0.5;
+  }
+
+  .exp-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .exp-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8f8f2;
+  }
+
+  .exp-date {
+    font-size: 11px;
+    color: #00FF41;
+    opacity: 0.7;
+  }
+
+  .exp-company {
+    font-size: 11px;
+    color: #8be9fd;
+    margin-bottom: 6px;
+  }
+
+  .exp-desc {
+    font-size: 11px;
+    color: #7d8ab0;
+    line-height: 1.65;
+  }
+
+  /* Skills - code tags */
+  .skills-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .skill-tag {
+    background: transparent;
+    border: 1px solid #00FF41;
+    color: #00FF41;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 8px;
+    font-family: 'Fira Code', monospace;
+    opacity: 0.85;
+  }
+
+  .skill-tag::before {
+    content: '<';
+    color: #555e7a;
+    margin-right: 1px;
+  }
+
+  .skill-tag::after {
+    content: '>';
+    color: #555e7a;
+    margin-left: 1px;
+  }
+
+  /* Two columns */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  /* Education */
+  .edu-item {
+    background: #0d1130;
+    border: 1px solid #1a2040;
+    border-left: 3px solid #8be9fd;
+    padding: 12px 16px;
+  }
+
+  .edu-degree {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f8f8f2;
+    margin-bottom: 2px;
+  }
+
+  .edu-school {
+    font-size: 11px;
+    color: #8be9fd;
+    margin-bottom: 2px;
+  }
+
+  .edu-date {
+    font-size: 10px;
+    color: #555e7a;
+  }
+
+  /* Languages */
+  .lang-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+
+  .lang-arrow {
+    color: #00FF41;
+    opacity: 0.6;
+  }
+
+  .lang-name {
+    color: #f8f8f2;
+    font-weight: 600;
+  }
+
+  .lang-level {
+    color: #7d8ab0;
+  }
+
+  @media print {
+    body { background: #0a0e27; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cv-wrapper { padding: 40px 48px; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  <div class="header">
+    <div class="header-prompt">$ cat ./anna_lindstrom_cv.json</div>
+    <h1>Anna Lindström</h1>
+    <div class="title">// Systemutvecklare · Fullstack · Cloud</div>
+    <div class="header-divider">───────────────────────────────────────────────────────────</div>
+    <div class="contact-row">
+      <span class="contact-item">anna@email.com</span>
+      <span class="contact-sep">|</span>
+      <span class="contact-item">+46 70 123 45 67</span>
+      <span class="contact-sep">|</span>
+      <span class="contact-item">Uppsala</span>
+      <span class="contact-sep">|</span>
+      <span class="contact-item">linkedin.com/in/annalindstrom</span>
+      <span class="contact-sep">|</span>
+      <span class="contact-item">github.com/annalindstrom</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">// SUMMARY</div>
+    <div class="summary-box">
+      <div class="summary-comment">/* Professional Profile */</div>
+      <div class="summary-text">Engagerad systemutvecklare med 4+ års erfarenhet av fullstack-utveckling. Specialiserad i Python, React och molnarkitektur. Drivs av att bygga skalbara, vältestad mjukvara och leverera affärsnytta i moderna teknologiorganisationer.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">// EXPERIENCE</div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Senior Systemutvecklare</div>
+        <div class="exp-date">2022 – Nu</div>
+      </div>
+      <div class="exp-company">function work() { return "TechCorp AB"; }</div>
+      <div class="exp-desc">Ledde implementation av microservices-arkitektur. Förbättrade systemprestanda med 40% via databasoptimering och cachning. Mentorerade juniorutvecklare och bidrog till teknisk roadmap.</div>
+    </div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Systemutvecklare</div>
+        <div class="exp-date">2020 – 2022</div>
+      </div>
+      <div class="exp-company">function work() { return "Startupbolaget AB"; }</div>
+      <div class="exp-desc">Byggde React-frontend för SaaS-produkt. Implementerade CI/CD-pipeline med GitHub Actions och Docker. Agilt samarbete med produktteam och designers.</div>
+    </div>
+
+  </div>
+
+  <div class="two-col">
+    <div>
+      <div class="section">
+        <div class="section-title">// EDUCATION</div>
+        <div class="edu-item">
+          <div class="edu-degree">Kandidatexamen, Datateknik</div>
+          <div class="edu-school">Uppsala Universitet</div>
+          <div class="edu-date">2016 – 2020</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">// LANGUAGES</div>
+        <div class="lang-item">
+          <span class="lang-arrow">=></span>
+          <span class="lang-name">Svenska</span>
+          <span class="lang-level">// modersmål</span>
+        </div>
+        <div class="lang-item">
+          <span class="lang-arrow">=></span>
+          <span class="lang-name">Engelska</span>
+          <span class="lang-level">// flytande</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section">
+        <div class="section-title">// STACK</div>
+        <div class="skills-wrap">
+          <span class="skill-tag">Python</span>
+          <span class="skill-tag">JavaScript</span>
+          <span class="skill-tag">React</span>
+          <span class="skill-tag">Node.js</span>
+          <span class="skill-tag">SQL</span>
+          <span class="skill-tag">Docker</span>
+          <span class="skill-tag">AWS</span>
+          <span class="skill-tag">Git</span>
+          <span class="skill-tag">Linux</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: #fff;
+    color: #1a1a1a;
+    font-size: 10.5pt;
+    line-height: 1.6;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 18mm 20mm 20mm 20mm;
+    position: relative;
+  }
+
+  /* ── Accent bar ── */
+  .accent-bar {
+    position: absolute;
+    top: 0; left: 0;
+    width: 6px;
+    height: 100%;
+    background: linear-gradient(180deg, #4AE54A 0%, #1de9b6 100%);
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #4AE54A;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+  }
+
+  .sender-name {
+    font-size: 20pt;
+    font-weight: 700;
+    color: #111;
+    letter-spacing: -0.3px;
+  }
+
+  .sender-title {
+    font-size: 10pt;
+    color: #555;
+    margin-top: 3px;
+    font-weight: 500;
+  }
+
+  .contact-block {
+    text-align: right;
+    font-size: 8.5pt;
+    color: #555;
+    line-height: 1.7;
+  }
+
+  .contact-block a { color: #4AE54A; text-decoration: none; }
+
+  /* ── Meta ── */
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    font-size: 9pt;
+    color: #666;
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: #4AE54A;
+    margin-bottom: 6px;
+  }
+
+  /* ── Problem box ── */
+  .problem-box {
+    background: #f5f5f5;
+    border-left: 4px solid #4AE54A;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .problem-box p { font-size: 10pt; color: #333; }
+
+  /* ── Body paragraphs ── */
+  p {
+    margin-bottom: 12px;
+    color: #2a2a2a;
+  }
+
+  /* ── Achievements row ── */
+  .achievements {
+    display: flex;
+    gap: 12px;
+    margin: 14px 0;
+  }
+
+  .achievement-pill {
+    background: #f0fdf0;
+    border: 1px solid #4AE54A;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 9pt;
+    color: #1a1a1a;
+    font-weight: 500;
+  }
+
+  /* ── Closing ── */
+  .closing {
+    margin-top: 22px;
+  }
+
+  .signature-name {
+    font-size: 13pt;
+    font-weight: 700;
+    margin-top: 18px;
+    color: #111;
+  }
+
+  .footer-strip {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #4AE54A 0%, #1de9b6 100%);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="accent-bar"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="sender-name">{{CANDIDATE_NAME}}</div>
+      <div class="sender-title">{{CANDIDATE_TITLE}}</div>
+    </div>
+    <div class="contact-block">
+      {{CANDIDATE_EMAIL}}<br>
+      {{CANDIDATE_PHONE}}<br>
+      {{CANDIDATE_LOCATION}}<br>
+      <a href="{{CANDIDATE_LINKEDIN}}">LinkedIn</a>
+    </div>
+  </div>
+
+  <!-- Meta -->
+  <div class="meta-row">
+    <span>{{CITY}}, {{DATE}}</span>
+    <span>{{COMPANY_NAME}} · {{JOB_TITLE}}</span>
+  </div>
+
+  <!-- Problem section -->
+  <div class="section-label">Utmaningen jag ser</div>
+  <div class="problem-box">
+    <p>{{COMPANY_CHALLENGE}}</p>
+  </div>
+
+  <!-- Greeting -->
+  <p>Hej,</p>
+
+  <!-- Solution -->
+  <div class="section-label">Min lösning</div>
+  <p>{{SOLUTION_PARAGRAPH}}</p>
+
+  <!-- Evidence / achievements -->
+  <div class="achievements">
+    <div class="achievement-pill">{{ACHIEVEMENT_1}}</div>
+    <div class="achievement-pill">{{ACHIEVEMENT_2}}</div>
+    <div class="achievement-pill">{{ACHIEVEMENT_3}}</div>
+  </div>
+
+  <p>{{QUALIFICATION_PARAGRAPH}}</p>
+
+  <!-- Why this company -->
+  <div class="section-label">Varför {{COMPANY_NAME}}</div>
+  <p>{{WHY_COMPANY_PARAGRAPH}}</p>
+
+  <!-- Closing -->
+  <div class="closing">
+    <p>Jag ser fram emot möjligheten att diskutera hur mina erfarenheter kan bidra till {{COMPANY_NAME}}:s fortsatta tillväxt.</p>
+    <p>Med vänliga hälsningar,</p>
+    <div class="signature-name">{{CANDIDATE_NAME}}</div>
+  </div>
+
+  <div class="footer-strip"></div>
+</div>
+</body>
+</html>

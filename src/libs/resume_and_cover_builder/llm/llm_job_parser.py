@@ -7,6 +7,7 @@ from src.libs.resume_and_cover_builder.utils import LoggerChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_openai import ChatOpenAI
+from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
@@ -34,11 +35,7 @@ logger.add(log_path / "gpt_resume.log", rotation="1 day", compression="zip", ret
 
 class LLMParser:
     def __init__(self, openai_api_key):
-        self.llm = LoggerChatModel(
-            ChatOpenAI(
-                model_name="gpt-4o-mini", openai_api_key=openai_api_key, temperature=0.4, timeout=60
-            )
-        )
+        self.llm = get_llm(temperature=0.4, timeout=60)
         self.llm_embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)  # Initialize embeddings
         self.vectorstore = None  # Will be initialized after document loading
 

@@ -65,12 +65,12 @@ class EmailSender:
             if 'password' in config:
                 raise ValueError(
                     "❌ SECURITY VIOLATION: Password found in YAML file!\n\n"
-                    "Passwords must ONLY be set via the JOBCRAFT_SMTP_PASSWORD environment variable.\n"
+                    "Passwords must ONLY be set via the APPLYMIND_SMTP_PASSWORD environment variable.\n"
                     "Remove the 'password' field from your YAML file immediately!\n\n"
                     "To set the environment variable:\n"
-                    "  Windows (PowerShell): $env:JOBCRAFT_SMTP_PASSWORD = 'your-password'\n"
-                    "  Windows (CMD):        set JOBCRAFT_SMTP_PASSWORD=your-password\n"
-                    "  Linux/Mac:            export JOBCRAFT_SMTP_PASSWORD='your-password'\n\n"
+                    "  Windows (PowerShell): $env:APPLYMIND_SMTP_PASSWORD = 'your-password'\n"
+                    "  Windows (CMD):        set APPLYMIND_SMTP_PASSWORD=your-password\n"
+                    "  Linux/Mac:            export APPLYMIND_SMTP_PASSWORD='your-password'\n\n"
                     "This security measure protects your credentials from being committed to Git."
                 )
 
@@ -83,15 +83,15 @@ class EmailSender:
                 else:
                     raise ValueError(
                         "❌ SMTP password not found in environment variable!\n\n"
-                        "Set JOBCRAFT_SMTP_PASSWORD environment variable:\n"
-                        "  Windows (PowerShell): $env:JOBCRAFT_SMTP_PASSWORD = 'your-password'\n"
-                        "  Windows (CMD):        set JOBCRAFT_SMTP_PASSWORD=your-password\n"
-                        "  Linux/Mac:            export JOBCRAFT_SMTP_PASSWORD='your-password'\n\n"
+                        "Set APPLYMIND_SMTP_PASSWORD environment variable:\n"
+                        "  Windows (PowerShell): $env:APPLYMIND_SMTP_PASSWORD = 'your-password'\n"
+                        "  Windows (CMD):        set APPLYMIND_SMTP_PASSWORD=your-password\n"
+                        "  Linux/Mac:            export APPLYMIND_SMTP_PASSWORD='your-password'\n\n"
                         "NEVER store passwords in YAML files - they will be committed to Git!"
                     )
             else:
                 # Fallback if SecurePasswordManager not available
-                env_password = os.environ.get('JOBCRAFT_SMTP_PASSWORD')
+                env_password = os.environ.get('APPLYMIND_SMTP_PASSWORD')
                 if env_password:
                     config['password'] = env_password
                     logger.info("✅ SMTP password loaded from environment variable (basic fallback)")
@@ -99,7 +99,7 @@ class EmailSender:
                     raise ValueError(
                         "❌ SMTP password not found!\n\n"
                         "Security utilities not available and no environment variable set.\n"
-                        "Set JOBCRAFT_SMTP_PASSWORD environment variable or install security_utils module."
+                        "Set APPLYMIND_SMTP_PASSWORD environment variable or install security_utils module."
                     )
 
             # Validate email format
@@ -331,7 +331,7 @@ def create_email_template_config():
     Create a template email configuration file.
 
     SECURITY NOTE: This template NO LONGER includes a password field.
-    Passwords MUST be set via environment variable JOBCRAFT_SMTP_PASSWORD.
+    Passwords MUST be set via environment variable APPLYMIND_SMTP_PASSWORD.
     """
     template_config = {
         'smtp_server': 'smtp.gmail.com',  # För Gmail
@@ -340,7 +340,7 @@ def create_email_template_config():
         'sender_name': 'Ditt Fullständiga Namn',
         'signature': 'Med vänliga hälsningar,\nDitt Namn\nTelefon: +46 70 123 45 67'
         # ✅ SECURITY FIX: Password field removed from template
-        # Passwords MUST be set via environment variable JOBCRAFT_SMTP_PASSWORD
+        # Passwords MUST be set via environment variable APPLYMIND_SMTP_PASSWORD
     }
 
     config_path = Path('data_folder/email_config.yaml')
@@ -351,9 +351,9 @@ def create_email_template_config():
         file.write('# SECURITY: DO NOT ADD PASSWORD TO THIS FILE!\n')
         file.write('# ============================================\n')
         file.write('# Set SMTP password via environment variable:\n')
-        file.write('#   Windows (PowerShell): $env:JOBCRAFT_SMTP_PASSWORD = "your-password"\n')
-        file.write('#   Windows (CMD):        set JOBCRAFT_SMTP_PASSWORD=your-password\n')
-        file.write('#   Linux/Mac:            export JOBCRAFT_SMTP_PASSWORD="your-password"\n')
+        file.write('#   Windows (PowerShell): $env:APPLYMIND_SMTP_PASSWORD = "your-password"\n')
+        file.write('#   Windows (CMD):        set APPLYMIND_SMTP_PASSWORD=your-password\n')
+        file.write('#   Linux/Mac:            export APPLYMIND_SMTP_PASSWORD="your-password"\n')
         file.write('# ============================================\n')
 
     print(f"Email configuration template created at: {config_path}")
@@ -362,9 +362,9 @@ def create_email_template_config():
     print("="*60)
     print("DO NOT add 'password' field to this YAML file!")
     print("Set SMTP password via environment variable:")
-    print("  Windows (PowerShell): $env:JOBCRAFT_SMTP_PASSWORD = 'your-password'")
-    print("  Windows (CMD):        set JOBCRAFT_SMTP_PASSWORD=your-password")
-    print("  Linux/Mac:            export JOBCRAFT_SMTP_PASSWORD='your-password'")
+    print("  Windows (PowerShell): $env:APPLYMIND_SMTP_PASSWORD = 'your-password'")
+    print("  Windows (CMD):        set APPLYMIND_SMTP_PASSWORD=your-password")
+    print("  Linux/Mac:            export APPLYMIND_SMTP_PASSWORD='your-password'")
     print("="*60)
     return config_path
 

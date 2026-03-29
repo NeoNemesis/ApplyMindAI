@@ -1,17 +1,22 @@
-# JobpowercraftAI
+# ApplyMind AI
 
-**AI-powered job application automation** — search multiple job boards, and generate a tailored CV and cover letter for every position, in minutes.
+**AI-powered job application assistant** — search Swedish job boards, score jobs against your profile, and generate tailored CVs and cover letters in minutes. Available as both a desktop app and a web interface.
 
 ---
 
 ## Features
 
-- **Multi-platform search** — LinkedIn, Indeed, Arbetsförmedlingen (and easy to extend)
-- **AI-tailored documents** — GPT-4o-mini rewrites your CV and cover letter to match each job description
-- **Modern PDF design** — clean, ATS-friendly layout generated with ReportLab
+- **Desktop app** — native window via pywebview + system tray icon (pystray)
+- **Web interface** — full Flask dashboard accessible in any browser
+- **Multi-platform job search** — Indeed, Arbetsförmedlingen, Jobtech API
+- **ATS scoring** — AI rates each job's match against your profile before generating documents
+- **AI-tailored documents** — GPT-4o rewrites your CV and cover letter per job description
+- **Dual design system** — Modern Design 1 (clean) and Modern Design 2 (bold) PDF layouts
 - **Duplicate detection** — never processes the same job twice
-- **Works in any language** — job ads and output documents match the language of the posting
-- **Single entry point** — just run `python run.py`
+- **Multi-language support** — output documents match the language of the job posting (Swedish/English)
+- **Job tracker** — Kanban-style board to track application status
+- **Letter templates** — reusable cover letter templates per industry/role
+- **Email notifications** — optional alerts when new jobs are found
 
 ---
 
@@ -21,7 +26,7 @@
 |---|---|
 | Python | 3.10+ |
 | Google Chrome | Latest |
-| OpenAI API key | Any tier |
+| OpenAI API key | Any tier (GPT-4o) |
 
 ---
 
@@ -52,132 +57,110 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Run the setup wizard
+### 4. Configure your profile
 
 ```bash
-python run.py
+# Copy example files
+cp data_folder_example/secrets.yaml.example data_folder/secrets.yaml
+cp data_folder_example/job_scraper_config.yaml data_folder/job_scraper_config.yaml
 ```
 
-The wizard will ask you for:
+Edit `data_folder/secrets.yaml` and add your OpenAI API key:
 
-1. **OpenAI API key** — get one at <https://platform.openai.com/api-keys>
-2. **Your resume** — fill in `data_folder/plain_text_resume.yaml` with your details
-3. **Job preferences** — edit `data_folder/work_preferences.yaml` to set positions, locations, and filters
-
-### 5. Start searching
-
-```bash
-python run.py
-# Choose option 1 — Search jobs
-```
-
-Documents are saved to `data_folder/output/job_master/`.
-
----
-
-## Configuration Files
-
-Both files are created automatically from templates during setup. They are excluded from git (`.gitignore`) so your personal data is never committed.
-
-### `data_folder/plain_text_resume.yaml`
-
-Your resume in structured YAML. Sections:
-- `personal_information` — name, contact, links
-- `professional_summary` — 2-3 sentence summary
-- `cover_letter_profile` — base text for cover letters
-- `education_details`, `experience_details` — your background
-- `projects`, `achievements`, `certifications`, `languages`, `technical_skills`
-- `legal_authorization`, `work_preferences`, `salary_expectations`
-
-Copy from the included template:
-```bash
-cp data_folder/plain_text_resume.example.yaml data_folder/plain_text_resume.yaml
-```
-
-### `data_folder/work_preferences.yaml`
-
-Controls what jobs are searched for:
 ```yaml
-remote: true
-hybrid: true
-onsite: true
-
-positions:
-  - "Software Engineer"
-  - "Backend Developer"
-
-locations:
-  - "Berlin"
-  - "Remote"
-
-experience_level:
-  entry: true
-  mid_senior_level: true
-
-company_blacklist:
-  - "CompanyToSkip"
-
-title_blacklist:
-  - "internship"
+openai_api_key: "sk-..."
 ```
 
-Copy from the included template:
+Edit `data_folder/job_scraper_config.yaml` with your job search preferences.
+
+### 5. Launch
+
+**Desktop app (recommended):**
 ```bash
-cp data_folder/work_preferences.example.yaml data_folder/work_preferences.yaml
+pythonw ApplyMindAI.pyw
 ```
 
----
-
-## Output Structure
-
-```
-data_folder/output/job_master/
-├── Job_001_CompanyName_JobTitle/
-│   ├── CV_CompanyName_JobTitle_Modern_Design_1.pdf
-│   ├── Cover_Letter_CompanyName_JobTitle_Modern_Design_1.pdf
-│   └── job_info.txt          ← application URL and instructions
-├── found_jobs.json
-└── processed_jobs.json       ← tracks already-processed jobs (no duplicates)
-```
-
----
-
-## Environment Variables
-
-Create a `.env` file in the project root (the setup wizard does this automatically):
-
-```env
-OPENAI_API_KEY=sk-...
-```
-
-A template is provided at `.env.example`.
-
----
-
-## Troubleshooting
-
-**`ModuleNotFoundError`** — make sure your virtual environment is activated and you ran `pip install -r requirements.txt`.
-
-**`ChromeDriver` errors** — make sure Google Chrome is installed. The `webdriver-manager` package handles the driver automatically.
-
-**API key errors** — check that your OpenAI API key is valid and has available credits.
-
-**Rate limits** — the tool adds short delays between requests to avoid being blocked by job sites.
-
----
-
-## Re-running Setup
-
+**Web interface only:**
 ```bash
-python run.py --setup
+python web_app.py
+# Then open http://localhost:5000
 ```
+
+---
+
+## Project Structure
+
+```
+ApplyMind AI/
+├── ApplyMindAI.pyw              # Desktop app entry point (pywebview + pystray)
+├── web_app.py                   # Flask web server
+├── job_master.py                # Core job search orchestration
+├── config.py                    # App configuration
+├── requirements.txt
+│
+├── templates/                   # Jinja2 HTML templates
+│   ├── index.html               # Dashboard
+│   ├── jobs.html                # Job list + ATS scores
+│   ├── tracker.html             # Kanban tracker
+│   ├── search.html              # Search configuration
+│   ├── settings.html            # Profile & API settings
+│   └── ...
+│
+├── static/                      # CSS, JS, assets
+│
+├── src/
+│   ├── job_scrapers.py          # Indeed / AF / Jobtech scrapers
+│   ├── i18n.py                  # Swedish/English translations
+│   ├── libs/
+│   │   ├── llm_manager.py       # OpenAI GPT-4o integration
+│   │   └── resume_and_cover_builder/
+│   │       ├── moderndesign1/   # Clean PDF layout
+│   │       └── moderndesign2/   # Bold PDF layout
+│   └── utils/
+│
+└── data_folder/
+    ├── plain_text_resume.yaml   # Your resume content (not committed)
+    ├── secrets.yaml             # API keys (not committed)
+    └── output/                  # Generated CVs and cover letters
+```
+
+---
+
+## Output
+
+Generated documents are saved to `data_folder/output/`:
+
+```
+data_folder/output/
+└── [Company] - [Job Title]/
+    ├── CV_[Name]_[Company].pdf
+    └── CoverLetter_[Name]_[Company].pdf
+```
+
+---
+
+## Tech Stack
+
+- **Backend:** Python · Flask · OpenAI GPT-4o
+- **Frontend:** HTML · CSS · JavaScript · Jinja2
+- **Desktop:** pywebview · pystray
+- **PDF generation:** ReportLab · WeasyPrint
+- **Scraping:** Selenium · BeautifulSoup · Playwright
+- **APIs:** Jobtech (Arbetsförmedlingen)
+
+---
+
+## Security
+
+Sensitive files are excluded from version control via `.gitignore`:
+
+- `data_folder/secrets.yaml` — API keys
+- `data_folder/plain_text_resume.yaml` — personal resume data
+- `data_folder/output/` — generated documents
+- `.env` — environment variables
 
 ---
 
 ## License
 
-MIT License — free to use, modify, and distribute.
-
----
-
-*Built with Python, Selenium, OpenAI API, and ReportLab.*
+MIT

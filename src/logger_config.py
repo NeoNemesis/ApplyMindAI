@@ -14,7 +14,10 @@ def remove_default_loggers():
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
     if os.path.exists("log/app.log"):
-        os.remove("log/app.log")
+        try:
+            os.remove("log/app.log")
+        except (PermissionError, OSError):
+            pass  # File in use by another process, skip deletion
 
 def init_loguru_logger():
     """Initialize and configure loguru logger."""

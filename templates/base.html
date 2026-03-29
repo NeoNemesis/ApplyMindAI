@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="sv" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ApplyMind AI{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">⚡</span>
+    <div>
+      <span class="brand-text">
+        ApplyMind AI
+        {% if setup_complete is defined and setup_complete %}
+          <span class="status-dot ms-1" title="System redo"></span>
+        {% endif %}
+      </span>
+      <span class="brand-version">v2.0</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+      <i class="bi bi-speedometer2"></i>
+      <span>{{ t.nav_dashboard }}</span>
+    </a>
+    <a href="/cv" class="nav-link {% if request.path.startswith('/cv') %}active{% endif %}">
+      <i class="bi bi-person-vcard"></i>
+      <span>{{ t.nav_my_cv }}</span>
+    </a>
+    <a href="/cover-letter" class="nav-link {% if request.path == '/cover-letter' %}active{% endif %}">
+      <i class="bi bi-file-earmark-text"></i>
+      <span>{{ t.nav_cover_letter }}</span>
+    </a>
+    <a href="/cover-letter/templates" class="nav-link {% if request.path.startswith('/cover-letter/template') %}active{% endif %}" style="padding-left:36px;font-size:0.82rem;">
+      <i class="bi bi-palette"></i>
+      <span>Brevdesigner</span>
+    </a>
+    <a href="/search" class="nav-link {% if request.path.startswith('/search') %}active{% endif %}">
+      <i class="bi bi-search"></i>
+      <span>{{ t.nav_search }}</span>
+    </a>
+    <a href="/jobs" class="nav-link {% if request.path.startswith('/jobs') %}active{% endif %}">
+      <i class="bi bi-briefcase"></i>
+      <span>{{ t.nav_applications }}</span>
+    </a>
+    <a href="/tracker" class="nav-link {% if request.path.startswith('/tracker') %}active{% endif %}">
+      <i class="bi bi-kanban"></i>
+      <span>Jobbspårare</span>
+    </a>
+    <hr style="border-color:var(--border);margin:8px 16px;">
+    <a href="/settings" class="nav-link {% if request.path.startswith('/settings') %}active{% endif %}">
+      <i class="bi bi-gear"></i>
+      <span>{{ t.nav_settings }}</span>
+    </a>
+    <a href="/setup" class="nav-link {% if request.path.startswith('/setup') %}active{% endif %}">
+      <i class="bi bi-magic"></i>
+      <span>{{ t.nav_setup }}</span>
+    </a>
+    <a href="/design" class="nav-link {% if request.path.startswith('/design') %}active{% endif %}">
+      <i class="bi bi-palette"></i>
+      <span>{{ t.nav_design }}</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <small class="text-muted" style="font-size:0.72rem;">Victor Vilches &copy; 2026</small>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="main-content" id="main-content">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <button class="btn btn-sm sidebar-toggle" onclick="toggleSidebar()">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Breadcrumb -->
+    <nav class="topbar-breadcrumb" aria-label="breadcrumb">
+      <span class="bc-brand">ApplyMind AI</span>
+      {% set _page_title %}{% block page_title %}{% endblock %}{% endset %}
+      {% if _page_title | trim %}
+        <span class="bc-sep"><i class="bi bi-chevron-right" style="font-size:0.7rem;"></i></span>
+        <span class="bc-page">{{ _page_title | trim }}</span>
+      {% endif %}
+    </nav>
+
+    <div class="topbar-right d-flex align-items-center gap-3">
+      {% if search_running is defined and search_running %}
+        <span class="badge bg-warning text-dark">
+          <i class="bi bi-hourglass-split"></i> {{ t.search_ongoing }}
+        </span>
+      {% endif %}
+
+      <!-- Language switcher -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                style="font-size:.8rem;padding:3px 10px;">
+          {{ languages[lang] }}
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark" style="min-width:140px">
+          {% for code, name in languages.items() %}
+          <li>
+            <a class="dropdown-item {% if lang == code %}active{% endif %}"
+               href="{{ request.path }}?lang={{ code }}" style="font-size:.85rem">
+              {{ name }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  <div class="container-fluid px-4 pt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+            <i class="bi bi-{{ 'check-circle' if category == 'success' else 'exclamation-triangle' }}-fill me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Page content -->
+  <div class="container-fluid px-4 pb-4">
+    {% block content %}{% endblock %}
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

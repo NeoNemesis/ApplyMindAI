@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Jobbspårare — ApplyMind AI{% endblock %}
+{% block page_title %}Jobbspårare{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div>
+    <h5 class="mb-0 text-green">
+      <i class="bi bi-kanban me-2"></i>Kanban-spårare
+    </h5>
+    <small class="text-muted">{{ total }} ansökningar totalt</small>
+  </div>
+  <a href="/jobs" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-list-ul me-1"></i>Visa som lista
+  </a>
+</div>
+
+<!-- Kanban Board -->
+<div class="kanban-board">
+  {% for key, col in columns.items() %}
+  <div class="kanban-col {{ col.css_class }}">
+    <div class="kanban-col-header">
+      <i class="bi {{ col.icon }}"></i>
+      {{ col.label }}
+      <span class="kanban-badge">{{ col.jobs | length }}</span>
+    </div>
+    <div class="kanban-col-body">
+      {% for job in col.jobs %}
+      <div class="kanban-card"
+           data-folder="{{ job.folder }}"
+           data-title="{{ job.title }}"
+           data-company="{{ job.company }}"
+           data-status="{{ job.tracker_status }}"
+           data-notes="{{ job.tracker_notes }}"
+           data-url="{{ job.url }}"
+           onclick="openMoveModal(this)">
+        <div class="kanban-card-title" title="{{ job.title }}">{{ job.title }}</div>
+        <div class="kanban-card-company">{{ job.company }}{% if job.location %} · <span>{{ job.location }}</span>{% endif %}</div>
+        <div class="kanban-card-meta">
+          {% if job.has_cv %}
+            <span class="badge bg-success bg-opacity-25 text-success" style="font-size:.65rem;padding:2px 6px;">CV</span>
+          {% endif %}
+          {% if job.has_letter %}
+            <span class="badge bg-info bg-opacity-25 text-info" style="font-size:.65rem;padding:2px 6px;">Brev</span>
+          {% endif %}
+          {% if job.date %}
+            <span class="text-muted" style="font-size:.65rem;margin-left:auto;">{{ job.date }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="kanban-empty">
+        <i class="bi bi-inbox d-block mb-1" style="font-size:1.4rem;"></i>
+        Inga jobb här
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Move Modal -->
+<div class="modal fade" id="moveModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-card);border:1px solid var(--border);">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h6 class="modal-title text-green mb-0" id="moveModalLabel">
+            <i class="bi bi-arrows-move me-2"></i>Flytta ansökan
+          </h6>
+          <small id="modal-job-name" class="text-muted"></small>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Status buttons -->
+        <p class="text-muted small mb-2">Välj ny status:</p>
+        <div class="d-flex flex-column gap-2 mb-3" id="status-buttons">
+          {% for key, label, icon, css in tracker_cols %}
+          <button class="kanban-status-btn" data-val="{{ key }}" onclick="selectStatus('{{ key }}')">
+            <i class="bi {{ icon }}"></i>{{ label }}
+          </button>
+          {% endfor %}
+        </div>
+
+        <!-- Notes -->
+        <label class="form-label text-muted small mb-1">Anteckningar (valfritt)</label>
+        <textarea id="modal-notes" class="form-control form-control-sm" rows="2"
+                  placeholder="Datum för intervju, kontaktperson..."></textarea>
+
+        <!-- Links -->
+        <div id="modal-links" class="d-flex gap-2 mt-3" style="display:none!important;"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Avbryt</button>
+        <button type="button" class="btn btn-green btn-sm" onclick="saveMove()">
+          <i class="bi bi-check2 me-1"></i>Spara
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _currentFolder = '';
+let _currentStatus = '';
+
+function openMoveModal(card) {
+  _currentFolder = card.dataset.folder;
+  _currentStatus = card.dataset.status;
+
+  document.getElementById('modal-job-name').textContent =
+    card.dataset.title + (card.dataset.company ? ' — ' + card.dataset.company : '');
+  document.getElementById('modal-notes').value = card.dataset.notes || '';
+
+  // Highlight active status
+  document.querySelectorAll('.kanban-status-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === _currentStatus);
+  });
+
+  // Links
+  const linksDiv = document.getElementById('modal-links');
+  linksDiv.innerHTML = '';
+  if (card.dataset.url) {
+    linksDiv.style.display = 'flex';
+    linksDiv.innerHTML = `
+      <a href="${card.dataset.url}" target="_blank" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Öppna jobbannonsen
+      </a>`;
+  } else {
+    linksDiv.style.display = 'none';
+  }
+
+  new bootstrap.Modal(document.getElementById('moveModal')).show();
+}
+
+function selectStatus(val) {
+  _currentStatus = val;
+  document.querySelectorAll('.kanban-status-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.val === val);
+  });
+}
+
+function saveMove() {
+  const notes = document.getElementById('modal-notes').value;
+  fetch('/api/tracker/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({folder: _currentFolder, status: _currentStatus, notes: notes})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+      location.reload();
+    } else {
+      alert('Fel: ' + (data.error || 'Okänt fel'));
+    }
+  })
+  .catch(() => alert('Nätverksfel, försök igen.'));
+}
+</script>
+{% endblock %}

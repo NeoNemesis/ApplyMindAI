@@ -110,12 +110,14 @@ class TestLinkedInScraper:
 
     def test_scrape_job_missing_element(self, mock_driver):
         """Test error handling when required element is missing."""
-        # Mock missing element
+        # Mock find_element to raise NoSuchElementException
         mock_driver.find_element.side_effect = NoSuchElementException("Element not found")
 
         scraper = LinkedInScraper(driver=mock_driver)
 
-        with pytest.raises(ValueError, match="Job page structure changed or invalid"):
+        # WebDriverWait.until catches NoSuchElementException and retries until TimeoutException
+        # so the scraper raises "Job page failed to load" (TimeoutException path)
+        with pytest.raises(ValueError, match="Job page failed to load"):
             scraper.scrape_job("https://www.linkedin.com/jobs/view/123456")
 
 

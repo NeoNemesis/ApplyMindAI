@@ -1,5 +1,5 @@
 """
-Browser Pool Manager for JobCraftAI
+Browser Pool Manager for ApplyMind AI
 
 PERFORMANCE FIX: Singleton pattern to reuse Chrome browser instances
 instead of spawning O(n) browsers.

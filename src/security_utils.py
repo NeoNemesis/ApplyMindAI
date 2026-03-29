@@ -1,5 +1,5 @@
 """
-Security utilities for JobCraftAI
+Security utilities for ApplyMind AI
 Handles sensitive data validation and sanitization
 """
 import re
@@ -197,12 +197,12 @@ class SecurePasswordManager:
         Returns:
             str: SMTP password or None if not found
         """
-        password = os.getenv('JOBCRAFT_SMTP_PASSWORD')
+        password = os.getenv('APPLYMIND_SMTP_PASSWORD')
         
         if not password:
             logger.warning(
                 "SMTP password not found in environment variables. "
-                "Set JOBCRAFT_SMTP_PASSWORD environment variable."
+                "Set APPLYMIND_SMTP_PASSWORD environment variable."
             )
             return None
         
@@ -216,11 +216,11 @@ class SecurePasswordManager:
         Returns:
             str: API key or None if not found
         """
-        api_key = os.getenv('JOBCRAFT_API_KEY')
+        api_key = os.getenv('APPLYMIND_API_KEY')
         
         if not api_key:
             logger.debug(
-                "API key not found in JOBCRAFT_API_KEY environment variable. "
+                "API key not found in APPLYMIND_API_KEY environment variable. "
                 "Falling back to secrets.yaml"
             )
             return None
@@ -240,29 +240,29 @@ För att skydda dina lösenord och API-nycklar, använd environment variables:
 WINDOWS (PowerShell):
 ---------------------
 # Tillfälligt (bara för nuvarande session):
-$env:JOBCRAFT_SMTP_PASSWORD = "ditt-gmail-app-password"
-$env:JOBCRAFT_API_KEY = "din-openai-api-key"
+$env:APPLYMIND_SMTP_PASSWORD = "ditt-gmail-app-password"
+$env:APPLYMIND_API_KEY = "din-openai-api-key"
 
 # Permanent (lägg till i din PowerShell-profil):
-[System.Environment]::SetEnvironmentVariable('JOBCRAFT_SMTP_PASSWORD', 'ditt-password', 'User')
-[System.Environment]::SetEnvironmentVariable('JOBCRAFT_API_KEY', 'din-api-key', 'User')
+[System.Environment]::SetEnvironmentVariable('APPLYMIND_SMTP_PASSWORD', 'ditt-password', 'User')
+[System.Environment]::SetEnvironmentVariable('APPLYMIND_API_KEY', 'din-api-key', 'User')
 
 LINUX/MAC (Bash):
 -----------------
 # Tillfälligt:
-export JOBCRAFT_SMTP_PASSWORD="ditt-gmail-app-password"
-export JOBCRAFT_API_KEY="din-openai-api-key"
+export APPLYMIND_SMTP_PASSWORD="ditt-gmail-app-password"
+export APPLYMIND_API_KEY="din-openai-api-key"
 
 # Permanent (lägg till i ~/.bashrc eller ~/.zshrc):
-echo 'export JOBCRAFT_SMTP_PASSWORD="ditt-password"' >> ~/.bashrc
-echo 'export JOBCRAFT_API_KEY="din-api-key"' >> ~/.bashrc
+echo 'export APPLYMIND_SMTP_PASSWORD="ditt-password"' >> ~/.bashrc
+echo 'export APPLYMIND_API_KEY="din-api-key"' >> ~/.bashrc
 
 ALTERNATIVT: Använd .env-fil (rekommenderat för utveckling):
 -------------------------------------------------------------
 Skapa en .env-fil i projektets rot:
 
-JOBCRAFT_SMTP_PASSWORD=ditt-gmail-app-password
-JOBCRAFT_API_KEY=din-openai-api-key
+APPLYMIND_SMTP_PASSWORD=ditt-gmail-app-password
+APPLYMIND_API_KEY=din-openai-api-key
 
 VIKTIGT: Lägg till .env i .gitignore för att inte committa secrets!
 

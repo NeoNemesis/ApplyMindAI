@@ -1,5 +1,5 @@
 """
-Base command class for JobCraftAI command pattern
+Base command class for ApplyMind AI command pattern
 All commands inherit from this base class
 """
 from abc import ABC, abstractmethod

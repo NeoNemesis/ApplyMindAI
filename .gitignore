@@ -1,5 +1,5 @@
-# JobCraftAI - Git Ignore File
-# Created by Victor Vilches (Vilchesab)
+# ApplyMind AI - Git Ignore File
+# Created by Victor Vilches
 
 # Sensitive data - NEVER commit these
 data_folder/secrets.yaml
@@ -96,3 +96,20 @@ pdfs/
 
 # Log directory
 log/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Claude Code project files (personal dev notes)
+CLAUDE.md
+GEMINI.md
+
+# Browser/WebView cache
+.cursor/
+.webview_cache/
+
+# Session docs (AIHawk-era)
+JobCraftAI-*.md
+WORK-SESSION-SUMMARY.md
+working-outline.md

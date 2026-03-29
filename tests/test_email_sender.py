@@ -16,7 +16,6 @@ def mock_email_config(tmp_path):
 smtp_server: smtp.gmail.com
 smtp_port: 587
 email: test@example.com
-password: test_password
 sender_name: Test User
 """
     config_path.write_text(config_content)
@@ -27,7 +26,7 @@ sender_name: Test User
 def email_sender(mock_email_config, monkeypatch):
     """Create EmailSender instance with mock configuration"""
     # Mock SecurePasswordManager to avoid env var requirements
-    monkeypatch.setenv("JOBCRAFT_SMTP_PASSWORD", "test_password")
+    monkeypatch.setenv("APPLYMIND_SMTP_PASSWORD", "test_password")
     return EmailSender(mock_email_config)
 
 
@@ -201,11 +200,10 @@ class TestEmailConfiguration:
 smtp_server: smtp.gmail.com
 smtp_port: 587
 email: not-an-email
-password: test_password
 sender_name: Test User
 """
         config_path.write_text(config_content)
-        monkeypatch.setenv("JOBCRAFT_SMTP_PASSWORD", "test_password")
+        monkeypatch.setenv("APPLYMIND_SMTP_PASSWORD", "test_password")
 
         with pytest.raises(ValueError, match="Invalid sender email"):
             EmailSender(config_path)

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV – Anna Lindström</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #ffffff;
+    color: #1a1a1a;
+    font-size: 13px;
+    line-height: 1.6;
+    width: 794px;
+    min-height: 1123px;
+    margin: 0 auto;
+  }
+
+  .cv-wrapper {
+    width: 794px;
+    min-height: 1123px;
+    background: #ffffff;
+    padding: 52px 56px 52px 56px;
+  }
+
+  /* Header */
+  .header {
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #111111;
+    margin-bottom: 4px;
+  }
+
+  .header .title {
+    font-size: 14px;
+    color: #757575;
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+
+  .contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    font-size: 12px;
+    color: #555555;
+  }
+
+  .contact-row span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 22px;
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #333333;
+    background: #f5f5f5;
+    padding: 5px 8px;
+    margin-bottom: 12px;
+    border-left: 3px solid #cccccc;
+  }
+
+  /* Summary */
+  .summary-text {
+    font-size: 13px;
+    color: #444444;
+    line-height: 1.7;
+  }
+
+  /* Experience */
+  .exp-item {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eeeeee;
+  }
+
+  .exp-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .exp-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111111;
+  }
+
+  .exp-date {
+    font-size: 11px;
+    color: #888888;
+    white-space: nowrap;
+  }
+
+  .exp-company {
+    font-size: 12px;
+    color: #555555;
+    margin-bottom: 6px;
+  }
+
+  .exp-desc {
+    font-size: 12px;
+    color: #555555;
+    line-height: 1.6;
+  }
+
+  /* Education */
+  .edu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .edu-degree {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111111;
+  }
+
+  .edu-school {
+    font-size: 12px;
+    color: #555555;
+  }
+
+  .edu-date {
+    font-size: 11px;
+    color: #888888;
+  }
+
+  /* Skills */
+  .skills-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .skill-tag {
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    color: #333333;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+
+  /* Languages */
+  .lang-row {
+    display: flex;
+    gap: 24px;
+  }
+
+  .lang-item {
+    font-size: 12px;
+    color: #555555;
+  }
+
+  .lang-item span {
+    font-weight: 700;
+    color: #111111;
+  }
+
+  @media print {
+    body { margin: 0; }
+    .cv-wrapper { padding: 40px 50px; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  <div class="header">
+    <h1>Anna Lindström</h1>
+    <div class="title">Systemutvecklare</div>
+    <div class="contact-row">
+      <span>anna@email.com</span>
+      <span>+46 70 123 45 67</span>
+      <span>Uppsala</span>
+      <span>linkedin.com/in/annalindstrom</span>
+      <span>github.com/annalindstrom</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Sammanfattning</div>
+    <p class="summary-text">Engagerad systemutvecklare med 4+ års erfarenhet av fullstack-utveckling. Specialiserad i Python, React och molnarkitektur. Drivs av att bygga skalbara, vältestad mjukvara och samarbeta i tvärfunktionella team.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Erfarenhet</div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Senior Systemutvecklare</div>
+        <div class="exp-date">2022 – Nu</div>
+      </div>
+      <div class="exp-company">TechCorp AB</div>
+      <div class="exp-desc">Ledde design och implementation av microservices-arkitektur. Förbättrade systemprestanda med 40% genom optimering av databaser och cachningsstrategi. Mentorerade juniorutvecklare och deltog i tekniska designbeslut.</div>
+    </div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Systemutvecklare</div>
+        <div class="exp-date">2020 – 2022</div>
+      </div>
+      <div class="exp-company">Startupbolaget AB</div>
+      <div class="exp-desc">Byggde React-baserad frontend för SaaS-produkt. Implementerade och underhöll CI/CD-pipeline med GitHub Actions och Docker. Samarbetade tätt med produktteamet för att leverera nya features.</div>
+    </div>
+
+  </div>
+
+  <div class="section">
+    <div class="section-title">Utbildning</div>
+    <div class="edu-item">
+      <div>
+        <div class="edu-degree">Kandidatexamen, Datateknik</div>
+        <div class="edu-school">Uppsala Universitet</div>
+      </div>
+      <div class="edu-date">2016 – 2020</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Kompetenser</div>
+    <div class="skills-grid">
+      <span class="skill-tag">Python</span>
+      <span class="skill-tag">JavaScript</span>
+      <span class="skill-tag">React</span>
+      <span class="skill-tag">Node.js</span>
+      <span class="skill-tag">SQL</span>
+      <span class="skill-tag">Docker</span>
+      <span class="skill-tag">AWS</span>
+      <span class="skill-tag">Git</span>
+      <span class="skill-tag">Linux</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Språk</div>
+    <div class="lang-row">
+      <div class="lang-item"><span>Svenska</span> – Modersmål</div>
+      <div class="lang-item"><span>Engelska</span> – Flytande</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

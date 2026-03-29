@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🎯 JOB MASTER - ULTIMAT JOBBSÖKNINGS- OCH ANSÖKNINGSSYSTEM
-=============================================================
+⚡ ApplyMind AI — Jobbsöknings- och ansökningssystem
+======================================================
 Kombinerar alla funktioner från tidigare script i ett enda kraftfullt verktyg
 
 FUNKTIONER:
@@ -11,7 +11,7 @@ FUNKTIONER:
 ✅ Välj vilka platformar du vill söka på
 ✅ Välj antal jobb att söka
 ✅ Automatisk jobbfiltrering baserat på plats och IT-kompetens
-✅ Genererar jobbanpassade CV med Modern Design 1
+✅ Genererar jobbanpassade CV med valt design
 ✅ Genererar jobbanpassade personliga brev
 ✅ Sparar dokument i strukturerade mappar
 ✅ Skapar job_info filer med ansökningsinstruktioner
@@ -177,11 +177,12 @@ class JobMaster:
     def initialize(self):
         """Initialisera system"""
         print("\n" + "="*80)
-        print("🎯 JOB MASTER - ULTIMAT JOBBSÖKNINGS- OCH ANSÖKNINGSSYSTEM")
+        cv_design = os.getenv("CV_DESIGN", "design_01_minimal")
+        print("⚡ ApplyMind AI — Jobbsöknings- och ansökningssystem")
         print("="*80)
         print("📍 Områden: Uppsala • Södra Stockholm • Enköping • Remote")
         print("💼 Plattformar: LinkedIn • Indeed • Arbetsförmedlingen")
-        print("📄 Auto-generering: Jobbanpassade CV + Personliga Brev (Modern Design 1)")
+        print(f"📄 Auto-generering: Jobbanpassade CV + Personliga Brev (Design: {cv_design})")
         print("="*80)
 
         # Ladda resume
@@ -203,9 +204,9 @@ class JobMaster:
             self.driver = init_browser()
             print("✅ Browser startad")
 
-        # Skapa Modern Design 1 facade
+        # Skapa dokumentgenereringsfacade
         style_manager = ModernDesign1StyleManager()
-        style_manager.set_selected_style('Modern Design 1 - Default')
+        style_manager.set_selected_style('Modern Design 1 - Default')  # style determined by design facade
 
         resume_generator = ModernDesign1ResumeGenerator()
 
@@ -218,7 +219,7 @@ class JobMaster:
         )
         self.modern_facade.set_driver(self.driver)
 
-        print("✅ Modern Design 1 dokumentgenereringssystem redo")
+        print("✅ ApplyMind AI dokumentgenereringssystem redo")
         print("="*80)
 
     def show_main_menu(self) -> Dict:
@@ -295,26 +296,26 @@ class JobMaster:
         return True
 
     def is_local_job(self, location: str) -> bool:
-        """Kontrollera om jobbet är i accepterad plats"""
+        """Kontrollera om jobbet är i accepterad plats (dynamisk baserat på search_locations).
+        ACCEPTED_LOCATIONS-konstanten behålls för bakåtkompatibilitet men används ej längre.
+        """
         if not location:
             return False
 
         location_lower = location.lower()
 
-        # Exkludera explicita platser
-        for excluded in self.EXCLUDED_LOCATIONS:
-            if excluded in location_lower:
-                return False
+        # Alltid acceptera remote- och distansjobb
+        if 'remote' in location_lower or 'distans' in location_lower or 'fjärr' in location_lower:
+            return True
 
-        # För remote-jobb, acceptera endast om Sverige nämns
-        if 'distans' in location_lower or 'remote' in location_lower:
-            if 'sverige' in location_lower or 'sweden' in location_lower:
-                return True
-            return False
+        # Om inga sökortsplatser är satta — acceptera alla platser (failsafe)
+        search_locs = getattr(self, 'search_locations', [])
+        if not search_locs:
+            return True
 
-        # Kontrollera om platsen är accepterad
-        for accepted in self.ACCEPTED_LOCATIONS:
-            if accepted in location_lower:
+        # Kontrollera om platsen matchar någon av användarens valda platser (case-insensitive)
+        for chosen in search_locs:
+            if chosen.lower() in location_lower or location_lower in chosen.lower():
                 return True
 
         return False
@@ -520,31 +521,18 @@ class JobMaster:
         all_jobs = []
         seen_urls = set()
 
-        # Sök i Uppsala OCH Södra Stockholm med alla relevanta IT-roller
-        searches = [
-            # Uppsala - Utvecklare
-            {"keyword": "Systemutvecklare", "location": "Uppsala"},
-            {"keyword": "IT-utvecklare", "location": "Uppsala"},
-            {"keyword": "Fullstack Developer", "location": "Uppsala"},
-            {"keyword": "Frontend utvecklare", "location": "Uppsala"},
-            {"keyword": "Backend utvecklare", "location": "Uppsala"},
-            {"keyword": "Webbutvecklare", "location": "Uppsala"},
-
-            # Uppsala - IT-tekniker och support
-            {"keyword": "IT-tekniker", "location": "Uppsala"},
-            {"keyword": "IT-support", "location": "Uppsala"},
-            {"keyword": "Systemadministratör", "location": "Uppsala"},
-            {"keyword": "Junior utvecklare", "location": "Uppsala"},
-
-            # Södra Stockholm - Utvecklare
-            {"keyword": "Systemutvecklare", "location": "Södermalm, Stockholm"},
-            {"keyword": "IT-utvecklare", "location": "Södermalm, Stockholm"},
-            {"keyword": "Fullstack Developer", "location": "Stockholm"},
-
-            # Södra Stockholm - IT-tekniker
-            {"keyword": "IT-tekniker", "location": "Stockholm"},
-            {"keyword": "Junior utvecklare", "location": "Stockholm"}
-        ]
+        # Bygg sökningar dynamiskt från användarens valda positioner och platser
+        searches = []
+        for position in self.search_positions:
+            for location in self.search_locations:
+                searches.append({"keyword": position, "location": location})
+        # Fallback om inga inställningar finns
+        if not searches:
+            searches = [
+                {"keyword": "Systemutvecklare", "location": "Uppsala"},
+                {"keyword": "IT-utvecklare", "location": "Uppsala"},
+                {"keyword": "Junior utvecklare", "location": "Stockholm"},
+            ]
 
         for search in searches:
             if len(all_jobs) >= max_jobs:
@@ -870,11 +858,23 @@ class JobMaster:
         all_jobs = []
         seen_urls = set()
 
-        searches = [
-            {"location": "Uppsala", "url": "https://arbetsformedlingen.se/platsbanken/annonser?q=systemutvecklare&l=Uppsala"},
-            {"location": "Stockholm", "url": "https://arbetsformedlingen.se/platsbanken/annonser?q=systemutvecklare&l=Stockholm"},
-            {"location": "Enköping", "url": "https://arbetsformedlingen.se/platsbanken/annonser?q=IT-utvecklare&l=Enköping"},
-        ]
+        import urllib.parse as _urlparse
+        searches = []
+        for position in self.search_positions[:3]:
+            for location in self.search_locations[:3]:
+                q = _urlparse.quote(position)
+                l = _urlparse.quote(location)
+                searches.append({
+                    "location": location,
+                    "keyword": position,
+                    "url": f"https://arbetsformedlingen.se/platsbanken/annonser?q={q}&l={l}"
+                })
+        # Fallback om inga inställningar finns
+        if not searches:
+            searches = [
+                {"location": "Uppsala", "keyword": "systemutvecklare",
+                 "url": "https://arbetsformedlingen.se/platsbanken/annonser?q=systemutvecklare&l=Uppsala"},
+            ]
 
         for search in searches:
             if len(all_jobs) >= max_jobs:
@@ -953,8 +953,13 @@ class JobMaster:
         print(f"\n📊 Arbetsförmedlingen: {len(all_jobs)} jobb hittade")
         return all_jobs
 
-    def search_jobs(self, platforms: List[str], max_jobs: int) -> List[Dict]:
-        """Sök jobb på valda plattformar"""
+    def search_jobs(self, platforms: List[str], max_jobs: int,
+                    locations: List[str] = None,
+                    positions: List[str] = None) -> List[Dict]:
+        """Sök jobb på valda plattformar med användarens platser och jobbtitlar"""
+        # Store user's search criteria for use by individual search methods
+        self.search_locations = locations or ['Uppsala']
+        self.search_positions = positions or ['Junior Systemutvecklare', 'Webbutvecklare']
         all_jobs = []
 
         # LinkedIn (kräver inloggning)
@@ -973,6 +978,11 @@ class JobMaster:
             af_jobs = self.search_arbetsformedlingen_jobs(max_jobs)
             all_jobs.extend(af_jobs)
 
+        # Jobtech API (Sveriges officiella jobbdatabas — ingen inloggning krävs)
+        if 'jobtech' in platforms:
+            jobtech_jobs = self.search_jobtech_jobs(max_jobs)
+            all_jobs.extend(jobtech_jobs)
+
         # Begränsa till max_jobs
         all_jobs = all_jobs[:max_jobs]
 
@@ -982,6 +992,85 @@ class JobMaster:
                 json.dump(all_jobs, f, indent=2, ensure_ascii=False)
             print(f"\n💾 Sparade {len(all_jobs)} jobb till: {self.found_jobs_file}")
 
+        return all_jobs
+
+
+    def search_jobtech_jobs(self, max_jobs: int) -> List[Dict]:
+        """Sök via Jobtech API (Sveriges officiella jobbdatabas — ingen inloggning krävs)"""
+        import urllib.request as _urllib_req
+        import urllib.parse as _urllib_parse
+        import json as _json_lib
+
+        print(f"\n🔍 SÖKER VIA JOBTECH API (max {max_jobs})")
+        print("=" * 80)
+
+        all_jobs: List[Dict] = []
+        seen_urls: set = set()
+
+        for position in self.search_positions[:5]:
+            if len(all_jobs) >= max_jobs:
+                break
+            try:
+                q = _urllib_parse.quote(position)
+                api_url = f"https://links.api.jobtechdev.se/joblinks?q={q}&limit=20"
+
+                req = _urllib_req.Request(api_url, headers={
+                    'Accept': 'application/json',
+                    'User-Agent': 'ApplyMindAI/2.0',
+                })
+                with _urllib_req.urlopen(req, timeout=10) as resp:
+                    data = _json_lib.loads(resp.read().decode())
+
+                hits = data.get('hits', []) or data.get('jobs', []) or []
+
+                for hit in hits:
+                    if len(all_jobs) >= max_jobs:
+                        break
+
+                    url = hit.get('webpage_url') or hit.get('url', '')
+                    title = hit.get('headline') or hit.get('title', 'Okänd titel')
+                    employer = hit.get('employer', {})
+                    company = (
+                        employer.get('name', 'Okänt företag')
+                        if isinstance(employer, dict)
+                        else str(employer)
+                    )
+                    workplace = hit.get('workplace_address', {})
+                    location = (
+                        workplace.get('municipality', '')
+                        if isinstance(workplace, dict)
+                        else ''
+                    )
+
+                    if not url or url in seen_urls or url in self.processed_urls:
+                        continue
+
+                    # Location filter — accept when no municipality provided
+                    if location and not self.is_local_job(location):
+                        continue
+
+                    # Level filter
+                    if not self.is_suitable_level(title):
+                        print(f"   ⏭️  Hoppar över: {title} (för avancerad nivå)")
+                        continue
+
+                    seen_urls.add(url)
+                    all_jobs.append({
+                        'title': title,
+                        'company': company,
+                        'location': location or 'Sverige',
+                        'url': url,
+                        'source': 'Jobtech',
+                        'search_query': position,
+                        'found_date': datetime.now().isoformat(),
+                    })
+                    print(f"   ✅ {title} @ {company} - {location}")
+
+            except Exception as e:
+                print(f"   ⚠️  Jobtech-fel för '{position}': {e}")
+                continue
+
+        print(f"\n📊 Jobtech: {len(all_jobs)} jobb hittade")
         return all_jobs
 
     def generate_documents_for_job(self, job: Dict, job_number: int) -> bool:
@@ -1007,10 +1096,12 @@ class JobMaster:
             self.modern_facade.link_to_job(job['url'])
 
             # Generera jobbanpassat CV (utan frågor för att spara tid)
-            print("\n📝 Genererar jobbanpassat CV med Modern Design 1...")
+            _design = os.getenv("CV_DESIGN", "design_01_minimal")
+            print(f"📝 Genererar jobbanpassat CV ({_design})...")
             cv_base64, _ = self.modern_facade.create_resume_pdf_job_tailored(ask_questions=False)
 
-            cv_path = job_folder / f"CV_{safe_company}_{safe_title}_Modern_Design_1.pdf"
+            _cv_design_slug = os.getenv("CV_DESIGN", "design_01_minimal")
+            cv_path = job_folder / f"CV_{safe_company}_{safe_title}_{_cv_design_slug}.pdf"
             with open(cv_path, 'wb') as f:
                 f.write(base64.b64decode(cv_base64))
 
@@ -1020,11 +1111,17 @@ class JobMaster:
             print("💌 Genererar anpassat personligt brev...")
             cover_base64, _ = self.modern_facade.create_cover_letter()
 
-            cover_path = job_folder / f"Personligt_Brev_{safe_company}_{safe_title}_Modern_Design_1.pdf"
+            cover_path = job_folder / f"Personligt_Brev_{safe_company}_{safe_title}_{_cv_design_slug}.pdf"
             with open(cover_path, 'wb') as f:
                 f.write(base64.b64decode(cover_base64))
 
             print(f"✅ Personligt brev sparat: {cover_path.name} ({cover_path.stat().st_size / 1024:.1f} KB)")
+
+            # Spara jobbeskrivning för ATS-analys
+            if hasattr(self.modern_facade, 'job') and self.modern_facade.job:
+                desc = getattr(self.modern_facade.job, 'description', '') or ''
+                if desc:
+                    (job_folder / 'job_description.txt').write_text(desc, encoding='utf-8')
 
             # Spara jobbinfo
             job_info_path = job_folder / "job_info.txt"

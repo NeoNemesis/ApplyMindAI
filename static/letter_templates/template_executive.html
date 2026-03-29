@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Source Sans 3', Georgia, serif;
+    background: #fff;
+    color: #1c1c1c;
+    font-size: 10.5pt;
+    line-height: 1.65;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 24mm 24mm 24mm 24mm;
+    position: relative;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #ccc;
+  }
+
+  .sender-name {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 26pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #111;
+  }
+
+  .sender-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 8px 0;
+    color: #888;
+    font-size: 8.5pt;
+    letter-spacing: 0.5px;
+  }
+
+  .sender-divider::before,
+  .sender-divider::after {
+    content: '';
+    height: 1px;
+    width: 60px;
+    background: #ccc;
+  }
+
+  .contact-line {
+    font-size: 8.5pt;
+    color: #555;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Date / recipient ── */
+  .meta-block {
+    margin-bottom: 22px;
+    font-size: 9.5pt;
+    color: #444;
+  }
+
+  .meta-block .recipient-company {
+    font-weight: 600;
+    color: #111;
+  }
+
+  /* ── Body ── */
+  .salutation {
+    font-size: 10.5pt;
+    margin-bottom: 14px;
+    font-weight: 500;
+  }
+
+  p {
+    margin-bottom: 13px;
+    text-align: justify;
+    hyphens: auto;
+  }
+
+  /* ── Highlight quote ── */
+  .highlight-quote {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 11.5pt;
+    font-style: italic;
+    color: #333;
+    border-top: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    padding: 12px 20px;
+    margin: 18px 0;
+    text-align: center;
+  }
+
+  /* ── Closing ── */
+  .closing-block {
+    margin-top: 26px;
+  }
+
+  .signature {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 15pt;
+    font-style: italic;
+    margin-top: 16px;
+    color: #111;
+  }
+
+  /* ── Footer ── */
+  .page-footer {
+    position: absolute;
+    bottom: 14mm;
+    left: 24mm;
+    right: 24mm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7.5pt;
+    color: #bbb;
+    border-top: 1px solid #eee;
+    padding-top: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="sender-name">{{CANDIDATE_NAME}}</div>
+    <div class="sender-divider">{{CANDIDATE_TITLE}}</div>
+    <div class="contact-line">
+      {{CANDIDATE_EMAIL}} &nbsp;·&nbsp; {{CANDIDATE_PHONE}} &nbsp;·&nbsp; {{CANDIDATE_LOCATION}}
+    </div>
+  </div>
+
+  <!-- Meta / recipient -->
+  <div class="meta-block">
+    <div>{{CITY}}, {{DATE}}</div>
+    <br>
+    <div class="recipient-company">{{COMPANY_NAME}}</div>
+    <div>Att: Rekryteringsansvarig — {{JOB_TITLE}}</div>
+  </div>
+
+  <!-- Salutation -->
+  <div class="salutation">Bäste rekryterare,</div>
+
+  <!-- Opening paragraph -->
+  <p>{{OPENING_PARAGRAPH}}</p>
+
+  <!-- Quote / highlight -->
+  <div class="highlight-quote">{{KEY_VALUE_STATEMENT}}</div>
+
+  <!-- Core paragraphs -->
+  <p>{{EXPERIENCE_PARAGRAPH}}</p>
+
+  <p>{{QUALIFICATION_PARAGRAPH}}</p>
+
+  <!-- Why this role -->
+  <p>{{WHY_COMPANY_PARAGRAPH}}</p>
+
+  <!-- Closing -->
+  <div class="closing-block">
+    <p>Jag är angelägen om att diskutera hur jag kan bidra till {{COMPANY_NAME}}:s framgång och ser fram emot möjligheten till ett samtal.</p>
+    <p>Vänliga hälsningar,</p>
+    <div class="signature">{{CANDIDATE_NAME}}</div>
+  </div>
+
+  <!-- Footer -->
+  <div class="page-footer">
+    <span>{{CANDIDATE_EMAIL}}</span>
+    <span>Ansökan — {{JOB_TITLE}}, {{COMPANY_NAME}}</span>
+    <span>{{DATE}}</span>
+  </div>
+
+</div>
+</body>
+</html>

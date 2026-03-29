@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}Mitt CV — ApplyMind AI{% endblock %}
+{% block page_title %}Mitt CV{% endblock %}
+
+{% block content %}
+{% set pi = resume.get('personal_information', {}) %}
+{% set exp = resume.get('experience_details', []) %}
+{% set edu = resume.get('education_details', []) %}
+{% set ts = resume.get('technical_skills', {}) %}
+{% set langs = resume.get('languages', []) %}
+
+<form action="/cv/save" method="POST" id="cv-form">
+
+  <!-- Save bar -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 text-green"><i class="bi bi-person-vcard me-2"></i>CV-editor</h5>
+    <button type="submit" class="btn btn-green">
+      <i class="bi bi-floppy me-2"></i>Spara CV
+    </button>
+  </div>
+
+  <!-- ── PERSONLIG INFO ── -->
+  <div class="form-section">
+    <div class="form-section-title">
+      <i class="bi bi-person-fill"></i> Personlig information
+    </div>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label">Förnamn</label>
+        <input type="text" name="name" class="form-control" value="{{ pi.get('name','') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Efternamn</label>
+        <input type="text" name="surname" class="form-control" value="{{ pi.get('surname','') }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">E-post</label>
+        <input type="email" name="email" class="form-control" value="{{ pi.get('email','') }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Landskod</label>
+        <input type="text" name="phone_prefix" class="form-control" value="{{ pi.get('phone_prefix','+46') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Telefon</label>
+        <input type="text" name="phone" class="form-control" value="{{ pi.get('phone','') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Stad</label>
+        <input type="text" name="city" class="form-control" value="{{ pi.get('city','') }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Land</label>
+        <input type="text" name="country" class="form-control" value="{{ pi.get('country','Sverige') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Adress</label>
+        <input type="text" name="address" class="form-control" value="{{ pi.get('address','') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">GitHub URL</label>
+        <input type="text" name="github" class="form-control" value="{{ pi.get('github','') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">LinkedIn URL</label>
+        <input type="text" name="linkedin" class="form-control" value="{{ pi.get('linkedin','') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Webbplats</label>
+        <input type="text" name="website" class="form-control" value="{{ pi.get('website','') }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SAMMANFATTNING ── -->
+  <div class="form-section">
+    <div class="form-section-title">
+      <i class="bi bi-file-person"></i> Professionell sammanfattning
+    </div>
+    <label class="form-label">Presenteras på CV:et under ditt namn</label>
+    <textarea name="professional_summary" class="form-control" rows="4"
+      placeholder="Kort och slagkraftig beskrivning av dig själv...">{{ resume.get('professional_summary','') }}</textarea>
+  </div>
+
+  <!-- ── COVER LETTER PROFIL ── -->
+  <div class="form-section">
+    <div class="form-section-title">
+      <i class="bi bi-chat-quote"></i> AI-profil för personliga brev
+    </div>
+    <label class="form-label">AI:n använder detta som grund när den skapar personliga brev</label>
+    <textarea name="cover_letter_profile" class="form-control" rows="6"
+      placeholder="Beskriv dig själv, dina styrkor och vad du söker...">{{ resume.get('cover_letter_profile','') }}</textarea>
+  </div>
+
+  <!-- ── ARBETSLIVSERFARENHET ── -->
+  <div class="form-section">
+    <div class="form-section-title d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-building"></i> Arbetslivserfarenhet</span>
+      <button type="button" class="btn btn-sm btn-outline-green"
+              onclick="addItem('exp-list', 'exp-template')">
+        <i class="bi bi-plus-lg me-1"></i>Lägg till
+      </button>
+    </div>
+
+    <div id="exp-list">
+      {% for e in exp %}
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Befattning</label>
+            <input type="text" name="exp_position[]" class="form-control" value="{{ e.get('position','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Företag</label>
+            <input type="text" name="exp_company[]" class="form-control" value="{{ e.get('company','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Period (t.ex. 2022 – Nu)</label>
+            <input type="text" name="exp_period[]" class="form-control" value="{{ e.get('employment_period','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Plats</label>
+            <input type="text" name="exp_location[]" class="form-control" value="{{ e.get('location','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Arbetsuppgifter (en per rad)</label>
+            <textarea name="exp_responsibilities[]" class="form-control" rows="3">{% for r in e.get('key_responsibilities',[]) %}{{ r.get('responsibility','') }}
+{% endfor %}</textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Förvärvade kompetenser (en per rad)</label>
+            <textarea name="exp_skills[]" class="form-control" rows="3">{% for s in e.get('skills_acquired',[]) %}{{ s }}
+{% endfor %}</textarea>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Template for new experience entry -->
+    <template id="exp-template">
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Befattning</label>
+            <input type="text" data-name="exp_position[]" class="form-control" placeholder="T.ex. Systemutvecklare">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Företag</label>
+            <input type="text" data-name="exp_company[]" class="form-control" placeholder="Företagsnamn">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Period</label>
+            <input type="text" data-name="exp_period[]" class="form-control" placeholder="2023 – Nu">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Plats</label>
+            <input type="text" data-name="exp_location[]" class="form-control" placeholder="Uppsala, Sverige">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Arbetsuppgifter (en per rad)</label>
+            <textarea data-name="exp_responsibilities[]" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Kompetenser (en per rad)</label>
+            <textarea data-name="exp_skills[]" class="form-control" rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ── UTBILDNING ── -->
+  <div class="form-section">
+    <div class="form-section-title d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-mortarboard"></i> Utbildning</span>
+      <button type="button" class="btn btn-sm btn-outline-green"
+              onclick="addItem('edu-list', 'edu-template')">
+        <i class="bi bi-plus-lg me-1"></i>Lägg till
+      </button>
+    </div>
+
+    <div id="edu-list">
+      {% for e in edu %}
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Examen / Nivå</label>
+            <input type="text" name="edu_level[]" class="form-control" value="{{ e.get('education_level','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Lärosäte</label>
+            <input type="text" name="edu_institution[]" class="form-control" value="{{ e.get('institution','') }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Inriktning</label>
+            <input type="text" name="edu_field[]" class="form-control" value="{{ e.get('field_of_study','') }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Examsår</label>
+            <input type="text" name="edu_year[]" class="form-control" value="{{ e.get('year_of_completion','') }}">
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <template id="edu-template">
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label">Examen / Nivå</label>
+            <input type="text" data-name="edu_level[]" class="form-control" placeholder="T.ex. Högskoleutbildning Datateknik">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Lärosäte</label>
+            <input type="text" data-name="edu_institution[]" class="form-control" placeholder="Universitetsnamn">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Inriktning</label>
+            <input type="text" data-name="edu_field[]" class="form-control" placeholder="T.ex. IT och Dataingenjörskap">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Examsår</label>
+            <input type="text" data-name="edu_year[]" class="form-control" placeholder="2024">
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ── TEKNISKA KOMPETENSER ── -->
+  <div class="form-section">
+    <div class="form-section-title">
+      <i class="bi bi-tools"></i> Tekniska kompetenser
+    </div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Operativsystem (en per rad)</label>
+        <textarea name="os_skills" class="form-control" rows="5">{% for s in ts.get('operating_systems',[]) %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Mjukvara / Verktyg (en per rad)</label>
+        <textarea name="software_skills" class="form-control" rows="5">{% for s in ts.get('software',[]) %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Övriga kompetenser (en per rad)</label>
+        <textarea name="additional_skills" class="form-control" rows="5">{% for s in ts.get('additional',[]) %}{{ s }}
+{% endfor %}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SPRÅK ── -->
+  <div class="form-section">
+    <div class="form-section-title d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-translate"></i> Språk</span>
+      <button type="button" class="btn btn-sm btn-outline-green"
+              onclick="addItem('lang-list', 'lang-template')">
+        <i class="bi bi-plus-lg me-1"></i>Lägg till
+      </button>
+    </div>
+
+    <div id="lang-list">
+      {% for l in langs %}
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Språk</label>
+            <input type="text" name="lang_name[]" class="form-control" value="{{ l.get('language','') }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nivå</label>
+            <input type="text" name="lang_level[]" class="form-control"
+                   value="{{ l.get('proficiency','') }}" placeholder="T.ex. Modersmål / Flytande">
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <template id="lang-template">
+      <div class="dynamic-item">
+        <button type="button" class="remove-btn" onclick="removeItem(this)">✕ Ta bort</button>
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label">Språk</label>
+            <input type="text" data-name="lang_name[]" class="form-control" placeholder="Svenska">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nivå</label>
+            <input type="text" data-name="lang_level[]" class="form-control" placeholder="Modersmål">
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Save button bottom -->
+  <div class="d-flex justify-content-end mt-2 mb-4">
+    <button type="submit" class="btn btn-green btn-lg">
+      <i class="bi bi-floppy me-2"></i>Spara CV
+    </button>
+  </div>
+
+</form>
+{% endblock %}

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CV – Anna Lindström</title>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Raleway', sans-serif;
+    background: #0d1117;
+    color: #e6edf3;
+    font-size: 13px;
+    line-height: 1.6;
+    width: 794px;
+    min-height: 1123px;
+    margin: 0 auto;
+  }
+
+  .cv-wrapper {
+    width: 794px;
+    min-height: 1123px;
+    background: #0d1117;
+    padding: 56px 60px 52px 60px;
+  }
+
+  /* Header */
+  .header {
+    margin-bottom: 32px;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .header .title {
+    font-size: 13px;
+    font-weight: 300;
+    color: #8b949e;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .gold-line {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(to right, #D4AF37, #f5d77e, #D4AF37, transparent);
+    margin-bottom: 16px;
+  }
+
+  .contact-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    font-size: 11px;
+    color: #8b949e;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  .contact-row span {
+    color: #c9d1d9;
+  }
+
+  .contact-sep {
+    color: #D4AF37;
+    font-size: 10px;
+  }
+
+  /* Sections */
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #D4AF37;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, #3a3010, transparent);
+  }
+
+  /* Summary */
+  .summary-text {
+    font-size: 13px;
+    color: #c9d1d9;
+    line-height: 1.75;
+    font-weight: 300;
+    padding-left: 16px;
+    border-left: 2px solid #D4AF37;
+  }
+
+  /* Experience */
+  .exp-item {
+    margin-bottom: 20px;
+    padding: 16px 18px;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-left: 3px solid #D4AF37;
+    position: relative;
+  }
+
+  .exp-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .exp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 2px;
+  }
+
+  .exp-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f0f6fc;
+  }
+
+  .exp-date {
+    font-size: 11px;
+    color: #D4AF37;
+    font-weight: 600;
+  }
+
+  .exp-company {
+    font-size: 11px;
+    color: #8b949e;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .exp-desc {
+    font-size: 12px;
+    color: #8b949e;
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* Education */
+  .edu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 18px;
+    background: #161b22;
+    border: 1px solid #21262d;
+  }
+
+  .edu-degree {
+    font-size: 13px;
+    font-weight: 600;
+    color: #f0f6fc;
+  }
+
+  .edu-school {
+    font-size: 11px;
+    color: #8b949e;
+    margin-top: 2px;
+  }
+
+  .edu-date {
+    font-size: 11px;
+    color: #D4AF37;
+    font-weight: 600;
+  }
+
+  /* Two columns for skills + languages */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  /* Skills */
+  .skills-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .skill-tag {
+    background: #161b22;
+    border: 1px solid #D4AF37;
+    color: #D4AF37;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Languages */
+  .lang-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 12px;
+  }
+
+  .lang-item:last-child { border-bottom: none; }
+
+  .lang-name {
+    color: #c9d1d9;
+    font-weight: 600;
+  }
+
+  .lang-level {
+    color: #8b949e;
+    font-weight: 300;
+  }
+
+  @media print {
+    body { background: #0d1117; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .cv-wrapper { padding: 48px 56px; }
+  }
+</style>
+</head>
+<body>
+<div class="cv-wrapper">
+
+  <div class="header">
+    <h1>Anna Lindström</h1>
+    <div class="title">Systemutvecklare</div>
+    <div class="gold-line"></div>
+    <div class="contact-row">
+      <span>anna@email.com</span>
+      <span class="contact-sep">◆</span>
+      <span>+46 70 123 45 67</span>
+      <span class="contact-sep">◆</span>
+      <span>Uppsala</span>
+      <span class="contact-sep">◆</span>
+      <span>linkedin.com/in/annalindstrom</span>
+      <span class="contact-sep">◆</span>
+      <span>github.com/annalindstrom</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Executive Profile</div>
+    <p class="summary-text">Engagerad systemutvecklare med 4+ års erfarenhet av fullstack-utveckling. Specialiserad i Python, React och molnarkitektur. Drivs av att bygga skalbara, väl testade system och leverera mätbar affärsnytta i moderna teknologiorganisationer.</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Career Experience</div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Senior Systemutvecklare</div>
+        <div class="exp-date">2022 – Nu</div>
+      </div>
+      <div class="exp-company">TechCorp AB &nbsp;·&nbsp; Stockholm</div>
+      <div class="exp-desc">Ledde design och implementation av microservices-arkitektur för affärskritiska system. Förbättrade systemprestanda med 40% genom strategisk databasoptimering och cachning. Drev teknisk roadmap och mentorerade teammedlemmar.</div>
+    </div>
+
+    <div class="exp-item">
+      <div class="exp-header">
+        <div class="exp-title">Systemutvecklare</div>
+        <div class="exp-date">2020 – 2022</div>
+      </div>
+      <div class="exp-company">Startupbolaget AB &nbsp;·&nbsp; Uppsala</div>
+      <div class="exp-desc">Byggde React-frontend för skalbar SaaS-produkt. Implementerade CI/CD-pipeline med Docker och GitHub Actions. Samarbetade med produktteam och UX-designers för att leverera features i högt tempo.</div>
+    </div>
+
+  </div>
+
+  <div class="section">
+    <div class="section-title">Education</div>
+    <div class="edu-item">
+      <div>
+        <div class="edu-degree">Kandidatexamen i Datateknik</div>
+        <div class="edu-school">Uppsala Universitet</div>
+      </div>
+      <div class="edu-date">2016 – 2020</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="two-col">
+      <div>
+        <div class="section-title">Technical Skills</div>
+        <div class="skills-wrap">
+          <span class="skill-tag">Python</span>
+          <span class="skill-tag">JavaScript</span>
+          <span class="skill-tag">React</span>
+          <span class="skill-tag">Node.js</span>
+          <span class="skill-tag">SQL</span>
+          <span class="skill-tag">Docker</span>
+          <span class="skill-tag">AWS</span>
+          <span class="skill-tag">Git</span>
+          <span class="skill-tag">Linux</span>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Languages</div>
+        <div class="lang-item">
+          <span class="lang-name">Svenska</span>
+          <span class="lang-level">Modersmål</span>
+        </div>
+        <div class="lang-item">
+          <span class="lang-name">Engelska</span>
+          <span class="lang-level">Flytande</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

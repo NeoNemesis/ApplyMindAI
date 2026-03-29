@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Brevmallar — ApplyMind AI{% endblock %}
+{% block page_title %}Brevmallar{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h5 class="mb-1 text-green"><i class="bi bi-palette me-2"></i>Personligt brev — Välj mall</h5>
+    <p class="text-muted small mb-0">Välj den design som passar bäst för branschen du söker i.</p>
+  </div>
+  <a href="/cover-letter" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Tillbaka
+  </a>
+</div>
+
+<!-- Research tip -->
+<div class="alert" style="background:rgba(74,229,74,0.08);border:1px solid rgba(74,229,74,0.25);border-radius:10px;" role="alert">
+  <div class="d-flex gap-2 align-items-start">
+    <i class="bi bi-lightbulb-fill text-green mt-1 flex-shrink-0"></i>
+    <div>
+      <strong class="text-green">Forskning visar:</strong>
+      <span class="text-muted"> 72% av rekryterare prioriterar jobbspecifik anpassning framför design. <strong class="text-white">Problem-lösning-formatet</strong> ger flest svar. Håll det under 400 ord.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Template grid -->
+<div class="row g-4 mt-1">
+
+  <!-- Template 1: Problem-Lösning -->
+  <div class="col-md-6">
+    <div class="card h-100 template-card {% if active_template == 'problem_solution' %}template-card--active{% endif %}"
+         data-template="problem_solution">
+      <div class="template-preview" style="background:linear-gradient(135deg,#1a1a1a 0%,#2a2a2a 100%);padding:20px;border-radius:10px 10px 0 0;position:relative;overflow:hidden;min-height:200px;">
+        <!-- Accent bar -->
+        <div style="position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,#4AE54A,#1de9b6);"></div>
+        <!-- Preview content -->
+        <div style="margin-left:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;border-bottom:2px solid #4AE54A;margin-bottom:10px;">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:#fff;">Kandidatens Namn</div>
+              <div style="font-size:9px;color:#888;margin-top:2px;">Software Engineer</div>
+            </div>
+            <div style="text-align:right;font-size:8px;color:#666;">namn@email.com<br>+46 70 xxx xxxx</div>
+          </div>
+          <div style="font-size:7px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4AE54A;margin-bottom:5px;">Utmaningen jag ser</div>
+          <div style="background:#2a2a2a;border-left:3px solid #4AE54A;padding:6px 8px;border-radius:0 4px 4px 0;margin-bottom:8px;">
+            <div style="font-size:8px;color:#aaa;line-height:1.4;">Företaget X expanderar snabbt och behöver…</div>
+          </div>
+          <div style="font-size:7px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4AE54A;margin-bottom:5px;">Min lösning</div>
+          <div style="font-size:8px;color:#ccc;line-height:1.5;">Med 5 år erfarenhet av skalbar backend-arkitektur kan jag direkt bidra till…</div>
+          <div style="display:flex;gap:5px;margin-top:8px;">
+            <div style="background:rgba(74,229,74,0.1);border:1px solid rgba(74,229,74,0.4);border-radius:12px;padding:2px 8px;font-size:7px;color:#4AE54A;">+40% effektivitet</div>
+            <div style="background:rgba(74,229,74,0.1);border:1px solid rgba(74,229,74,0.4);border-radius:12px;padding:2px 8px;font-size:7px;color:#4AE54A;">3 produkter</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="mb-1">Problem-Lösning <span class="badge bg-success ms-1" style="font-size:0.65rem;">Rekommenderas</span></h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">Tech</span>
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">Startup</span>
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">Product</span>
+            </div>
+          </div>
+          {% if active_template == 'problem_solution' %}
+          <span class="text-green"><i class="bi bi-check-circle-fill fs-5"></i></span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-3">Identifierar ett specifikt företagsproblem och presenterar dig som lösningen. Forskning visar att detta format ger flest intervjuer.</p>
+        <div class="d-flex gap-2">
+          <a href="/cover-letter/template/preview/problem_solution" target="_blank"
+             class="btn btn-outline-secondary btn-sm flex-grow-1">
+            <i class="bi bi-eye me-1"></i>Förhandsgranska
+          </a>
+          <form action="/cover-letter/template/select" method="POST" class="flex-grow-1">
+            <input type="hidden" name="template" value="problem_solution">
+            <button type="submit" class="btn btn-sm w-100 {% if active_template == 'problem_solution' %}btn-green{% else %}btn-outline-success{% endif %}">
+              {% if active_template == 'problem_solution' %}
+                <i class="bi bi-check me-1"></i>Vald
+              {% else %}
+                <i class="bi bi-check2 me-1"></i>Välj
+              {% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template 2: Executive -->
+  <div class="col-md-6">
+    <div class="card h-100 template-card {% if active_template == 'executive' %}template-card--active{% endif %}"
+         data-template="executive">
+      <div class="template-preview" style="background:#f9f6f0;padding:20px;border-radius:10px 10px 0 0;min-height:200px;">
+        <div style="text-align:center;padding-bottom:10px;border-bottom:1px solid #ccc;margin-bottom:10px;">
+          <div style="font-size:16px;font-weight:700;color:#111;font-family:Georgia,serif;letter-spacing:0.5px;">Kandidatens Namn</div>
+          <div style="font-size:8px;color:#888;margin-top:3px;">● Senior Manager ●</div>
+          <div style="font-size:7.5px;color:#666;margin-top:3px;">namn@email.com · +46 70 xxx xxxx</div>
+        </div>
+        <div style="font-size:8px;color:#555;margin-bottom:8px;">Stockholm, {{datum}}<br><br><strong>Företaget X AB</strong><br>Rekryteringsansvarig — VD-assistent</div>
+        <div style="font-style:italic;font-family:Georgia,serif;font-size:9px;color:#333;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:6px 10px;text-align:center;margin:8px 0;">
+          "Med 10 år av ledarskap i tillväxtbolag…"
+        </div>
+        <div style="font-size:8px;color:#444;line-height:1.5;">Min erfarenhet av strategisk planering och teamutveckling gör mig till en stark kandidat för…</div>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="mb-1">Executive / Klassisk</h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">Management</span>
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">Senior</span>
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">Konsult</span>
+            </div>
+          </div>
+          {% if active_template == 'executive' %}
+          <span class="text-green"><i class="bi bi-check-circle-fill fs-5"></i></span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-3">Elegant och professionell. Passar ledarpositioner, konsultroller och traditionella branscher. Serif-typografi signalerar erfarenhet.</p>
+        <div class="d-flex gap-2">
+          <a href="/cover-letter/template/preview/executive" target="_blank"
+             class="btn btn-outline-secondary btn-sm flex-grow-1">
+            <i class="bi bi-eye me-1"></i>Förhandsgranska
+          </a>
+          <form action="/cover-letter/template/select" method="POST" class="flex-grow-1">
+            <input type="hidden" name="template" value="executive">
+            <button type="submit" class="btn btn-sm w-100 {% if active_template == 'executive' %}btn-green{% else %}btn-outline-success{% endif %}">
+              {% if active_template == 'executive' %}
+                <i class="bi bi-check me-1"></i>Vald
+              {% else %}
+                <i class="bi bi-check2 me-1"></i>Välj
+              {% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template 3: Modern Tech -->
+  <div class="col-md-6">
+    <div class="card h-100 template-card {% if active_template == 'modern_tech' %}template-card--active{% endif %}"
+         data-template="modern_tech">
+      <div class="template-preview" style="background:#fff;border-radius:10px 10px 0 0;overflow:hidden;min-height:200px;">
+        <!-- Top banner -->
+        <div style="background:#111;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#fff;">Kandidatens Namn</div>
+            <div style="font-family:monospace;font-size:8px;color:#4AE54A;margin-top:2px;">// Backend Engineer</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:flex-end;">
+            <div style="background:rgba(74,229,74,0.15);border:1px solid rgba(74,229,74,0.4);color:#4AE54A;font-size:7px;padding:1px 7px;border-radius:10px;font-family:monospace;">namn@email.com</div>
+            <div style="background:rgba(74,229,74,0.15);border:1px solid rgba(74,229,74,0.4);color:#4AE54A;font-size:7px;padding:1px 7px;border-radius:10px;font-family:monospace;">+46 70 xxx xxxx</div>
+          </div>
+        </div>
+        <!-- Green job bar -->
+        <div style="background:#4AE54A;padding:5px 16px;display:flex;justify-content:space-between;">
+          <div style="font-size:8.5px;font-weight:700;color:#111;">TechCorp AB — Senior Backend Developer</div>
+          <div style="font-family:monospace;font-size:7.5px;color:#111;">2026-03-27</div>
+        </div>
+        <!-- Body preview -->
+        <div style="padding:12px 16px;background:#fff;">
+          <div style="font-size:8px;color:#444;margin-bottom:8px;line-height:1.5;">Med 6 år av erfarenhet inom distribuerade system och mikrotjänster söker jag nu en ny utmaning…</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:2px 7px;font-family:monospace;font-size:7px;color:#333;">Python</div>
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:2px 7px;font-family:monospace;font-size:7px;color:#333;">FastAPI</div>
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:2px 7px;font-family:monospace;font-size:7px;color:#333;">Kubernetes</div>
+            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:2px 7px;font-family:monospace;font-size:7px;color:#333;">PostgreSQL</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;border:1px solid #eee;border-radius:5px;padding:5px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:#4AE54A;">3x</div>
+              <div style="font-size:6.5px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Prestanda</div>
+            </div>
+            <div style="flex:1;border:1px solid #eee;border-radius:5px;padding:5px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:#4AE54A;">50k</div>
+              <div style="font-size:6.5px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Req/s</div>
+            </div>
+            <div style="flex:1;border:1px solid #eee;border-radius:5px;padding:5px;text-align:center;">
+              <div style="font-size:14px;font-weight:700;color:#4AE54A;">5yr</div>
+              <div style="font-size:6.5px;color:#888;text-transform:uppercase;letter-spacing:0.5px;">Erfarenhet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="mb-1">Modern Tech</h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">Utvecklare</span>
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">Data</span>
+              <span class="badge" style="background:rgba(74,229,74,0.12);color:#4AE54A;font-size:0.68rem;">DevOps</span>
+            </div>
+          </div>
+          {% if active_template == 'modern_tech' %}
+          <span class="text-green"><i class="bi bi-check-circle-fill fs-5"></i></span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-3">Mörkt header, kodstil och metrikkort. Visar teknisk kompetens visuellt med skills-chips och impacttal. Perfekt för tech-roller.</p>
+        <div class="d-flex gap-2">
+          <a href="/cover-letter/template/preview/modern_tech" target="_blank"
+             class="btn btn-outline-secondary btn-sm flex-grow-1">
+            <i class="bi bi-eye me-1"></i>Förhandsgranska
+          </a>
+          <form action="/cover-letter/template/select" method="POST" class="flex-grow-1">
+            <input type="hidden" name="template" value="modern_tech">
+            <button type="submit" class="btn btn-sm w-100 {% if active_template == 'modern_tech' %}btn-green{% else %}btn-outline-success{% endif %}">
+              {% if active_template == 'modern_tech' %}
+                <i class="bi bi-check me-1"></i>Vald
+              {% else %}
+                <i class="bi bi-check2 me-1"></i>Välj
+              {% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template 4: Nordic Minimal -->
+  <div class="col-md-6">
+    <div class="card h-100 template-card {% if active_template == 'nordic_minimal' %}template-card--active{% endif %}"
+         data-template="nordic_minimal">
+      <div class="template-preview" style="background:#fff;padding:20px;border-radius:10px 10px 0 0;min-height:200px;border:1px solid #eee;">
+        <div style="width:30px;height:3px;background:#1a1a1a;margin-bottom:14px;"></div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:15px;font-weight:700;color:#1a1a1a;letter-spacing:-0.3px;">Kandidatens Namn</div>
+          <div style="font-size:8.5px;font-weight:300;color:#888;margin-top:3px;">UX Designer</div>
+          <div style="font-size:7.5px;color:#aaa;margin-top:5px;display:flex;gap:12px;">
+            <span>namn@email.com</span>
+            <span>+46 70 xxx xxxx</span>
+          </div>
+        </div>
+        <div style="height:1px;background:#eee;margin-bottom:12px;"></div>
+        <div style="display:flex;justify-content:space-between;font-size:8px;color:#aaa;margin-bottom:14px;font-weight:300;">
+          <span>Stockholm, 27 mars 2026</span>
+          <span>Till: <strong style="color:#1a1a1a;">DesignCo AB</strong></span>
+        </div>
+        <div style="font-size:8.5px;color:#444;line-height:1.6;margin-bottom:10px;">Jag söker tjänsten som UX Designer med ett genuint intresse för tillgänglig design…</div>
+        <div style="list-style:none;padding:0;">
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px solid #f5f5f5;font-size:8px;color:#333;">
+            <div style="width:4px;height:4px;background:#1a1a1a;border-radius:50%;flex-shrink:0;margin-top:5px;"></div>
+            <span>3 år Figma, Sketch och prototyputveckling</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:8px;color:#333;">
+            <div style="width:4px;height:4px;background:#1a1a1a;border-radius:50%;flex-shrink:0;margin-top:5px;"></div>
+            <span>Ledd användartest med 200+ deltagare</span>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <h6 class="mb-1">Nordisk Minimal</h6>
+            <div class="d-flex gap-2 flex-wrap">
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">Design</span>
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">HR</span>
+              <span class="badge" style="background:rgba(100,100,100,0.15);color:#aaa;font-size:0.68rem;">Alla branscher</span>
+            </div>
+          </div>
+          {% if active_template == 'nordic_minimal' %}
+          <span class="text-green"><i class="bi bi-check-circle-fill fs-5"></i></span>
+          {% endif %}
+        </div>
+        <p class="text-muted small mb-3">Skandinavisk enkelhet — vit bakgrund, svart typografi, maximalt luftrum. Universellt accepterad och ATS-säker.</p>
+        <div class="d-flex gap-2">
+          <a href="/cover-letter/template/preview/nordic_minimal" target="_blank"
+             class="btn btn-outline-secondary btn-sm flex-grow-1">
+            <i class="bi bi-eye me-1"></i>Förhandsgranska
+          </a>
+          <form action="/cover-letter/template/select" method="POST" class="flex-grow-1">
+            <input type="hidden" name="template" value="nordic_minimal">
+            <button type="submit" class="btn btn-sm w-100 {% if active_template == 'nordic_minimal' %}btn-green{% else %}btn-outline-success{% endif %}">
+              {% if active_template == 'nordic_minimal' %}
+                <i class="bi bi-check me-1"></i>Vald
+              {% else %}
+                <i class="bi bi-check2 me-1"></i>Välj
+              {% endif %}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /row -->
+
+<style>
+.template-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+}
+.template-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green), 0 4px 20px rgba(74,229,74,0.1);
+}
+.template-card--active {
+  border-color: var(--green) !important;
+  box-shadow: 0 0 0 2px var(--green), 0 4px 20px rgba(74,229,74,0.15) !important;
+}
+</style>
+
+{% endblock %}

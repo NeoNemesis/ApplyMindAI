@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="sv" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kom igång — ApplyMind AI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/style.css" rel="stylesheet">
+  <style>
+    body { background: #111; }
+    .setup-container { max-width: 760px; margin: 0 auto; padding: 40px 16px 80px; }
+    .step-indicator { display:flex; gap:0; margin-bottom:32px; }
+    .step-dot {
+      flex:1; text-align:center; padding:10px 4px;
+      font-size:.82rem; font-weight:600; color:var(--text-muted);
+      border-bottom: 3px solid var(--border);
+      transition: all .2s;
+    }
+    .step-dot.active  { color:var(--green); border-bottom-color:var(--green); }
+    .step-dot.done    { color:#555; border-bottom-color:#555; }
+    .provider-card {
+      background:var(--bg-card); border:2px solid var(--border);
+      border-radius:12px; padding:16px 20px; cursor:pointer;
+      transition: all .15s; display:flex; align-items:flex-start; gap:14px;
+    }
+    .provider-card:hover  { border-color:var(--green); }
+    .provider-card.active { border-color:var(--green); background:var(--green-glow); }
+    .provider-icon { font-size:1.6rem; line-height:1; margin-top:2px; }
+    .free-badge { background:rgba(74,229,74,.2); color:var(--green);
+                  font-size:.7rem; padding:2px 8px; border-radius:20px; }
+    .model-radio { display:none; }
+    .model-option {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 14px; border-radius:8px; cursor:pointer;
+      border:1px solid var(--border); background:var(--bg-input);
+      margin-bottom:6px; transition:.15s;
+    }
+    .model-option:hover { border-color:var(--green); }
+    .model-option.selected { border-color:var(--green); background:var(--green-glow); }
+    .rec-badge { font-size:.7rem; padding:1px 7px; border-radius:20px;
+                 background:rgba(74,229,74,.2); color:var(--green); }
+  </style>
+</head>
+<body>
+<div class="setup-container">
+
+  <!-- Logo -->
+  <div class="text-center mb-4">
+    <div style="font-size:2.5rem;">⚡</div>
+    <h2 class="fw-bold text-green mb-0">ApplyMind AI</h2>
+    <p class="text-muted small">Kom igång på 3 minuter</p>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="step-indicator">
+    <div class="step-dot {% if step == '1' %}active{% elif step > '1' %}done{% endif %}">
+      1. AI-modell
+    </div>
+    <div class="step-dot {% if step == '2' %}active{% elif step > '2' %}done{% endif %}">
+      2. Mitt CV
+    </div>
+    <div class="step-dot {% if step == '3' %}active{% endif %}">
+      3. Personligt brev
+    </div>
+  </div>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat, msg in messages %}
+      <div class="alert alert-{{ 'success' if cat == 'success' else 'danger' }} alert-dismissible fade show mb-3">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  <!-- ═══════════════════════════════════════════════
+       STEG 1 — Välj AI-leverantör och modell
+       ═══════════════════════════════════════════════ -->
+  {% if step == '1' %}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-robot"></i> Välj AI-leverantör</div>
+
+    <form action="/setup/save-model" method="POST" id="model-form">
+      <input type="hidden" name="provider" id="selected-provider" value="{{ env.get('LLM_PROVIDER','openai') }}">
+      <input type="hidden" name="model"    id="selected-model"    value="{{ env.get('LLM_MODEL','gpt-4o-mini') }}">
+
+      <!-- Provider cards -->
+      <div class="row g-3 mb-4">
+        {% for pid, pinfo in provider_info.items() %}
+        <div class="col-md-6">
+          <div class="provider-card {% if env.get('LLM_PROVIDER','openai') == pid %}active{% endif %}"
+               onclick="selectProvider('{{ pid }}')">
+            <div class="provider-icon">{{ pinfo.icon }}</div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="fw-semibold">{{ pinfo.label }}</span>
+                {% if pinfo.free %}<span class="free-badge">Gratis</span>{% endif %}
+              </div>
+              <div class="text-muted small">{{ pinfo.description }}</div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Model selection (per provider) -->
+      {% for pid, models in available_models.items() %}
+      <div class="model-group" id="models-{{ pid }}"
+           style="display:{% if env.get('LLM_PROVIDER','openai') == pid %}block{% else %}none{% endif %}">
+        <label class="form-label mb-2">Välj modell för <strong>{{ provider_info[pid].label }}</strong>:</label>
+        {% for m in models %}
+        <label class="model-option {% if env.get('LLM_MODEL', m.id) == m.id and loop.first %}selected{% endif %}"
+               onclick="selectModel('{{ m.id }}', this)">
+          <span style="font-size:1.1rem;">{{ '★' if m.recommended else '○' }}</span>
+          <span class="flex-grow-1">{{ m.label }}</span>
+          {% if m.recommended %}<span class="rec-badge">Rekommenderad</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <!-- API Key input -->
+      <div id="api-key-section" class="mt-4" {% if env.get('LLM_PROVIDER','openai') == 'ollama' %}style="display:none"{% endif %}>
+        <label class="form-label">
+          <i class="bi bi-key me-1"></i>API-nyckel
+          <span id="api-key-label" class="text-muted small ms-1">(OpenAI)</span>
+        </label>
+        <input type="password" name="api_key" id="api-key-input" class="form-control"
+               placeholder="Klistra in din API-nyckel här..."
+               value="">
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+          <a id="api-key-link" href="https://platform.openai.com/api-keys" target="_blank"
+             class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Hämta API-nyckel
+          </a>
+          <span class="text-muted small align-self-center">
+            Nyckeln sparas lokalt i .env och lämnar aldrig din dator.
+          </span>
+        </div>
+      </div>
+
+      <!-- Ollama info -->
+      <div id="ollama-info" class="mt-3" style="display:{% if env.get('LLM_PROVIDER') == 'ollama' %}block{% else %}none{% endif %}">
+        <div class="card">
+          <div class="card-body">
+            <p class="mb-2 fw-semibold"><i class="bi bi-info-circle text-green me-2"></i>Ollama — lokal AI</p>
+            <ol class="text-muted small mb-0">
+              <li>Ladda ner Ollama: <a href="https://ollama.com/" target="_blank" class="text-green">ollama.com</a></li>
+              <li>Kör: <code>ollama pull llama3.2</code></li>
+              <li>Starta Ollama och kom tillbaka hit</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- LinkedIn (valfritt) -->
+      <div class="mt-4">
+        <div class="form-section-title" style="font-size:.85rem;color:var(--text-muted);">
+          <i class="bi bi-linkedin me-2" style="color:#0A66C2"></i>
+          LinkedIn (valfritt &mdash; för LinkedIn-jobbsökning)
+        </div>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <input type="email" name="linkedin_email" class="form-control"
+                   placeholder="LinkedIn e-post"
+                   value="{{ env.get('LINKEDIN_EMAIL','') }}">
+          </div>
+          <div class="col-md-6">
+            <input type="password" name="linkedin_password" class="form-control"
+                   placeholder="LinkedIn lösenord">
+          </div>
+        </div>
+        <small class="text-muted">Sparas lokalt i .env-filen. Används bara för jobbsökning.</small>
+      </div>
+
+      <div class="d-flex justify-content-end mt-4">
+        <button type="submit" class="btn btn-green btn-lg">
+          Nästa: Mitt CV <i class="bi bi-arrow-right ms-2"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       STEG 2 — Ladda upp CV
+       ═══════════════════════════════════════════════ -->
+  {% elif step == '2' %}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-person-vcard"></i> Importera ditt CV</div>
+    <p class="text-muted small mb-3">
+      AI:n läser ditt CV och fyller i formuläret automatiskt.
+      Du kan alltid redigera det senare under <strong>Mitt CV</strong>.
+    </p>
+
+    <!-- Tab: PDF / Text / Skip -->
+    <ul class="nav nav-pills mb-3" id="cv-tabs">
+      <li class="nav-item">
+        <button class="nav-link active" onclick="showTab('tab-pdf', this)">
+          <i class="bi bi-file-pdf me-1"></i>PDF
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" onclick="showTab('tab-text', this)">
+          <i class="bi bi-textarea-t me-1"></i>Klistra in text
+        </button>
+      </li>
+    </ul>
+
+    <!-- PDF upload -->
+    <div id="tab-pdf">
+      <form action="/setup/upload-cv" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="mode" value="pdf">
+        <div class="mb-3">
+          <label class="form-label">Välj PDF-fil</label>
+          <input type="file" name="cv_pdf" accept=".pdf" class="form-control" required>
+        </div>
+        <div class="d-flex gap-2 justify-content-between">
+          <a href="/setup?step=3" class="btn btn-outline-secondary">Hoppa över →</a>
+          <button type="submit" class="btn btn-green">
+            <i class="bi bi-upload me-2"></i>Importera CV
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Text paste -->
+    <div id="tab-text" style="display:none">
+      <form action="/setup/upload-cv" method="POST">
+        <input type="hidden" name="mode" value="text">
+        <div class="mb-3">
+          <label class="form-label">Klistra in CV-text</label>
+          <textarea name="cv_text" class="form-control" rows="12"
+            placeholder="Klistra in innehållet från ditt CV här...&#10;&#10;AI:n extraherar automatiskt: namn, email, telefon, erfarenheter, utbildning osv."></textarea>
+        </div>
+        <div class="d-flex gap-2 justify-content-between">
+          <a href="/setup?step=3" class="btn btn-outline-secondary">Hoppa över →</a>
+          <button type="submit" class="btn btn-green">
+            <i class="bi bi-robot me-2"></i>Importera med AI
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       STEG 3 — Personligt brev
+       ═══════════════════════════════════════════════ -->
+  {% elif step == '3' %}
+  {% set cover_content = '' %}
+  {% if cover_letter_path is defined %}{% set cover_content = cover_letter_path %}{% endif %}
+  <div class="form-section">
+    <div class="form-section-title"><i class="bi bi-file-earmark-text"></i> Personligt brev</div>
+    <p class="text-muted small mb-3">
+      Skriv en mall för ditt personliga brev. AI:n anpassar det sedan automatiskt
+      till varje jobb du söker.
+    </p>
+
+    <form action="/setup/save-cover-letter" method="POST">
+      <div class="mb-3">
+        <label class="form-label">Din brevmall <span class="text-muted small">(kan vara generell)</span></label>
+        <textarea name="content" class="form-control" rows="10"
+          placeholder="Hej!&#10;&#10;Jag heter [Ditt namn] och söker tjänsten som [Titel].&#10;&#10;Berätta om dig själv, dina styrkor och varför du är intresserad av jobbet...&#10;&#10;Med vänliga hälsningar,&#10;[Ditt namn]">{% if cover_content %}{{ cover_content }}{% endif %}</textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">
+          Extra info till AI:n <span class="text-muted small">(valfritt men rekommenderat)</span>
+        </label>
+        <textarea name="profile" class="form-control" rows="5"
+          placeholder="Berätta mer om dig: bakgrund, styrkor, vad du söker, teknikintressen...&#10;AI:n använder detta för att göra breven mer personliga."></textarea>
+      </div>
+      <div class="d-flex gap-2 justify-content-between">
+        <a href="/setup?step=2" class="btn btn-outline-secondary">← Tillbaka</a>
+        <button type="submit" class="btn btn-green btn-lg">
+          <i class="bi bi-check-lg me-2"></i>Klar — Starta ApplyMind AI!
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+const providerKeyUrls = {{ provider_info | tojson }};
+
+function selectProvider(pid) {
+  document.getElementById('selected-provider').value = pid;
+  document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  // Show/hide model groups
+  document.querySelectorAll('.model-group').forEach(g => g.style.display = 'none');
+  const mg = document.getElementById('models-' + pid);
+  if (mg) {
+    mg.style.display = 'block';
+    // Auto-select first recommended
+    const first = mg.querySelector('.model-option');
+    if (first) first.click();
+  }
+
+  // API key section
+  const apiSection = document.getElementById('api-key-section');
+  const ollamaInfo = document.getElementById('ollama-info');
+  if (pid === 'ollama') {
+    apiSection.style.display = 'none';
+    ollamaInfo.style.display = 'block';
+  } else {
+    apiSection.style.display = 'block';
+    ollamaInfo.style.display = 'none';
+    const pinfo = providerKeyUrls[pid];
+    if (pinfo) {
+      document.getElementById('api-key-label').textContent = '(' + pinfo.label + ')';
+      document.getElementById('api-key-link').href = pinfo.key_url;
+    }
+  }
+}
+
+function selectModel(modelId, el) {
+  const group = el.closest('.model-group');
+  group.querySelectorAll('.model-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('selected-model').value = modelId;
+}
+
+function showTab(tabId, btn) {
+  document.querySelectorAll('#tab-pdf, #tab-text').forEach(t => t.style.display = 'none');
+  document.getElementById(tabId).style.display = 'block';
+  document.querySelectorAll('#cv-tabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
