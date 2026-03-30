@@ -1172,148 +1172,216 @@ class JobMaster:
         except Exception as e:
             return (100, f'Fel i ATS-check: {e}')
 
-    def attempt_auto_apply(self, job: Dict, job_folder) -> str:
-        """Försöker auto-ansöka för Indeed och AF-jobb.
-        Returnerar: 'submitted', 'prefilled', 'skipped (<orsak>)'"""
-        source = job.get('source', '')
-        dry_run = os.getenv('AUTO_APPLY_DRY_RUN', 'true').lower() != 'false'
+    # ------------------------------------------------------------------
+    # Auto-apply helpers
+    # ------------------------------------------------------------------
 
-        # Hitta CV-filen i jobbmappen
-        cv_files = list(job_folder.glob('CV_*.pdf'))
-        cover_files = list(job_folder.glob('Personligt_Brev_*.pdf'))
-        if not cv_files or not cover_files:
-            return 'skipped (dokument saknas)'
-
-        cv_path = cv_files[0]
-        cover_path = cover_files[0]
-
-        try:
-            if 'Indeed' in source or 'indeed' in source.lower():
-                return self._auto_apply_indeed(job, cv_path, cover_path, dry_run)
-            elif 'Arbetsförmedlingen' in source or 'af' in source.lower():
-                return self._auto_apply_af(job, cv_path, cover_path, dry_run)
-            else:
-                return f'skipped (plattformen {source} stöds ej)'
-        except Exception as e:
-            return f'skipped (fel: {str(e)[:80]})'
-
-    def _auto_apply_indeed(self, job: Dict, cv_path, cover_path, dry_run: bool) -> str:
-        """Auto-ansök på Indeed via Easy Apply."""
-        self.driver.get(job['url'])
-        time.sleep(3)
-
-        # Leta efter Easy Apply-knapp
-        easy_apply_selectors = [
+    def _find_apply_button(self):
+        """Hitta ansökningsknapp/länk på nuvarande sida oavsett plattform.
+        Returnerar WebElement eller None."""
+        selectors = [
+            # Indeed
+            "button[aria-label*='Apply now']",
             "button[aria-label*='Apply']",
-            "button[class*='apply']",
             "[data-testid='applyButton']",
+            "button[class*='apply']",
             "a[class*='apply']",
-        ]
-        apply_btn = None
-        for sel in easy_apply_selectors:
-            btns = self.driver.find_elements(By.CSS_SELECTOR, sel)
-            if btns:
-                apply_btn = btns[0]
-                break
-
-        if not apply_btn:
-            return 'skipped (ingen Easy Apply-knapp hittad)'
-
-        # Kontrollera att det är en Indeed-intern ansökan (inte extern redirect)
-        href = apply_btn.get_attribute('href') or ''
-        if href and 'indeed.com' not in href and href.startswith('http'):
-            return 'skipped (extern ansökan)'
-
-        apply_btn.click()
-        time.sleep(3)
-
-        current_url = self.driver.current_url
-        if 'indeed.com' not in current_url:
-            return 'skipped (redirectad till extern sida)'
-
-        # Fyll i namn och e-post om fälten finns
-        pi = getattr(self.resume_object, 'personal_information', {}) or {}
-        name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip()
-        email = pi.get('email', '')
-
-        for field_id in ['applicant.name', 'name', 'fullName']:
-            fields = self.driver.find_elements(By.CSS_SELECTOR, f"input[name='{field_id}'], input[id='{field_id}']")
-            if fields and name:
-                fields[0].clear()
-                fields[0].send_keys(name)
-                break
-
-        for field_id in ['applicant.email', 'email']:
-            fields = self.driver.find_elements(By.CSS_SELECTOR, f"input[name='{field_id}'], input[id='{field_id}']")
-            if fields and email:
-                fields[0].clear()
-                fields[0].send_keys(email)
-                break
-
-        # Ladda upp CV
-        file_inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
-        if file_inputs:
-            file_inputs[0].send_keys(str(cv_path.absolute()))
-            time.sleep(2)
-
-        if dry_run:
-            return 'prefilled (dry-run — skickades ej)'
-
-        # Klicka submit
-        submit_btns = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], button[aria-label*='Submit'], button[aria-label*='Skicka']")
-        if submit_btns:
-            submit_btns[0].click()
-            time.sleep(3)
-            return 'submitted ✅'
-
-        return 'prefilled (submit-knapp ej hittad)'
-
-    def _auto_apply_af(self, job: Dict, cv_path, cover_path, dry_run: bool) -> str:
-        """Auto-ansök på Arbetsförmedlingen."""
-        self.driver.get(job['url'])
-        time.sleep(3)
-
-        # Leta efter ansökningslänk
-        apply_selectors = [
-            "a[data-testid*='apply']",
-            "a[href*='apply']",
+            # Generiska
+            "a[href*='/apply']",
+            "a[href*='apply?']",
             "button[data-testid*='apply']",
+            "a[data-testid*='apply']",
         ]
-        # Sök även på text
-        try:
-            from selenium.webdriver.common.by import By as B
-            links = self.driver.find_elements(B.PARTIAL_LINK_TEXT, 'Ansök')
-            if not links:
-                links = self.driver.find_elements(B.PARTIAL_LINK_TEXT, 'ansök')
-        except Exception:
-            links = []
-
-        apply_element = None
-        for sel in apply_selectors:
+        for sel in selectors:
             els = self.driver.find_elements(By.CSS_SELECTOR, sel)
             if els:
-                apply_element = els[0]
-                break
-        if not apply_element and links:
-            apply_element = links[0]
+                return els[0]
 
-        if not apply_element:
-            return 'skipped (ingen ansökningsknapp hittad)'
+        # Text-baserad sökning (fungerar på alla sidor)
+        for text in ['Apply now', 'Apply', 'Ansök', 'Sök jobbet', 'Skicka ansökan']:
+            try:
+                els = self.driver.find_elements(By.PARTIAL_LINK_TEXT, text)
+                if els:
+                    return els[0]
+            except Exception:
+                continue
+            try:
+                from selenium.webdriver.common.by import By as _B
+                btns = self.driver.find_elements(_B.XPATH,
+                    f"//button[contains(translate(., 'ABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ', "
+                    f"'abcdefghijklmnopqrstuvwxyzåäö'), '{text.lower()}')]")
+                if btns:
+                    return btns[0]
+            except Exception:
+                continue
+        return None
 
-        href = apply_element.get_attribute('href') or ''
-        if href and 'arbetsformedlingen.se' not in href and href.startswith('http'):
-            return 'skipped (extern arbetsgivarsida)'
+    def _fill_form_fields(self, cv_path, cover_path):
+        """Generisk formulär-ifyllning: namn, e-post, telefon, fritext, filuppladdning.
+        Fungerar oavsett plattform."""
+        pi = getattr(self.resume_object, 'personal_information', {}) or {}
+        name     = f"{pi.get('name', '')} {pi.get('surname', '')}".strip()
+        email    = pi.get('email', '')
+        phone    = f"{pi.get('phone_prefix', '')}{pi.get('phone', '')}".strip()
 
-        apply_element.click()
-        time.sleep(3)
+        filled = []
 
-        if 'arbetsformedlingen.se' not in self.driver.current_url:
-            return 'skipped (redirectad till extern sida)'
+        # --- Textfält ---
+        name_patterns    = ['name', 'fullname', 'full_name', 'applicant.name', 'firstname', 'first_name', 'förnamn', 'namn']
+        email_patterns   = ['email', 'e-mail', 'applicant.email', 'epost', 'e_post']
+        phone_patterns   = ['phone', 'telephone', 'tel', 'mobile', 'mobilnummer', 'telefon']
 
-        if dry_run:
-            return 'prefilled (dry-run — skickades ej)'
+        def try_fill(patterns, value):
+            if not value:
+                return
+            for pat in patterns:
+                for attr in ('name', 'id', 'placeholder', 'aria-label'):
+                    sel = f"input[{attr}*='{pat}' i]"
+                    try:
+                        els = self.driver.find_elements(By.CSS_SELECTOR, sel)
+                        for el in els:
+                            if el.is_displayed() and el.is_enabled():
+                                current = el.get_attribute('value') or ''
+                                if not current:  # Fyll bara tomma fält
+                                    el.clear()
+                                    el.send_keys(value)
+                                    filled.append(pat)
+                                    return
+                    except Exception:
+                        continue
 
-        return 'skipped (AF-formulär kräver manuell hantering)'
+        try_fill(name_patterns, name)
+        try_fill(email_patterns, email)
+        try_fill(phone_patterns, phone)
+
+        # --- Fritext / textarea (personligt brev) ---
+        try:
+            cover_text = cover_path.read_text(encoding='utf-8', errors='ignore') if cover_path.suffix == '.txt' else ''
+            if not cover_text:
+                ref = self.script_dir / 'data_folder' / 'reference_cover_letter.txt'
+                cover_text = ref.read_text(encoding='utf-8', errors='ignore') if ref.exists() else ''
+            if cover_text:
+                textareas = self.driver.find_elements(By.CSS_SELECTOR, 'textarea')
+                for ta in textareas:
+                    if ta.is_displayed() and ta.is_enabled():
+                        current = ta.get_attribute('value') or ta.text or ''
+                        if not current:
+                            ta.clear()
+                            ta.send_keys(cover_text[:3000])
+                            filled.append('textarea/cover_letter')
+                            break
+        except Exception:
+            pass
+
+        # --- Filuppladdning ---
+        try:
+            file_inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+            uploaded = []
+            for i, fi in enumerate(file_inputs[:2]):
+                try:
+                    if i == 0:
+                        fi.send_keys(str(cv_path.absolute()))
+                        uploaded.append('CV')
+                    elif i == 1:
+                        fi.send_keys(str(cover_path.absolute()))
+                        uploaded.append('Brev')
+                    time.sleep(1)
+                except Exception:
+                    continue
+            if uploaded:
+                filled.append(f"filer: {', '.join(uploaded)}")
+        except Exception:
+            pass
+
+        return filled
+
+    def attempt_auto_apply(self, job: Dict, job_folder) -> str:
+        """Försöker auto-ansöka oavsett plattform.
+
+        Flöde:
+          1. Gå till jobbets URL
+          2. Hitta ansökningsknapp
+          3. Klicka — oavsett om den är intern eller extern
+          4. Fyll i formulärfält generiskt (namn, e-post, telefon, CV-upload, brev)
+          5. Submit om AUTO_APPLY_DRY_RUN=false, annars stanna efter ifyllning
+
+        Returnerar: 'submitted ✅', 'prefilled (<detaljer>)', 'skipped (<orsak>)'
+        """
+        dry_run = os.getenv('AUTO_APPLY_DRY_RUN', 'true').lower() != 'false'
+
+        cv_files    = list(job_folder.glob('CV_*.pdf'))
+        cover_files = list(job_folder.glob('Personligt_Brev_*.pdf'))
+        if not cv_files:
+            return 'skipped (CV saknas i mappen)'
+
+        cv_path    = cv_files[0]
+        cover_path = cover_files[0] if cover_files else cv_files[0]
+
+        try:
+            # Steg 1: Navigera till jobbets sida
+            print(f"   🌐 Navigerar till ansökningssidan...")
+            self.driver.get(job['url'])
+            time.sleep(3)
+
+            # Steg 2: Hitta ansökningsknapp
+            apply_btn = self._find_apply_button()
+
+            if apply_btn:
+                btn_text = apply_btn.text or apply_btn.get_attribute('aria-label') or 'knapp'
+                print(f"   🖱️  Klickar: '{btn_text.strip()}'")
+                href = apply_btn.get_attribute('href') or ''
+                apply_btn.click()
+                time.sleep(3)
+
+                final_url = self.driver.current_url
+                print(f"   📍 Landade på: {final_url[:80]}")
+            else:
+                # Ingen knapp — vi är möjligen redan på ansökningssidan (direktlänk)
+                print("   ℹ️  Ingen ansökningsknapp hittad — försöker fylla formuläret direkt")
+
+            # Steg 3: Fyll formuläret
+            filled = self._fill_form_fields(cv_path, cover_path)
+            if filled:
+                print(f"   ✏️  Fyllde i: {', '.join(filled)}")
+
+            if dry_run:
+                summary = f"prefilled — {', '.join(filled) if filled else 'inga fält'} (dry-run, skickades ej)"
+                print(f"   ⏸️  Dry-run aktiv. Sätt AUTO_APPLY_DRY_RUN=false i .env för att skicka.")
+                return summary
+
+            # Steg 4: Skicka
+            submit_selectors = [
+                "button[type='submit']",
+                "input[type='submit']",
+                "button[aria-label*='Submit']",
+                "button[aria-label*='Skicka']",
+                "button[aria-label*='Send']",
+            ]
+            for sel in submit_selectors:
+                btns = self.driver.find_elements(By.CSS_SELECTOR, sel)
+                if btns and btns[0].is_displayed() and btns[0].is_enabled():
+                    btns[0].click()
+                    time.sleep(3)
+                    return f'submitted ✅ ({self.driver.current_url[:60]})'
+
+            # Försök text-baserad submit
+            for text in ['Submit', 'Skicka', 'Send application', 'Skicka ansökan']:
+                try:
+                    btns = self.driver.find_elements(By.PARTIAL_LINK_TEXT, text)
+                    if not btns:
+                        btns = self.driver.find_elements(By.XPATH,
+                            f"//button[contains(., '{text}')]")
+                    if btns and btns[0].is_displayed():
+                        btns[0].click()
+                        time.sleep(3)
+                        return f'submitted ✅'
+                except Exception:
+                    continue
+
+            return f"prefilled men submit-knapp ej hittad — {', '.join(filled) if filled else 'inga fält ifyllda'}"
+
+        except Exception as e:
+            return f'fel: {str(e)[:100]}'
 
     def generate_documents_for_job(self, job: Dict, job_number: int,
                                    ats_filter: bool = False,
