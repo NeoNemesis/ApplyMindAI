@@ -320,16 +320,68 @@ class JobMaster:
 
         return False
 
+    # ------------------------------------------------------------------
+    # LinkedIn cookie helpers
+    # ------------------------------------------------------------------
+
+    def _save_linkedin_cookies(self):
+        """Spara LinkedIn-session cookies till fil för framtida inloggningar."""
+        cookie_path = self.script_dir / 'data_folder' / 'linkedin_cookies.json'
+        try:
+            cookies = self.driver.get_cookies()
+            with open(cookie_path, 'w', encoding='utf-8') as f:
+                json.dump(cookies, f, indent=2)
+            print(f"🍪 LinkedIn-cookies sparade ({len(cookies)} cookies)")
+        except Exception as e:
+            print(f"⚠️  Kunde inte spara cookies: {e}")
+
+    def _load_linkedin_cookies(self) -> bool:
+        """Försök återställa LinkedIn-session från sparade cookies.
+        Returnerar True om sidan laddas som inloggad, annars False."""
+        cookie_path = self.script_dir / 'data_folder' / 'linkedin_cookies.json'
+        if not cookie_path.exists():
+            return False
+        try:
+            with open(cookie_path, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
+            # Måste navigera till domänen innan cookies läggs till
+            self.driver.get("https://www.linkedin.com")
+            time.sleep(2)
+            for cookie in cookies:
+                cookie.pop('sameSite', None)  # Chromedriver godkänner inte okända värden
+                try:
+                    self.driver.add_cookie(cookie)
+                except Exception:
+                    continue
+            # Navigera till feed och kontrollera om vi är inloggade
+            self.driver.get("https://www.linkedin.com/feed/")
+            time.sleep(3)
+            url = self.driver.current_url
+            if 'login' not in url and 'checkpoint' not in url and 'linkedin.com' in url:
+                print("✅ LinkedIn-session återställd från cookies!")
+                return True
+            return False
+        except Exception as e:
+            print(f"⚠️  Kunde inte ladda cookies: {e}")
+            return False
+
     def login_to_linkedin(self) -> bool:
-        """Logga in på LinkedIn"""
+        """Logga in på LinkedIn. Försöker cookies först, faller tillbaka på lösenord."""
         print("\n🔐 LOGGAR IN PÅ LINKEDIN")
         print("="*80)
 
+        # Steg 1: Försök cookie-inloggning
+        print("🍪 Försöker återställa session från cookies...")
+        if self._load_linkedin_cookies():
+            return True
+        print("   → Inga giltiga cookies, försöker med lösenord...")
+
+        # Steg 2: Lösenordsinloggning
         email = os.getenv('LINKEDIN_EMAIL')
         password = os.getenv('LINKEDIN_PASSWORD')
 
         if not email or not password:
-            print("❌ LinkedIn-uppgifter saknas i .env")
+            print("❌ LinkedIn-uppgifter saknas i .env (LINKEDIN_EMAIL / LINKEDIN_PASSWORD)")
             return False
 
         try:
@@ -357,6 +409,8 @@ class JobMaster:
                 time.sleep(30)
 
             time.sleep(2)
+            # Steg 3: Spara cookies så nästa start slipper lösenord
+            self._save_linkedin_cookies()
             print("✅ Inloggad på LinkedIn!")
             return True
 
@@ -1073,7 +1127,198 @@ class JobMaster:
         print(f"\n📊 Jobtech: {len(all_jobs)} jobb hittade")
         return all_jobs
 
-    def generate_documents_for_job(self, job: Dict, job_number: int) -> bool:
+    def quick_ats_score(self, job_description: str, threshold: int) -> tuple:
+        """Snabb ATS-bedömning via LLM innan dokumentgenerering.
+        Returnerar (score: int, reasoning: str).
+        Vid fel returneras (100, 'fallback') så jobbet inte missas."""
+        try:
+            api_key = os.getenv('OPENAI_API_KEY', '')
+            if not api_key:
+                return (100, 'Ingen API-nyckel — hoppar över filter')
+
+            # Bygg kompakt CV-sammanfattning
+            pi = getattr(self.resume_object, 'personal_information', {}) or {}
+            skills = getattr(self.resume_object, 'technical_skills', {}) or {}
+            exp = getattr(self.resume_object, 'experience_details', []) or []
+            skill_list = []
+            for v in (skills.values() if hasattr(skills, 'values') else []):
+                if isinstance(v, list):
+                    skill_list.extend(v)
+            cv_summary = (
+                f"Skills: {', '.join(skill_list[:20])}\n"
+                f"Experience: {len(exp)} positions\n"
+            )
+
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+            prompt = (
+                f"Rate this CV against the job description. Reply with ONLY:\n"
+                f"Score: <0-100>\nReasoning: <one sentence>\n\n"
+                f"CV:\n{cv_summary}\n\n"
+                f"Job (first 1500 chars):\n{job_description[:1500]}"
+            )
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=60,
+                temperature=0,
+            )
+            text = resp.choices[0].message.content or ''
+            import re
+            m = re.search(r'Score:\s*(\d+)', text)
+            score = int(m.group(1)) if m else 100
+            reasoning = re.sub(r'Score:\s*\d+\s*', '', text).replace('Reasoning:', '').strip()
+            return (min(100, max(0, score)), reasoning)
+        except Exception as e:
+            return (100, f'Fel i ATS-check: {e}')
+
+    def attempt_auto_apply(self, job: Dict, job_folder) -> str:
+        """Försöker auto-ansöka för Indeed och AF-jobb.
+        Returnerar: 'submitted', 'prefilled', 'skipped (<orsak>)'"""
+        source = job.get('source', '')
+        dry_run = os.getenv('AUTO_APPLY_DRY_RUN', 'true').lower() != 'false'
+
+        # Hitta CV-filen i jobbmappen
+        cv_files = list(job_folder.glob('CV_*.pdf'))
+        cover_files = list(job_folder.glob('Personligt_Brev_*.pdf'))
+        if not cv_files or not cover_files:
+            return 'skipped (dokument saknas)'
+
+        cv_path = cv_files[0]
+        cover_path = cover_files[0]
+
+        try:
+            if 'Indeed' in source or 'indeed' in source.lower():
+                return self._auto_apply_indeed(job, cv_path, cover_path, dry_run)
+            elif 'Arbetsförmedlingen' in source or 'af' in source.lower():
+                return self._auto_apply_af(job, cv_path, cover_path, dry_run)
+            else:
+                return f'skipped (plattformen {source} stöds ej)'
+        except Exception as e:
+            return f'skipped (fel: {str(e)[:80]})'
+
+    def _auto_apply_indeed(self, job: Dict, cv_path, cover_path, dry_run: bool) -> str:
+        """Auto-ansök på Indeed via Easy Apply."""
+        self.driver.get(job['url'])
+        time.sleep(3)
+
+        # Leta efter Easy Apply-knapp
+        easy_apply_selectors = [
+            "button[aria-label*='Apply']",
+            "button[class*='apply']",
+            "[data-testid='applyButton']",
+            "a[class*='apply']",
+        ]
+        apply_btn = None
+        for sel in easy_apply_selectors:
+            btns = self.driver.find_elements(By.CSS_SELECTOR, sel)
+            if btns:
+                apply_btn = btns[0]
+                break
+
+        if not apply_btn:
+            return 'skipped (ingen Easy Apply-knapp hittad)'
+
+        # Kontrollera att det är en Indeed-intern ansökan (inte extern redirect)
+        href = apply_btn.get_attribute('href') or ''
+        if href and 'indeed.com' not in href and href.startswith('http'):
+            return 'skipped (extern ansökan)'
+
+        apply_btn.click()
+        time.sleep(3)
+
+        current_url = self.driver.current_url
+        if 'indeed.com' not in current_url:
+            return 'skipped (redirectad till extern sida)'
+
+        # Fyll i namn och e-post om fälten finns
+        pi = getattr(self.resume_object, 'personal_information', {}) or {}
+        name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip()
+        email = pi.get('email', '')
+
+        for field_id in ['applicant.name', 'name', 'fullName']:
+            fields = self.driver.find_elements(By.CSS_SELECTOR, f"input[name='{field_id}'], input[id='{field_id}']")
+            if fields and name:
+                fields[0].clear()
+                fields[0].send_keys(name)
+                break
+
+        for field_id in ['applicant.email', 'email']:
+            fields = self.driver.find_elements(By.CSS_SELECTOR, f"input[name='{field_id}'], input[id='{field_id}']")
+            if fields and email:
+                fields[0].clear()
+                fields[0].send_keys(email)
+                break
+
+        # Ladda upp CV
+        file_inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[type='file']")
+        if file_inputs:
+            file_inputs[0].send_keys(str(cv_path.absolute()))
+            time.sleep(2)
+
+        if dry_run:
+            return 'prefilled (dry-run — skickades ej)'
+
+        # Klicka submit
+        submit_btns = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit'], button[aria-label*='Submit'], button[aria-label*='Skicka']")
+        if submit_btns:
+            submit_btns[0].click()
+            time.sleep(3)
+            return 'submitted ✅'
+
+        return 'prefilled (submit-knapp ej hittad)'
+
+    def _auto_apply_af(self, job: Dict, cv_path, cover_path, dry_run: bool) -> str:
+        """Auto-ansök på Arbetsförmedlingen."""
+        self.driver.get(job['url'])
+        time.sleep(3)
+
+        # Leta efter ansökningslänk
+        apply_selectors = [
+            "a[data-testid*='apply']",
+            "a[href*='apply']",
+            "button[data-testid*='apply']",
+        ]
+        # Sök även på text
+        try:
+            from selenium.webdriver.common.by import By as B
+            links = self.driver.find_elements(B.PARTIAL_LINK_TEXT, 'Ansök')
+            if not links:
+                links = self.driver.find_elements(B.PARTIAL_LINK_TEXT, 'ansök')
+        except Exception:
+            links = []
+
+        apply_element = None
+        for sel in apply_selectors:
+            els = self.driver.find_elements(By.CSS_SELECTOR, sel)
+            if els:
+                apply_element = els[0]
+                break
+        if not apply_element and links:
+            apply_element = links[0]
+
+        if not apply_element:
+            return 'skipped (ingen ansökningsknapp hittad)'
+
+        href = apply_element.get_attribute('href') or ''
+        if href and 'arbetsformedlingen.se' not in href and href.startswith('http'):
+            return 'skipped (extern arbetsgivarsida)'
+
+        apply_element.click()
+        time.sleep(3)
+
+        if 'arbetsformedlingen.se' not in self.driver.current_url:
+            return 'skipped (redirectad till extern sida)'
+
+        if dry_run:
+            return 'prefilled (dry-run — skickades ej)'
+
+        return 'skipped (AF-formulär kräver manuell hantering)'
+
+    def generate_documents_for_job(self, job: Dict, job_number: int,
+                                   ats_filter: bool = False,
+                                   ats_threshold: int = 65,
+                                   auto_apply: bool = False) -> bool:
         """Generera CV och personligt brev för specifikt jobb"""
         print(f"\n{'='*80}")
         print(f"📄 GENERERAR DOKUMENT #{job_number}")
@@ -1094,6 +1339,19 @@ class JobMaster:
             # Hämta jobbinformation
             print(f"\n🔗 Hämtar jobbinformation från: {job['url']}")
             self.modern_facade.link_to_job(job['url'])
+
+            # ATS-filter: kontrollera matchning INNAN vi genererar dokument
+            if ats_filter:
+                desc = ''
+                if hasattr(self.modern_facade, 'job') and self.modern_facade.job:
+                    desc = getattr(self.modern_facade.job, 'description', '') or ''
+                score, reasoning = self.quick_ats_score(desc, ats_threshold)
+                print(f"   🎯 ATS-poäng: {score}/100 (tröskel: {ats_threshold})")
+                if score < ats_threshold:
+                    short_reason = reasoning[:80] + ('...' if len(reasoning) > 80 else '')
+                    print(f"   ⏭️  Hoppar över: poäng under tröskel — {short_reason}")
+                    return False
+                print(f"   ✅ ATS-poäng OK — fortsätter med generering")
 
             # Generera jobbanpassat CV (utan frågor för att spara tid)
             _design = os.getenv("CV_DESIGN", "design_01_minimal")
@@ -1146,6 +1404,15 @@ class JobMaster:
                 f.write("4. Fyll i eventuella frågor från arbetsgivaren\n\n")
 
             print(f"\n📁 Alla filer sparade i: {job_folder}")
+
+            # Auto-apply om aktiverat
+            if auto_apply:
+                print("🚀 Auto-ansöker...")
+                apply_result = self.attempt_auto_apply(job, job_folder)
+                print(f"   Auto-ansök: {apply_result}")
+                # Spara status i job_info.txt
+                with open(job_folder / "job_info.txt", 'a', encoding='utf-8') as f:
+                    f.write(f"\nAuto-ansök status: {apply_result}\n")
 
             # Markera som processad
             self.save_processed_job(job)

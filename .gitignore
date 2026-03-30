@@ -14,6 +14,7 @@ data_folder/profile.png
 data_folder/reference_cv.txt
 data_folder/reference_cover_letter.txt
 data_folder/reference_cover_letter.pdf
+data_folder/linkedin_cookies.json
 
 # Python
 __pycache__/

@@ -488,6 +488,13 @@ def search_run():
         hybrid   = 'hybrid' in request.form
         onsite   = 'onsite' in request.form
 
+        # ATS-filter alternativ
+        ats_filter_enabled = 'ats_filter' in request.form
+        ats_threshold      = max(0, min(100, int(request.form.get('ats_threshold', 65))))
+
+        # Auto-apply alternativ
+        auto_apply_enabled = 'auto_apply' in request.form
+
         # Save selected CV design to .env
         cv_design = request.form.get('cv_design', 'design_01_minimal')
         if cv_design in DESIGNS:
@@ -562,12 +569,17 @@ def search_run():
                 for i, job in enumerate(jobs, 1):
                     search_queue.put(('progress', f'{i}/{len(jobs)}'))
                     search_queue.put(('output', f'\n[{i}/{len(jobs)}] 📄 {job["title"]} @ {job["company"]}\n'))
-                    ok = jm.generate_documents_for_job(job, i)
+                    ok = jm.generate_documents_for_job(
+                        job, i,
+                        ats_filter=ats_filter_enabled,
+                        ats_threshold=ats_threshold,
+                        auto_apply=auto_apply_enabled,
+                    )
                     if ok:
                         successful += 1
                         search_queue.put(('output', '   ✅ Klar!\n'))
                     else:
-                        search_queue.put(('output', '   ❌ Misslyckades\n'))
+                        search_queue.put(('output', '   ⏭️  Hoppades över\n'))
                 search_queue.put(('output', f'\n✅ KLART! {successful}/{len(jobs)} jobb processade.\n'))
                 search_queue.put(('output', f'📂 Filer sparade i: {jm.base_output_dir}\n'))
             else:

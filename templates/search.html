@@ -185,6 +185,48 @@
         </div>
       </div>
 
+      <!-- ATS-filter -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-funnel"></i> ATS-filter <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.7rem">Valfritt</span>
+        </div>
+        <label class="d-flex align-items-center gap-2 cursor-pointer mb-2">
+          <input type="checkbox" name="ats_filter" id="ats-filter-check" class="form-check-input"
+            style="accent-color: var(--green); width:16px;height:16px;"
+            onchange="document.getElementById('ats-threshold-row').style.display=this.checked?'flex':'none'">
+          <span>Generera bara dokument för jobb med hög ATS-matchning</span>
+        </label>
+        <div id="ats-threshold-row" class="d-none align-items-center gap-2 mt-1">
+          <label class="text-muted small mb-0">Minsta poäng:</label>
+          <input type="number" name="ats_threshold" value="65" min="0" max="100"
+            class="form-control form-control-sm"
+            style="width:80px;background:var(--card);border-color:var(--border);color:var(--text)">
+          <span class="text-muted small">/100</span>
+        </div>
+        <small class="text-muted d-block mt-1">
+          AI bedömer matchning innan dokument genereras. Sparar tid och API-kostnad.
+          Stäng av för att alltid generera oavsett matchning.
+        </small>
+      </div>
+
+      <!-- Auto-apply -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-send"></i> Auto-ansök
+          <span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.7rem">BETA</span>
+        </div>
+        <label class="d-flex align-items-center gap-2 cursor-pointer mb-1">
+          <input type="checkbox" name="auto_apply" class="form-check-input"
+            style="accent-color: var(--green); width:16px;height:16px;">
+          <span>Försök skicka ansökan automatiskt (Indeed &amp; Arbetsförmedlingen)</span>
+        </label>
+        <small class="text-muted d-block">
+          Fungerar bäst för jobb med enkel ansökningsprocess. Externa arbetsgivarsidor
+          hoppas över. Sätt <code>AUTO_APPLY_DRY_RUN=false</code> i .env för att aktivera
+          faktisk inlämning — annars fylls formulär i utan att skickas.
+        </small>
+      </div>
+
       <!-- Start button -->
       <button type="button" id="start-btn" class="btn btn-green btn-lg w-100"
               onclick="startSearch('search-form')"
