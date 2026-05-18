@@ -326,8 +326,20 @@ Jag värdesätter att arbeta i team där kunskapsutbyte och samarbete står i fo
             else:
                 content = self._get_fallback_content(company_name, position_title)
             
-            # Ladda CLEAN template
-            template_path = Path(__file__).parent / "cover_letter_template_clean.html"
+            # Ladda CLEAN template — router baserat på LETTER_TEMPLATE env
+            import os
+            LETTER_TEMPLATE_MAP = {
+                'nordic_minimal':   'cover_letter_template_clean.html',
+                'problem_solution': 'cover_letter_template_problem_solution.html',
+                'modern_tech':      'cover_letter_template_modern_tech.html',
+            }
+            chosen_letter = os.getenv('LETTER_TEMPLATE', 'nordic_minimal')
+            letter_filename = LETTER_TEMPLATE_MAP.get(chosen_letter, 'cover_letter_template_clean.html')
+            template_path = Path(__file__).parent / letter_filename
+            if not template_path.exists():
+                logger.warning(f'Brev-template "{letter_filename}" saknas, fallback till cover_letter_template_clean.html')
+                template_path = Path(__file__).parent / "cover_letter_template_clean.html"
+            logger.info(f'Använder brev-template: {template_path.name} (LETTER_TEMPLATE={chosen_letter})')
             with open(template_path, 'r', encoding='utf-8') as f:
                 template = f.read()
 

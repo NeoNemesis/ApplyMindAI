@@ -689,8 +689,9 @@ LETTER_TEMPLATE_NAMES = {
 
 @app.route('/cover-letter/templates')
 def letter_templates():
-    active = read_env().get('LETTER_TEMPLATE', 'problem_solution')
-    return render_template('letter_templates.html', active_template=active)
+    # Brev-design integrerat på /search under CV-design.
+    # Behåller routen för bakåtkompat men redirectar.
+    return redirect(url_for('search') + '#letter-picker')
 
 @app.route('/cover-letter/template/select', methods=['POST'])
 def letter_template_select():
@@ -729,8 +730,37 @@ def cover_letter_save():
 @app.route('/search')
 def search():
     prefs = load_yaml(PREFS_YAML)
-    current_cv_design = read_env().get('CV_DESIGN', 'design_01_minimal')
-    return render_template('search.html', prefs=prefs, search_state=search_state, current_cv_design=current_cv_design)
+    env = read_env()
+    current_cv_design = env.get('CV_DESIGN', 'design_02_classic')
+    current_letter_template = env.get('LETTER_TEMPLATE', 'nordic_minimal')
+    return render_template(
+        'search.html',
+        prefs=prefs,
+        search_state=search_state,
+        current_cv_design=current_cv_design,
+        current_letter_template=current_letter_template,
+    )
+
+
+# Whitelist av designer som faktiskt har en motsvarande Jinja2/string.Template-fil.
+# Synka med CV_TEMPLATE_MAP i improved_generator.py och LETTER_TEMPLATE_MAP i
+# moderndesign1/cover_letter_generator.py.
+ACTIVE_CV_DESIGNS     = {'design_02_classic', 'design_03_modern_green', 'design_07_tech_modern'}
+ACTIVE_LETTER_DESIGNS = {'nordic_minimal', 'problem_solution', 'modern_tech'}
+
+
+@app.route('/api/design/save', methods=['POST'])
+def api_design_save():
+    """AJAX-spar för CV-/brev-design-val på sökrutan."""
+    kind = request.form.get('kind', '')
+    value = request.form.get('value', '')
+    if kind == 'cv' and value in ACTIVE_CV_DESIGNS:
+        write_env({'CV_DESIGN': value})
+        return jsonify({'ok': True, 'kind': kind, 'value': value})
+    if kind == 'letter' and value in ACTIVE_LETTER_DESIGNS:
+        write_env({'LETTER_TEMPLATE': value})
+        return jsonify({'ok': True, 'kind': kind, 'value': value})
+    return jsonify({'ok': False, 'error': 'invalid kind or value'}), 400
 
 
 @app.route('/search/run', methods=['POST'])
@@ -768,10 +798,13 @@ def search_run():
         # Auto-apply alternativ
         auto_apply_enabled = 'auto_apply' in request.form
 
-        # Save selected CV design to .env
-        cv_design = request.form.get('cv_design', 'design_01_minimal')
-        if cv_design in DESIGNS:
+        # Save selected CV design + letter template to .env
+        cv_design = request.form.get('cv_design', 'design_02_classic')
+        if cv_design in ACTIVE_CV_DESIGNS:
             write_env({'CV_DESIGN': cv_design})
+        letter_template = request.form.get('letter_template', 'nordic_minimal')
+        if letter_template in ACTIVE_LETTER_DESIGNS:
+            write_env({'LETTER_TEMPLATE': letter_template})
 
         # Update preferences YAML
         prefs = load_yaml(PREFS_YAML)

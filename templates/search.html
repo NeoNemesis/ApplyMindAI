@@ -24,42 +24,34 @@
       <!-- CV Design Picker — TOP of left column -->
       <div class="form-section">
         <div class="form-section-title">
-          <i class="bi bi-palette"></i> CV-design för generering
+          <i class="bi bi-palette"></i> CV-design
         </div>
 
-        {# Determine current selection from env or default #}
-        {% set current_design = current_cv_design if current_cv_design is defined else 'design_01_minimal' %}
-
+        {# 3 designer som faktiskt fungerar (riktiga Jinja2-mallar i moderndesign1/) #}
+        {% set current_design = current_cv_design if current_cv_design is defined else 'design_02_classic' %}
         {% set design_list = [
-          ('design_01_minimal',       'Minimal',       '📄'),
-          ('design_02_classic',       'Klassisk',      '📋'),
-          ('design_03_modern_green',  'Modern Grön',   '🟢'),
-          ('design_04_dark_executive','Dark Executive','🖤'),
-          ('design_05_nordic_blue',   'Nordic Blue',   '🔵'),
-          ('design_06_creative_sidebar','Creative',    '🎨'),
-          ('design_07_tech_modern',   'Tech Modern',   '💻'),
-          ('design_08_timeline',      'Timeline',      '📅'),
-          ('design_09_infographic',   'Infografik',    '📊'),
-          ('design_10_premium_gold',  'Premium Gold',  '✨')
+          ('design_02_classic',       'Klassisk',      'Sidopanel + vit höger; standardlayout som funkar för alla ATS-system.'),
+          ('design_03_modern_green',  'Modern Grön',   'Mörk vänsterpanel med gröna accenter. Tech- och IT-vänlig.'),
+          ('design_07_tech_modern',   'Tech Modern',   'Dark theme, monospace + grön accent. För developer/devops-roller.')
         ] %}
 
         <div class="design-picker-scroll" id="design-picker">
-          {% for design_key, design_label, design_icon in design_list %}
+          {% for design_key, design_label, design_desc in design_list %}
           <div class="design-card {% if current_design == design_key %}selected{% endif %}"
                data-design="{{ design_key }}"
-               onclick="selectDesign('{{ design_key }}')">
-            {# Try preview image; fall back to icon placeholder #}
-            {% set preview_src = '/static/previews/' ~ design_key ~ '.png' %}
-            <div class="design-thumb-placeholder" id="thumb-wrap-{{ design_key }}">
-              <img src="{{ preview_src }}"
+               data-desc="{{ design_desc }}"
+               onclick="selectCvDesign('{{ design_key }}')">
+            <div class="design-thumb-placeholder">
+              <img src="/static/previews/{{ design_key }}.png"
                    alt="{{ design_label }}"
                    class="design-thumb"
-                   style="display:none;"
-                   onload="this.style.display='block';this.parentElement.style.background='none';this.parentElement.style.border='none';"
-                   onerror="this.remove();">
-              <span class="thumb-icon">{{ design_icon }}</span>
+                   onerror="this.style.display='none';">
             </div>
             <div class="design-name">{{ design_label }}</div>
+            <button type="button" class="design-preview-btn"
+                    onclick="event.stopPropagation();openDesignPreview('cv','{{ design_key }}','{{ design_label }}')">
+              <i class="bi bi-eye"></i> Förhandsgranska
+            </button>
           </div>
           {% endfor %}
         </div>
@@ -67,8 +59,50 @@
         <input type="hidden" name="cv_design" id="cv-design-input" value="{{ current_design }}">
         <small class="text-muted d-block mt-2">
           <i class="bi bi-info-circle me-1"></i>
-          Valt design används för alla CV och personliga brev i sökningen.
+          Aktivt val sparas direkt och används vid alla framtida CV-genereringar:
           <span class="tag-pill ms-1" id="selected-design-label">{{ current_design }}</span>
+        </small>
+      </div>
+
+      <!-- Cover Letter Template Picker — UNDER CV Design -->
+      <div class="form-section">
+        <div class="form-section-title">
+          <i class="bi bi-envelope-paper"></i> Personligt brev — design
+        </div>
+
+        {% set current_letter = current_letter_template if current_letter_template is defined else 'nordic_minimal' %}
+        {% set letter_list = [
+          ('nordic_minimal',   'Nordisk Minimal',  'Vit bakgrund, ren typografi. ATS-säker, passar alla branscher.'),
+          ('problem_solution', 'Problem-Lösning',  'Strukturerat brev med grön accentlinje. Forskning visar mest svar.'),
+          ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.')
+        ] %}
+
+        <div class="design-picker-scroll" id="letter-picker">
+          {% for letter_key, letter_label, letter_desc in letter_list %}
+          <div class="design-card {% if current_letter == letter_key %}selected{% endif %}"
+               data-letter="{{ letter_key }}"
+               data-desc="{{ letter_desc }}"
+               onclick="selectLetterTemplate('{{ letter_key }}')">
+            <div class="design-thumb-placeholder">
+              <img src="/static/previews/letter_{{ letter_key }}.png"
+                   alt="{{ letter_label }}"
+                   class="design-thumb"
+                   onerror="this.style.display='none';">
+            </div>
+            <div class="design-name">{{ letter_label }}</div>
+            <button type="button" class="design-preview-btn"
+                    onclick="event.stopPropagation();openDesignPreview('letter','{{ letter_key }}','{{ letter_label }}')">
+              <i class="bi bi-eye"></i> Förhandsgranska
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+
+        <input type="hidden" name="letter_template" id="letter-template-input" value="{{ current_letter }}">
+        <small class="text-muted d-block mt-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Aktivt val:
+          <span class="tag-pill ms-1" id="selected-letter-label">{{ current_letter }}</span>
         </small>
       </div>
 
@@ -358,6 +392,36 @@ Tips:
   </div>
 </div>
 
+<!-- Design preview modal -->
+<div class="modal fade" id="design-preview-modal" tabindex="-1" aria-labelledby="preview-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content" style="background:#0f0f0f;border:1px solid var(--border)">
+      <div class="modal-header" style="border-bottom:1px solid var(--border)">
+        <h5 class="modal-title text-green" id="preview-modal-title">Förhandsgranskning</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Stäng"></button>
+      </div>
+      <div class="modal-body p-0" style="height:80vh;background:#fff">
+        <iframe id="preview-modal-frame" src="about:blank"
+                style="width:100%;height:100%;border:0;background:#fff"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.design-card { position:relative; }
+.design-preview-btn {
+  display:block; width:100%; margin-top:6px; padding:4px 8px;
+  font-size:0.7rem; background:transparent; color:var(--text-muted);
+  border:1px solid var(--border); border-radius:4px; cursor:pointer;
+  transition:all .15s;
+}
+.design-preview-btn:hover {
+  background:rgba(74,229,74,0.08); color:var(--green); border-color:rgba(74,229,74,0.4);
+}
+.design-card.selected .design-preview-btn { border-color:rgba(74,229,74,0.5); color:var(--green); }
+</style>
+
 {% endblock %}
 
 {% block scripts %}
@@ -366,25 +430,57 @@ Tips:
 // Design picker
 // -------------------------------------------------------
 const DESIGN_LABELS = {
-  design_01_minimal:        'Minimal',
   design_02_classic:        'Klassisk',
   design_03_modern_green:   'Modern Grön',
-  design_04_dark_executive: 'Dark Executive',
-  design_05_nordic_blue:    'Nordic Blue',
-  design_06_creative_sidebar:'Creative',
   design_07_tech_modern:    'Tech Modern',
-  design_08_timeline:       'Timeline',
-  design_09_infographic:    'Infografik',
-  design_10_premium_gold:   'Premium Gold',
+};
+const LETTER_LABELS = {
+  nordic_minimal:   'Nordisk Minimal',
+  problem_solution: 'Problem-Lösning',
+  modern_tech:      'Modern Tech',
 };
 
-function selectDesign(key) {
+async function autoSaveDesign(kind, value) {
+  try {
+    const fd = new FormData();
+    fd.append('kind', kind);
+    fd.append('value', value);
+    const r = await fetch('/api/design/save', { method: 'POST', body: fd });
+    if (!r.ok) console.warn('design save failed', r.status);
+  } catch (e) { console.warn('design save error', e); }
+}
+
+function selectCvDesign(key) {
   document.querySelectorAll('#design-picker .design-card').forEach(card => {
     card.classList.toggle('selected', card.dataset.design === key);
   });
   document.getElementById('cv-design-input').value = key;
   const label = document.getElementById('selected-design-label');
   if (label) label.textContent = DESIGN_LABELS[key] || key;
+  autoSaveDesign('cv', key);
+}
+
+function selectLetterTemplate(key) {
+  document.querySelectorAll('#letter-picker .design-card').forEach(card => {
+    card.classList.toggle('selected', card.dataset.letter === key);
+  });
+  document.getElementById('letter-template-input').value = key;
+  const label = document.getElementById('selected-letter-label');
+  if (label) label.textContent = LETTER_LABELS[key] || key;
+  autoSaveDesign('letter', key);
+}
+
+// Bakåtkompat — vissa befintliga handlers kan ha kallat detta
+function selectDesign(key) { selectCvDesign(key); }
+
+function openDesignPreview(kind, key, label) {
+  const url = kind === 'letter'
+    ? '/cover-letter/template/preview/' + encodeURIComponent(key)
+    : '/preview/pdf/' + encodeURIComponent(key);
+  document.getElementById('preview-modal-title').textContent = label + ' — förhandsgranskning';
+  document.getElementById('preview-modal-frame').src = url;
+  const modal = new bootstrap.Modal(document.getElementById('design-preview-modal'));
+  modal.show();
 }
 
 // -------------------------------------------------------
