@@ -79,11 +79,11 @@
         </div>
         <div class="d-flex flex-column gap-2">
 
-          <label class="platform-card {% if not prefs or 'indeed' not in (prefs.get('locations',[])|string) %}selected{% endif %}">
-            <input type="checkbox" name="platforms" value="indeed" checked>
+          <label class="platform-card selected">
+            <input type="checkbox" name="platforms" value="jobtech" checked>
             <div>
-              <div class="fw-semibold">Indeed</div>
-              <small class="text-muted">se.indeed.com — Bäst för svenska jobb</small>
+              <div class="fw-semibold">Jobtech <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.65rem">REKOMMENDERAS</span></div>
+              <small class="text-muted">Sveriges officiella jobbdatabas — ingen inloggning, alltid tillgänglig</small>
             </div>
           </label>
 
@@ -91,7 +91,7 @@
             <input type="checkbox" name="platforms" value="linkedin">
             <div>
               <div class="fw-semibold">LinkedIn</div>
-              <small class="text-muted">linkedin.com — Kräver inloggning</small>
+              <small class="text-muted">linkedin.com — Kräver inloggning via .env</small>
             </div>
           </label>
 
@@ -99,15 +99,15 @@
             <input type="checkbox" name="platforms" value="af">
             <div>
               <div class="fw-semibold">Arbetsförmedlingen</div>
-              <small class="text-muted">af.se — Svenska statliga jobb</small>
+              <small class="text-muted">af.se — Svenska statliga och kommunala jobb</small>
             </div>
           </label>
 
           <label class="platform-card">
-            <input type="checkbox" name="platforms" value="jobtech" checked>
+            <input type="checkbox" name="platforms" value="indeed">
             <div>
-              <div class="fw-semibold">Jobtech <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.65rem">GRATIS API</span></div>
-              <small class="text-muted">Sveriges officiella jobbdatabas — ingen inloggning</small>
+              <div class="fw-semibold">Indeed <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:#4AE54A;font-size:.65rem">STEALTH</span></div>
+              <small class="text-muted">indeed.com — Globalt jobbindex</small>
             </div>
           </label>
 
@@ -227,16 +227,24 @@
         </small>
       </div>
 
-      <!-- Start button -->
-      <button type="button" id="start-btn" class="btn btn-green btn-lg w-100"
-              onclick="startSearch('search-form')"
-              {% if search_state.running %}disabled{% endif %}>
-        {% if search_state.running %}
-          <span class="spinner-border spinner-border-sm me-2"></span>Sökning pågår...
-        {% else %}
-          <i class="bi bi-search me-2"></i>Starta sökning
-        {% endif %}
-      </button>
+      <!-- Start + Stop buttons -->
+      <div class="d-flex gap-2">
+        <button type="button" id="start-btn" class="btn btn-green btn-lg flex-grow-1"
+                onclick="startSearch('search-form')"
+                {% if search_state.running %}disabled{% endif %}>
+          {% if search_state.running %}
+            <span class="spinner-border spinner-border-sm me-2"></span>Sökning pågår...
+          {% else %}
+            <i class="bi bi-search me-2"></i>Starta sökning
+          {% endif %}
+        </button>
+        <button type="button" id="stop-btn" class="btn btn-danger btn-lg"
+                onclick="stopSearch()"
+                style="display:{% if search_state.running %}inline-block{% else %}none{% endif %}"
+                title="Avbryt sökning">
+          <i class="bi bi-stop-fill"></i>
+        </button>
+      </div>
 
       <small class="text-muted d-block mt-2 text-center">
         AI:n hittar jobb, genererar anpassade CV och personliga brev automatiskt.

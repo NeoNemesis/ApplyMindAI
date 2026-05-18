@@ -48,7 +48,6 @@ class ModernDesign1Facade:
         self.output_path = output_path
         self.driver = None
         self.job = None  # SAMMA SOM ResumeFacade - Job objekt, inte bara URL
-        self.job_specific_answers = None  # Svar på jobbspecifika frågor
 
         logger.info("🎨 ModernDesign1Facade initialiserad med EXAKT samma global_config som ResumeFacade")
     
@@ -57,8 +56,10 @@ class ModernDesign1Facade:
         self.driver = driver
         logger.debug("🌐 WebDriver satt för ModernDesign1Facade")
     
-    def link_to_job(self, job_url: str):
+    def link_to_job(self, job_url: str, job_title: str = "", job_company: str = ""):
         """Länka till jobb - FÖRBÄTTRAD VERSION MED TIMEOUT-HANTERING"""
+        self._job_title_hint = job_title
+        self._job_company_hint = job_company
         try:
             logger.info(f"🔗 Modern Design 1: Länkar till jobb: {job_url}")
 
@@ -110,10 +111,24 @@ class ModernDesign1Facade:
                 self.job.company = "Företag"
 
             try:
-                self.job.description = self.llm_job_parser.extract_job_description()
+                extracted = self.llm_job_parser.extract_job_description()
+                # Detect LLM failure responses (GPT says "I'm sorry..." when context is empty)
+                _error_patterns = ["i'm sorry", "i cannot", "cannot provide", "not included in", "no job description"]
+                # Detect bot/captcha pages (short text with no Swedish content)
+                _is_bot_page = body_text and len(body_text) < 1000 and sum(1 for c in body_text if c in 'åäöÅÄÖ') == 0
+                if extracted and not any(p in extracted.lower() for p in _error_patterns):
+                    self.job.description = extracted
+                elif _is_bot_page and self._job_title_hint:
+                    # Bot detection page AND we have job title hint — use title as description context
+                    logger.warning(f"⚠️ Bot-skyddssida detekterad ({len(body_text)} tecken, inga svenska tecken) - använder jobbtitelledtråd")
+                    self.job.description = f"Tjänst: {self._job_title_hint}\nFöretag: {self._job_company_hint}\n\nVi söker en engagerad {self._job_title_hint} till vårt team. Tjänsten kräver teknisk kompetens och erfarenhet av webbutveckling."
+                else:
+                    # Fall back to raw page text — already in Swedish if job is Swedish
+                    logger.warning("⚠️ LLM-extraktion misslyckades, använder rå sidtext som beskrivning")
+                    self.job.description = body_text[:4000] if body_text else "Vi söker en engagerad medarbetare."
             except Exception as e:
                 logger.warning(f"⚠️ Kunde inte extrahera beskrivning: {e}")
-                self.job.description = "Vi söker en dataingenjör med erfarenhet av systemintegration och webbutveckling."
+                self.job.description = body_text[:4000] if body_text else "Vi söker en engagerad medarbetare."
 
             try:
                 self.job.location = self.llm_job_parser.extract_location()
@@ -126,77 +141,30 @@ class ModernDesign1Facade:
 
         except Exception as e:
             logger.error(f"❌ Modern Design 1: Fel vid jobb-länkning: {e}")
-            # Skapa fallback job-objekt
+            # Skapa fallback job-objekt, bevara body_text om den hann extraheras
+            _fallback_raw = getattr(self, 'full_job_text', '') or ""
+            _title_hint = getattr(self, '_job_title_hint', '')
+            _company_hint = getattr(self, '_job_company_hint', '')
+            if _title_hint:
+                _fallback_text = f"Tjänst: {_title_hint}\nFöretag: {_company_hint}\n\nVi söker en engagerad {_title_hint} till vårt team."
+            else:
+                _fallback_text = _fallback_raw or "Vi söker en engagerad medarbetare med IT-kompetens."
             self.job = Job()
-            self.job.role = "Dataingenjör"
-            self.job.company = "Företag"
-            self.job.description = "Vi söker en dataingenjör med erfarenhet av systemintegration och webbutveckling."
-            self.job.location = "Stockholm"
+            self.job.role = _title_hint or "Systemutvecklare"
+            self.job.company = _company_hint or "Företag"
+            self.job.description = _fallback_text[:4000]
+            self.job.location = "Sverige"
             self.job.link = job_url
-            self.full_job_text = "Vi söker en dataingenjör med erfarenhet av systemintegration och webbutveckling."
+            self.full_job_text = _fallback_text
             logger.info(f"🔄 Modern Design 1: Använder fallback job-objekt")
 
-    def ask_job_specific_questions(self, ask_questions: bool = True) -> None:
+    def create_resume_pdf_job_tailored(self) -> Tuple[str, str]:
         """
-        Ställ jobbspecifika frågor för att anpassa CV:t
-
-        Args:
-            ask_questions: Om False, hoppa över frågor (default: True)
-        """
-        if not ask_questions:
-            logger.info("⏭️  Hoppar över jobbspecifika frågor")
-            return
-
-        if not self.job or not self.job.description:
-            logger.warning("⚠️  Ingen jobbeskrivning tillgänglig, hoppar över frågor")
-            return
-
-        try:
-            from src.smart_question_generator import analyze_and_ask_for_job
-            import yaml
-
-            # Hämta CV-data
-            resume_data = {
-                'experience_details': [
-                    {
-                        'position': exp.position if hasattr(exp, 'position') else '',
-                        'company': exp.company if hasattr(exp, 'company') else '',
-                        'skills_acquired': exp.skills_acquired if hasattr(exp, 'skills_acquired') else []
-                    }
-                    for exp in (self.resume_generator.resume_object.experience_details or [])
-                ]
-            }
-
-            logger.info("\n🎯 Analyserar jobb och genererar relevanta frågor...")
-
-            # Ställ frågor
-            result = analyze_and_ask_for_job(
-                self.job.description,
-                resume_data,
-                self.api_key
-            )
-
-            self.job_specific_answers = result
-            logger.info(f"✅ Samlade in {len(result.get('answers', {}))} svar för CV-anpassning")
-
-        except Exception as e:
-            logger.error(f"❌ Fel vid frågegenerering: {e}")
-            self.job_specific_answers = None
-
-    def create_resume_pdf_job_tailored(self, ask_questions: bool = True) -> Tuple[str, str]:
-        """
-        Skapa jobbanpassat CV - MED JOBBSPECIFIKA FRÅGOR
-
-        Args:
-            ask_questions: Om True, ställ jobbspecifika frågor först
+        Skapa jobbanpassat CV - AI anpassar automatiskt utifrån jobbeskrivningen.
 
         Returns:
             Tuple[str, str]: (base64_pdf, suggested_name)
         """
-        # Ställ jobbspecifika frågor först
-        if ask_questions:
-            self.ask_job_specific_questions(ask_questions=True)
-
         # EXAKT SAMMA LOGIK SOM ResumeFacade.create_resume_pdf_job_tailored()
         style_path = self.style_manager.get_style_path()  # SAMMA METOD-NAMN SOM ResumeFacade
         if style_path is None:
@@ -224,7 +192,7 @@ class ModernDesign1Facade:
     
     def _create_modern_design1_resume(self, style_path: Path, job_description: str) -> str:
         """
-        Skapa Modern Design 1 CV - MED JOBBSPECIFIKA SVAR
+        Skapa Modern Design 1 CV - AI anpassar upp till 25% av texten mot jobbeskrivningen.
 
         Args:
             style_path: Sökväg till CSS-fil
@@ -233,10 +201,7 @@ class ModernDesign1Facade:
         Returns:
             str: Komplett HTML för CV:et (med CSS och struktur)
         """
-        if self.job_specific_answers:
-            logger.info("🎯 Skapar CV med jobbspecifika svar från frågor")
-        else:
-            logger.info("🎯 Skapar CV utan jobbspecifika svar")
+        logger.info("🎯 Skapar jobbanpassat CV (AI anpassar upp till 25% av texten)")
 
         # Använd förbättrad generator som matchar exakt design från bilden
         from .improved_generator import ImprovedModernDesign1Generator
@@ -246,10 +211,6 @@ class ModernDesign1Facade:
             self.resume_generator.resume_object,
             global_config.API_KEY
         )
-
-        # Sätt jobbspecifika svar om de finns
-        if self.job_specific_answers:
-            generator.set_job_specific_answers(self.job_specific_answers)
 
         # Använd FULL jobbtext för språkdetektering om tillgänglig
         # Men använd sammanfattad beskrivning för CV-innehåll

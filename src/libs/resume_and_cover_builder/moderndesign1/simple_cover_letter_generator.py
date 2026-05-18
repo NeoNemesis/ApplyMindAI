@@ -227,7 +227,9 @@ Returnera ENDAST brevet, ingen header."""
         }}
         p {{
             margin-bottom: 15px;
-            text-align: justify;
+            text-align: left;
+            word-spacing: normal;
+            hyphens: none;
         }}
     </style>
 </head>

@@ -100,6 +100,38 @@
         </div>
       </div>
 
+      <!-- LinkedIn Credentials -->
+      <div class="form-section mt-4">
+        <div class="form-section-title">
+          <i class="bi bi-linkedin"></i> LinkedIn-inloggning
+        </div>
+        <p class="text-muted small mb-3">
+          Används för att söka jobb och logga in automatiskt via LinkedIn.
+          Lämna fälten tomma för att behålla befintliga uppgifter.
+        </p>
+        <div class="mb-3">
+          <label class="form-label small"><i class="bi bi-envelope me-1"></i>E-post</label>
+          <input type="email" name="linkedin_email" class="form-control"
+                 placeholder="din@email.com">
+          <small class="text-muted d-block mt-1">
+            Nuvarande: {{ '✅ Konfigurerad' if env.get('LINKEDIN_EMAIL') else '❌ Ej konfigurerad' }}
+          </small>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small"><i class="bi bi-lock me-1"></i>Lösenord</label>
+          <input type="password" name="linkedin_password" class="form-control"
+                 placeholder="Klistra in nytt lösenord för att byta">
+          <small class="text-muted d-block mt-1">
+            Nuvarande: {{ '✅ Konfigurerad' if env.get('LINKEDIN_PASSWORD') else '❌ Ej konfigurerad' }}
+          </small>
+        </div>
+        <div class="d-flex justify-content-end">
+          <button type="submit" class="btn btn-green btn-sm">
+            <i class="bi bi-floppy me-2"></i>Spara inställningar
+          </button>
+        </div>
+      </div>
+
     </form>
 
     <!-- Schemalagd sökning -->

@@ -350,8 +350,15 @@ def get_job_folders():
 def parse_job_folder(folder: Path) -> dict:
     """Parse a job folder into a usable dict"""
     files = [f for f in folder.iterdir() if f.is_file()]
-    cv_file     = next((f for f in files if f.name.startswith('CV_') and f.suffix == '.pdf'), None)
-    letter_file = next((f for f in files if f.name.startswith('Personligt_Brev') and f.suffix == '.pdf'), None)
+    cv_file = next((f for f in files if f.name.startswith('CV_') and f.suffix == '.pdf'), None)
+    if cv_file is None:
+        cv_file = next((f for f in files if f.name == 'CV.pdf'), None)
+
+    letter_candidates = sorted(
+        [f for f in files if f.name.startswith('Personligt_Brev') and f.suffix == '.pdf'],
+        key=lambda f: f.stat().st_size, reverse=True
+    )
+    letter_file = letter_candidates[0] if letter_candidates else None
 
     info = {}
     info_file = folder / 'job_info.txt'

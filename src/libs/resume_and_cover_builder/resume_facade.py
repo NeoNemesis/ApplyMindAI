@@ -3,7 +3,6 @@ This module contains the FacadeManager class, which is responsible for managing 
 """
 # app/libs/resume_and_cover_builder/manager_facade.py
 import hashlib
-import inquirer
 from pathlib import Path
 
 from loguru import logger
@@ -49,10 +48,11 @@ class ResumeFacade:
         Returns:
             str: The choice selected by the user.
         """
+        import inquirer as _inquirer
         questions = [
-            inquirer.List('selection', message=message, choices=choices),
+            _inquirer.List('selection', message=message, choices=choices),
         ]
-        return inquirer.prompt(questions)['selection']
+        return _inquirer.prompt(questions)['selection']
 
     def prompt_for_text(self, message: str) -> str:
         """
@@ -62,10 +62,11 @@ class ResumeFacade:
         Returns:
             str: The text entered by the user.
         """
+        import inquirer as _inquirer
         questions = [
-            inquirer.Text('text', message=message),
+            _inquirer.Text('text', message=message),
         ]
-        return inquirer.prompt(questions)['text']
+        return _inquirer.prompt(questions)['text']
 
         
     def link_to_job(self, job_url):

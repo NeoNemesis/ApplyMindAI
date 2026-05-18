@@ -97,7 +97,9 @@ body {
     font-size: 10.5pt;
     line-height: 1.5;
     color: #1a1a1a;
-    text-align: justify;
+    text-align: left;
+    word-spacing: normal;
+    hyphens: none;
     margin-bottom: 0.35in;
 }
 
@@ -145,7 +147,9 @@ body {
     font-size: 10pt;
     line-height: 1.5;
     color: #1a1a1a;
-    text-align: justify;
+    text-align: left;
+    word-spacing: normal;
+    hyphens: none;
     margin-bottom: 0.12in;
 }
 

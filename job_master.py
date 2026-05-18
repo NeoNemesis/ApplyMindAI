@@ -41,9 +41,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from dotenv import load_dotenv
 
-# Fix Windows console encoding
-if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8')
+# Fix Windows console encoding — cp1252 kan inte hantera emojis i loggar
+for _stream in (sys.stdout, sys.stderr):
+    if _stream and hasattr(_stream, 'reconfigure'):
+        try:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
 
 load_dotenv()
 
@@ -52,6 +57,14 @@ from src.resume_schemas.resume import Resume
 from src.libs.resume_and_cover_builder.moderndesign1.modern_facade import ModernDesign1Facade
 from src.libs.resume_and_cover_builder.moderndesign1.modern_style_manager import ModernDesign1StyleManager
 from src.libs.resume_and_cover_builder.moderndesign1.modern_resume_generator import ModernDesign1ResumeGenerator
+from src.utils.job_dedup import (
+    JobSignature,
+    build_sets_from_processed,
+    is_duplicate as _dedup_is_duplicate,
+    mark_seen as _dedup_mark_seen,
+    normalize_url as _dedup_normalize_url,
+    job_signature as _dedup_signature,
+)
 
 # Browser pool support
 try:
@@ -88,17 +101,18 @@ class JobMaster:
         ]
     }
 
-    # Exkluderade nyckelord (för avancerade roller)
+    # Exkluderade nyckelord — BARA tydliga chef/ledningsroller utesluts
+    # OBS: "senior" är INTE med — det är normalt för de flesta jobb i Sverige
     EXCLUDED_KEYWORDS = [
-        'senior', 'lead', 'principal', 'architect', 'chef', 'manager',
-        'director', 'head of', 'tech lead', 'team lead', '10+ years',
-        '10 years', '8+ years', '5+ years experience'
+        'lead developer', 'tech lead', 'team lead', 'engineering manager',
+        'head of', 'director', 'cto', 'cio', 'vd ', 'chef ', 'avdelningschef',
+        '10+ years', '10 years experience', '8+ years',
     ]
 
     # Föredragna nyckelord (mellannivå och junior)
     PREFERRED_KEYWORDS = [
         'junior', 'utvecklare', 'developer', 'trainee', 'graduate',
-        'entry level', 'nyexaminerad', 'starter'
+        'entry level', 'nyexaminerad', 'starter', 'medior'
     ]
 
     # Accepterade platser (Uppsala, södra Stockholm, Enköping, Remote)
@@ -125,6 +139,8 @@ class JobMaster:
         self.resume_object = None
         self.modern_facade = None
         self.api_key = os.getenv('OPENAI_API_KEY')
+        self.stop_requested = False  # Set to True by web_app to abort search
+        self._browser_initialized = False  # Tracks if browser has been started
 
         # Base directory - resolve to script's directory
         self.script_dir = Path(__file__).parent.absolute()
@@ -138,24 +154,58 @@ class JobMaster:
         self.found_jobs_file = self.base_output_dir / 'found_jobs.json'
 
         # Load processed jobs
-        self.processed_urls: Set[str] = set()
+        self.processed_urls: Set[str] = set()              # bakåtkompatibel rå-URL-set
+        self.processed_url_keys: Set[str] = set()          # normaliserade URL:er (tracking-strippade)
+        self.processed_signatures: Set[JobSignature] = set()  # (norm_company, norm_title)
         self.load_processed_jobs()
 
     def load_processed_jobs(self):
-        """Ladda redan processade jobb för att undvika dubletter"""
+        """Ladda redan processade jobb för att undvika dubletter.
+
+        Bygger tre lager: rå-URL-set (legacy), normaliserad URL-set (strippar
+        tracking-parametrar) och (företag, titel)-signaturer. Se
+        src/utils/job_dedup.py för normaliseringsreglerna.
+        """
         if self.processed_jobs_file.exists():
             try:
                 with open(self.processed_jobs_file, 'r', encoding='utf-8') as f:
                     processed = json.load(f)
-                    self.processed_urls = set(job['url'] for job in processed)
-                print(f"📋 Laddade {len(self.processed_urls)} redan processade jobb")
+                    self.processed_urls = set(job['url'] for job in processed if job.get('url'))
+                    self.processed_url_keys, self.processed_signatures = build_sets_from_processed(processed)
+                print(
+                    f"📋 Laddade {len(self.processed_urls)} processade jobb "
+                    f"({len(self.processed_url_keys)} unika URL:er, "
+                    f"{len(self.processed_signatures)} unika (företag,titel))"
+                )
             except Exception as e:
                 print(f"⚠️  Kunde inte ladda processade jobb: {e}")
                 self.processed_urls = set()
+                self.processed_url_keys = set()
+                self.processed_signatures = set()
+
+    def _job_is_duplicate(self, job: Dict, session_urls: Set[str], session_sigs: Set[JobSignature]) -> bool:
+        """True om jobbet redan setts (i denna session eller historiskt)."""
+        if _dedup_is_duplicate(job, session_urls, session_sigs):
+            return True
+        if _dedup_is_duplicate(job, self.processed_url_keys, self.processed_signatures):
+            return True
+        # Fallback: rå-URL-set (om processed_jobs.json laddats men något skulle gå snett)
+        url = job.get('url') or ''
+        return url in self.processed_urls
+
+    def _mark_job_seen(self, job: Dict, session_urls: Set[str], session_sigs: Set[JobSignature]) -> None:
+        """Registrera jobbet som sett i session + historik."""
+        _dedup_mark_seen(job, session_urls, session_sigs)
+        _dedup_mark_seen(job, self.processed_url_keys, self.processed_signatures)
+        url = job.get('url') or ''
+        if url:
+            self.processed_urls.add(url)
 
     def save_processed_job(self, job: Dict):
         """Spara ett processat jobb"""
         self.processed_urls.add(job['url'])
+        # Säkerställ att alla dedup-set är synkade
+        _dedup_mark_seen(job, self.processed_url_keys, self.processed_signatures)
 
         # Load existing
         existing = []
@@ -174,39 +224,56 @@ class JobMaster:
         with open(self.processed_jobs_file, 'w', encoding='utf-8') as f:
             json.dump(existing, f, indent=2, ensure_ascii=False)
 
-    def initialize(self):
-        """Initialisera system"""
+    # Plattformar som kräver en webbläsare
+    BROWSER_PLATFORMS = {'linkedin', 'indeed', 'arbetsformedlingen'}
+
+    def initialize(self, platforms: list = None):
+        """Initialisera system.
+
+        platforms: lista med plattformar som ska användas (avgör om browser behövs).
+                   None = starta alltid browser (bakåtkompatibelt).
+        """
         print("\n" + "="*80)
         cv_design = os.getenv("CV_DESIGN", "design_01_minimal")
-        print("⚡ ApplyMind AI — Jobbsöknings- och ansökningssystem")
-        print("="*80)
-        print("📍 Områden: Uppsala • Södra Stockholm • Enköping • Remote")
-        print("💼 Plattformar: LinkedIn • Indeed • Arbetsförmedlingen")
-        print(f"📄 Auto-generering: Jobbanpassade CV + Personliga Brev (Design: {cv_design})")
+        print("ApplyMind AI — Jobbsoknings- och ansokningssystem")
         print("="*80)
 
         # Ladda resume
         resume_yaml_path = self.script_dir / 'data_folder' / 'plain_text_resume.yaml'
-        print(f"\n📖 Laddar CV från: {resume_yaml_path}")
+        print(f"Laddar CV fran: {resume_yaml_path}")
 
         with open(resume_yaml_path, 'r', encoding='utf-8') as f:
             yaml_content = f.read()
 
         self.resume_object = Resume(yaml_content)
-        print("✅ CV laddat")
+        print("CV laddat")
 
-        # Starta browser
-        print("\n🌐 Startar browser...")
-        if BROWSER_POOL_AVAILABLE:
-            self.driver = get_browser()
-            print("✅ Browser pool aktiverad (13x snabbare!)")
+        # Avgör om browser behövs
+        needs_browser = (
+            platforms is None
+            or any(p in self.BROWSER_PLATFORMS for p in (platforms or []))
+        )
+
+        if needs_browser:
+            print("Startar browser (kravs for LinkedIn/Indeed/AF)...")
+            try:
+                if BROWSER_POOL_AVAILABLE:
+                    self.driver = get_browser()
+                    print("Browser pool aktiverad")
+                else:
+                    self.driver = init_browser()
+                    print("Browser startad")
+            except Exception as e:
+                print(f"VARNING: Kunde inte starta browser: {e}")
+                print("Fortsatter utan browser — bara API-baserade plattformar fungerar.")
+                self.driver = None
         else:
-            self.driver = init_browser()
-            print("✅ Browser startad")
+            print("Ingen browser kravs (enbart API-baserade plattformar).")
+            self.driver = None
 
-        # Skapa dokumentgenereringsfacade
+        # Skapa dokumentgenereringsfacade (behöver driver om den finns)
         style_manager = ModernDesign1StyleManager()
-        style_manager.set_selected_style('Modern Design 1 - Default')  # style determined by design facade
+        style_manager.set_selected_style('Modern Design 1 - Default')
 
         resume_generator = ModernDesign1ResumeGenerator()
 
@@ -217,10 +284,28 @@ class JobMaster:
             resume_object=self.resume_object,
             output_path=self.base_output_dir
         )
-        self.modern_facade.set_driver(self.driver)
+        if self.driver:
+            self.modern_facade.set_driver(self.driver)
 
-        print("✅ ApplyMind AI dokumentgenereringssystem redo")
+        print("ApplyMind AI klart")
         print("="*80)
+
+    def _ensure_browser(self):
+        """Starta browser om den inte redan är igång (lazy init för dokumentgenerering)."""
+        if self.driver is not None:
+            return  # Already running
+
+        print("Browser behovs for dokumentgenerering — startar nu...")
+        try:
+            if BROWSER_POOL_AVAILABLE:
+                self.driver = get_browser()
+            else:
+                self.driver = init_browser()
+            self.modern_facade.set_driver(self.driver)
+            self._browser_initialized = True
+            print("Browser startad.")
+        except Exception as e:
+            raise RuntimeError(f"Kunde inte starta browser for dokumentgenerering: {e}")
 
     def show_main_menu(self) -> Dict:
         """Visa huvudmeny och få användarens val"""
@@ -345,6 +430,7 @@ class JobMaster:
             with open(cookie_path, 'r', encoding='utf-8') as f:
                 cookies = json.load(f)
             # Måste navigera till domänen innan cookies läggs till
+            self.driver.set_page_load_timeout(20)
             self.driver.get("https://www.linkedin.com")
             time.sleep(2)
             for cookie in cookies:
@@ -385,6 +471,7 @@ class JobMaster:
             return False
 
         try:
+            self.driver.set_page_load_timeout(20)
             self.driver.get("https://www.linkedin.com/login")
             time.sleep(2)
 
@@ -425,6 +512,7 @@ class JobMaster:
 
         all_jobs = []
         seen_urls = set()
+        seen_sigs: Set[JobSignature] = set()
 
         # Generera sökningar baserat på jobbkategorier
         searches = []
@@ -447,6 +535,7 @@ class JobMaster:
 
             try:
                 search_url = f"https://www.linkedin.com/jobs/search/?keywords={search['title']}&location={search['location']}&f_TPR=r86400"
+                self.driver.set_page_load_timeout(20)  # Max 20s per sida
                 self.driver.get(search_url)
                 time.sleep(3)
 
@@ -536,11 +625,6 @@ class JobMaster:
                             except:
                                 continue
 
-                        if not url or url in seen_urls or url in self.processed_urls:
-                            continue
-
-                        seen_urls.add(url)
-
                         job = {
                             'title': title,
                             'company': company,
@@ -551,6 +635,10 @@ class JobMaster:
                             'found_date': datetime.now().isoformat()
                         }
 
+                        if not url or self._job_is_duplicate(job, seen_urls, seen_sigs):
+                            continue
+
+                        self._mark_job_seen(job, seen_urls, seen_sigs)
                         all_jobs.append(job)
                         print(f"   ✅ {title} @ {company} - {location}")
 
@@ -564,111 +652,227 @@ class JobMaster:
         print(f"\n📊 LinkedIn: {len(all_jobs)} lokala jobb hittade")
         return all_jobs
 
+    def _indeed_extract_card(self, card, fallback_location: str) -> dict | None:
+        """Extrahera jobdata från ett Indeed-jobbkort med flera fallback-selektorer."""
+        # Titel — Indeed ändrar klasser ofta, prova flera
+        title = ""
+        for sel in [
+            'h2.jobTitle span[title]', 'h2.jobTitle span', 'h2[class*="jobTitle"] span',
+            'a[class*="JobTitle"]', '[data-testid="job-title"]', 'h2 a span',
+        ]:
+            try:
+                el = card.find_element(By.CSS_SELECTOR, sel)
+                title = el.get_attribute('title') or el.text.strip()
+                if title:
+                    break
+            except Exception:
+                pass
+        if not title:
+            return None
+
+        # Företag
+        company = ""
+        for sel in [
+            '[data-testid="company-name"]', 'span[class*="companyName"]',
+            '[class*="company"]', 'span.company',
+        ]:
+            try:
+                company = card.find_element(By.CSS_SELECTOR, sel).text.strip()
+                if company:
+                    break
+            except Exception:
+                pass
+
+        # Plats
+        location = fallback_location
+        for sel in [
+            '[data-testid="text-location"]', '[class*="companyLocation"]',
+            'div[class*="location"]', '[class*="Location"]',
+        ]:
+            try:
+                loc = card.find_element(By.CSS_SELECTOR, sel).text.strip()
+                if loc:
+                    location = loc
+                    break
+            except Exception:
+                pass
+
+        # URL
+        url = ""
+        for sel in ['h2.jobTitle a', 'h2 a', 'a[data-jk]', 'a[id^="job_"]']:
+            try:
+                href = card.find_element(By.CSS_SELECTOR, sel).get_attribute('href')
+                if href:
+                    url = href if href.startswith('http') else f"https://se.indeed.com{href}"
+                    break
+            except Exception:
+                pass
+        if not url:
+            return None
+
+        return {'title': title, 'company': company or 'Okänt företag', 'location': location, 'url': url}
+
+    def _create_undetected_driver(self):
+        """Skapar en undetected-chromedriver instans som kringgår Indeeds botskydd."""
+        import undetected_chromedriver as uc
+        options = uc.ChromeOptions()
+        options.add_argument("--window-size=1280,900")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(
+            "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        )
+        driver = uc.Chrome(options=options, use_subprocess=True)
+        return driver
+
     def search_indeed_jobs(self, max_jobs: int) -> List[Dict]:
-        """Sök jobb på Indeed - Uppsala + Södra Stockholm, 50 km radie"""
-        print(f"\n🔍 SÖKER JOBB PÅ INDEED (max {max_jobs})")
-        print("="*80)
-        print("📍 Uppsala + Södra Stockholm (50 km radie)")
-        print("💼 Jobbtyper: IT-utvecklare, IT-tekniker, Systemadministratör")
-        print("="*80)
+        """Sök jobb på Indeed med undetected-chromedriver för att kringgå botskydd."""
+        import urllib.parse as _uparse
+
+        print(f"\n🔍 SÖKER JOBB PÅ INDEED med stealth-browser (max {max_jobs})")
+        print("=" * 80)
 
         all_jobs = []
-        seen_urls = set()
+        seen_urls: set = set()
+        seen_sigs: Set[JobSignature] = set()
+        uc_driver = None
 
-        # Bygg sökningar dynamiskt från användarens valda positioner och platser
-        searches = []
-        for position in self.search_positions:
-            for location in self.search_locations:
-                searches.append({"keyword": position, "location": location})
-        # Fallback om inga inställningar finns
-        if not searches:
-            searches = [
-                {"keyword": "Systemutvecklare", "location": "Uppsala"},
-                {"keyword": "IT-utvecklare", "location": "Uppsala"},
-                {"keyword": "Junior utvecklare", "location": "Stockholm"},
-            ]
+        searches = [
+            {"keyword": pos, "location": loc}
+            for pos in (self.search_positions or ['Systemutvecklare'])
+            for loc in (self.search_locations or ['Uppsala'])
+        ]
 
-        for search in searches:
-            if len(all_jobs) >= max_jobs:
-                break
+        try:
+            print("   🌐 Startar stealth-browser för Indeed...")
+            uc_driver = self._create_undetected_driver()
+            print("   ✅ Stealth-browser startad")
 
-            print(f"\n🔍 {search['keyword']} i {search['location']}")
+            for search in searches:
+                if len(all_jobs) >= max_jobs or self.stop_requested:
+                    break
 
-            try:
-                search_url = f"https://se.indeed.com/jobs?q={search['keyword']}&l={search['location']}&radius=50&sort=date"
-                self.driver.get(search_url)
-                time.sleep(3)
+                keyword_enc = _uparse.quote(search['keyword'])
+                location_enc = _uparse.quote(search['location'])
+                search_url = (
+                    f"https://se.indeed.com/jobs?q={keyword_enc}"
+                    f"&l={location_enc}&radius=50&sort=date"
+                )
+                print(f"\n🔍 {search['keyword']} i {search['location']}")
 
-                # Hitta jobbkort
-                job_cards = self.driver.find_elements(By.CLASS_NAME, 'job_seen_beacon')
-                print(f"   📋 {len(job_cards)} jobbkort hittade")
+                try:
+                    uc_driver.set_page_load_timeout(25)
+                    uc_driver.get(search_url)
+                    time.sleep(5)  # Ge sidan tid att ladda och JS att köra
 
-                for card in job_cards[:10]:
-                    try:
-                        # Extrahera titel
-                        try:
-                            title_elem = card.find_element(By.CSS_SELECTOR, 'h2.jobTitle span')
-                            title = title_elem.text.strip()
-                        except:
-                            title = "Okänd titel"
+                    page_src = uc_driver.page_source.lower()
 
-                        # Extrahera företag
-                        try:
-                            company_elem = card.find_element(By.CSS_SELECTOR, '[data-testid="company-name"]')
-                            company = company_elem.text.strip()
-                        except:
-                            company = "Okänt företag"
-
-                        # Extrahera plats
-                        try:
-                            location_elem = card.find_element(By.CSS_SELECTOR, '[data-testid="text-location"]')
-                            location = location_elem.text.strip()
-                        except:
-                            location = search['location']
-
-                        # Filtrera lokala jobb
-                        if not self.is_local_job(location):
-                            continue
-
-                        # Filtrera bort senior-roller
-                        if not self.is_suitable_level(title):
-                            print(f"   ⏭️  Hoppar över: {title} (för avancerad nivå)")
-                            continue
-
-                        # Extrahera URL
-                        try:
-                            link_elem = card.find_element(By.CSS_SELECTOR, 'h2.jobTitle a')
-                            href = link_elem.get_attribute('href')
-                            url = href if href.startswith('http') else f"https://se.indeed.com{href}"
-                        except:
-                            continue
-
-                        if not url or url in seen_urls or url in self.processed_urls:
-                            continue
-
-                        seen_urls.add(url)
-
-                        job = {
-                            'title': title,
-                            'company': company,
-                            'location': location,
-                            'url': url,
-                            'source': 'Indeed',
-                            'search_query': f"{search['keyword']} i {search['location']}",
-                            'found_date': datetime.now().isoformat()
-                        }
-
-                        all_jobs.append(job)
-                        print(f"   ✅ {title} @ {company} - {location}")
-
-                    except Exception as e:
+                    # Kontrollera om vi fortfarande blockeras
+                    if any(kw in page_src for kw in ['captcha', 'are you a human', 'verify you are human']):
+                        print("   ⚠️  Indeed kräver manuell CAPTCHA — hoppar över")
                         continue
 
-            except Exception as e:
-                print(f"   ❌ Fel: {str(e)}")
-                continue
+                    # Extrahera jobbkort med flera fallback-selektorer
+                    job_cards = []
+                    for cls in ['job_seen_beacon', 'tapItem', 'slider_item']:
+                        job_cards = uc_driver.find_elements(By.CLASS_NAME, cls)
+                        if job_cards:
+                            break
+                    if not job_cards:
+                        job_cards = uc_driver.find_elements(By.CSS_SELECTOR, 'li[class*="job"], div[class*="job_seen"]')
 
-        print(f"\n📊 Indeed: {len(all_jobs)} lokala jobb hittade")
+                    print(f"   📋 {len(job_cards)} jobbkort hittade")
+                    if not job_cards:
+                        print(f"   ℹ️  Sidtitel: {uc_driver.title[:80]}")
+
+                    for card in job_cards[:15]:
+                        if len(all_jobs) >= max_jobs:
+                            break
+                        try:
+                            # Använd befintlig extraktionslogik
+                            title = ""
+                            for sel in ['h2.jobTitle span[title]', 'h2.jobTitle span', 'h2[class*="jobTitle"] a span', '[data-testid="job-title"]']:
+                                try:
+                                    el = card.find_element(By.CSS_SELECTOR, sel)
+                                    title = el.get_attribute('title') or el.text.strip()
+                                    if title:
+                                        break
+                                except Exception:
+                                    pass
+                            if not title:
+                                continue
+
+                            company = ""
+                            for sel in ['[data-testid="company-name"]', 'span[class*="companyName"]', '.company']:
+                                try:
+                                    company = card.find_element(By.CSS_SELECTOR, sel).text.strip()
+                                    if company:
+                                        break
+                                except Exception:
+                                    pass
+
+                            location = search['location']
+                            for sel in ['[data-testid="text-location"]', '[class*="companyLocation"]']:
+                                try:
+                                    loc = card.find_element(By.CSS_SELECTOR, sel).text.strip()
+                                    if loc:
+                                        location = loc
+                                        break
+                                except Exception:
+                                    pass
+
+                            url = ""
+                            for sel in ['h2.jobTitle a', 'h2 a', 'a[data-jk]']:
+                                try:
+                                    href = card.find_element(By.CSS_SELECTOR, sel).get_attribute('href')
+                                    if href:
+                                        url = href if href.startswith('http') else f"https://se.indeed.com{href}"
+                                        break
+                                except Exception:
+                                    pass
+                            if not url:
+                                continue
+
+                            if not self.is_local_job(location):
+                                continue
+                            if not self.is_suitable_level(title):
+                                print(f"   ⏭️  Hoppar över: {title}")
+                                continue
+                            job = {
+                                'title': title,
+                                'company': company or 'Okänt företag',
+                                'location': location,
+                                'url': url,
+                                'source': 'Indeed',
+                                'search_query': f"{search['keyword']} i {search['location']}",
+                                'found_date': datetime.now().isoformat(),
+                            }
+                            if self._job_is_duplicate(job, seen_urls, seen_sigs):
+                                continue
+
+                            self._mark_job_seen(job, seen_urls, seen_sigs)
+                            all_jobs.append(job)
+                            print(f"   ✅ {title} @ {company} - {location}")
+
+                        except Exception:
+                            continue
+
+                except Exception as e:
+                    print(f"   ❌ Fel vid sökning: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"   ❌ Kunde inte starta stealth-browser: {e}")
+        finally:
+            if uc_driver:
+                try:
+                    uc_driver.quit()
+                except Exception:
+                    pass
+
+        print(f"\n📊 Indeed: {len(all_jobs)} jobb hittade")
         return all_jobs
 
     def search_indeed_jobs_deep(self, max_jobs: int) -> List[Dict]:
@@ -682,6 +886,7 @@ class JobMaster:
 
         all_jobs = []
         seen_urls = set()
+        seen_sigs: Set[JobSignature] = set()
 
         searches = [
             {"keyword": "Systemutvecklare", "location": "Uppsala"},
@@ -751,12 +956,6 @@ class JobMaster:
                         except:
                             continue
 
-                        # SKIPPA DUPLIKAT (både från denna session och tidigare processade)
-                        if not url or url in seen_urls or url in self.processed_urls:
-                            continue
-
-                        seen_urls.add(url)
-
                         job = {
                             'title': title,
                             'company': company,
@@ -766,7 +965,11 @@ class JobMaster:
                             'search_query': f"{search['keyword']} i {search['location']}",
                             'found_date': datetime.now().isoformat()
                         }
+                        # SKIPPA DUPLIKAT (URL + fuzzy företag/titel, både session och historik)
+                        if not url or self._job_is_duplicate(job, seen_urls, seen_sigs):
+                            continue
 
+                        self._mark_job_seen(job, seen_urls, seen_sigs)
                         all_jobs.append(job)
                         print(f"   ✅ {title} @ {company} - {location}")
 
@@ -791,6 +994,7 @@ class JobMaster:
 
         all_jobs = []
         seen_urls = set()
+        seen_sigs: Set[JobSignature] = set()
 
         searches = [
             {"keyword": "it", "location": "Uppsala"},
@@ -872,13 +1076,6 @@ class JobMaster:
                             except:
                                 continue
 
-                            # SKIPPA DUPLIKAT - både från denna session och tidigare processade
-                            if not url or url in seen_urls or url in self.processed_urls:
-                                continue
-
-                            seen_urls.add(url)
-                            page_jobs += 1
-
                             job = {
                                 'title': title,
                                 'company': company,
@@ -888,7 +1085,12 @@ class JobMaster:
                                 'search_query': f"{search['keyword']} i {search['location']} (sida {page+1})",
                                 'found_date': datetime.now().isoformat()
                             }
+                            # SKIPPA DUPLIKAT (URL + fuzzy företag/titel, både session och historik)
+                            if not url or self._job_is_duplicate(job, seen_urls, seen_sigs):
+                                continue
 
+                            self._mark_job_seen(job, seen_urls, seen_sigs)
+                            page_jobs += 1
                             all_jobs.append(job)
                             print(f"   ✅ {title} @ {company} - {location}")
 
@@ -911,6 +1113,7 @@ class JobMaster:
 
         all_jobs = []
         seen_urls = set()
+        seen_sigs: Set[JobSignature] = set()
 
         import urllib.parse as _urlparse
         searches = []
@@ -931,7 +1134,7 @@ class JobMaster:
             ]
 
         for search in searches:
-            if len(all_jobs) >= max_jobs:
+            if len(all_jobs) >= max_jobs or self.stop_requested:
                 break
 
             try:
@@ -968,9 +1171,6 @@ class JobMaster:
                         if not url or 'arbetsformedlingen.se' not in url:
                             continue
 
-                        if url in seen_urls or url in self.processed_urls:
-                            continue
-
                         # Extrahera text
                         text = card.text.strip()
                         lines = text.split('\n')
@@ -982,8 +1182,6 @@ class JobMaster:
                         if len(title) < 3:
                             continue
 
-                        seen_urls.add(url)
-
                         job = {
                             'title': title,
                             'company': company,
@@ -993,6 +1191,11 @@ class JobMaster:
                             'search_query': search['location'],
                             'found_date': datetime.now().isoformat()
                         }
+
+                        if self._job_is_duplicate(job, seen_urls, seen_sigs):
+                            continue
+
+                        self._mark_job_seen(job, seen_urls, seen_sigs)
 
                         all_jobs.append(job)
                         print(f"   ✅ {title} @ {company}")
@@ -1016,24 +1219,51 @@ class JobMaster:
         self.search_positions = positions or ['Junior Systemutvecklare', 'Webbutvecklare']
         all_jobs = []
 
-        # LinkedIn (kräver inloggning)
-        if 'linkedin' in platforms:
-            if self.login_to_linkedin():
-                linkedin_jobs = self.search_linkedin_jobs(max_jobs)
-                all_jobs.extend(linkedin_jobs)
+        import threading as _threading
 
-        # Indeed
-        if 'indeed' in platforms:
-            indeed_jobs = self.search_indeed_jobs(max_jobs)
-            all_jobs.extend(indeed_jobs)
+        # LinkedIn (kräver inloggning, max 60s timeout)
+        if 'linkedin' in platforms and not self.stop_requested:
+            print("\n⏳ Startar LinkedIn-sökning (max 60 sek)...")
+            _linkedin_result = []
+            def _run_linkedin():
+                if self.login_to_linkedin():
+                    _linkedin_result.extend(self.search_linkedin_jobs(max_jobs))
+            _t = _threading.Thread(target=_run_linkedin, daemon=True)
+            _t.start(); _t.join(timeout=60)
+            if _t.is_alive():
+                print("⚠️  LinkedIn tog för lång tid (>60 sek) — hoppar över.")
+            else:
+                all_jobs.extend(_linkedin_result)
 
-        # Arbetsförmedlingen
-        if 'arbetsformedlingen' in platforms:
-            af_jobs = self.search_arbetsformedlingen_jobs(max_jobs)
-            all_jobs.extend(af_jobs)
+        # Indeed — stealth-browser med undetected-chromedriver
+        if 'indeed' in platforms and not self.stop_requested:
+            print("\n⏳ Startar Indeed-sökning med stealth-browser (max 90 sek)...")
+            _indeed_result = []
+            def _run_indeed():
+                _indeed_result.extend(self.search_indeed_jobs(max_jobs))
+            _t = _threading.Thread(target=_run_indeed, daemon=True)
+            _t.start(); _t.join(timeout=90)
+            if _t.is_alive():
+                print("⚠️  Indeed tog för lång tid (>90 sek) — hoppar över.")
+            else:
+                all_jobs.extend(_indeed_result)
+
+        # Arbetsförmedlingen (max 60s timeout)
+        if 'arbetsformedlingen' in platforms and not self.stop_requested:
+            print("\n⏳ Startar Arbetsförmedlingen-sökning (max 60 sek)...")
+            _af_result = []
+            def _run_af():
+                _af_result.extend(self.search_arbetsformedlingen_jobs(max_jobs))
+            _t = _threading.Thread(target=_run_af, daemon=True)
+            _t.start(); _t.join(timeout=60)
+            if _t.is_alive():
+                print("⚠️  Arbetsförmedlingen tog för lång tid (>60 sek) — hoppar över.")
+            else:
+                all_jobs.extend(_af_result)
 
         # Jobtech API (Sveriges officiella jobbdatabas — ingen inloggning krävs)
-        if 'jobtech' in platforms:
+        if 'jobtech' in platforms and not self.stop_requested:
+            print("\n⏳ Startar Jobtech API-sökning...")
             jobtech_jobs = self.search_jobtech_jobs(max_jobs)
             all_jobs.extend(jobtech_jobs)
 
@@ -1050,7 +1280,12 @@ class JobMaster:
 
 
     def search_jobtech_jobs(self, max_jobs: int) -> List[Dict]:
-        """Sök via Jobtech API (Sveriges officiella jobbdatabas — ingen inloggning krävs)"""
+        """Sök via Jobtech JobSearch API (Sveriges officiella jobbdatabas — ingen inloggning krävs).
+
+        Strategi: inkludera orten direkt i sökfrågan (q="Systemutvecklare Uppsala") — detta
+        är vad Jobtech rekommenderar och ger korrekt lokal filtrering utan municipality-concept-id.
+        Söker varje kombination av position × plats.
+        """
         import urllib.request as _urllib_req
         import urllib.parse as _urllib_parse
         import json as _json_lib
@@ -1060,13 +1295,25 @@ class JobMaster:
 
         all_jobs: List[Dict] = []
         seen_urls: set = set()
+        seen_sigs: Set[JobSignature] = set()
 
-        for position in self.search_positions[:5]:
-            if len(all_jobs) >= max_jobs:
+        # Fallback om inget är konfigurerat
+        positions = self.search_positions[:5] or ['Systemutvecklare', 'Webbutvecklare']
+        locations = self.search_locations[:3] or ['Uppsala']
+
+        # Bygg kombination position × plats
+        searches = [(pos, loc) for pos in positions for loc in locations]
+        print(f"Söker {len(searches)} kombinationer: {positions} x {locations}")
+
+        for position, location in searches:  # noqa: E501
+            if len(all_jobs) >= max_jobs or self.stop_requested:
                 break
             try:
-                q = _urllib_parse.quote(position)
-                api_url = f"https://links.api.jobtechdev.se/joblinks?q={q}&limit=20"
+                # Inkludera orten i frågesträngen — verifierat fungerar för Jobtech API
+                combined_q = _urllib_parse.quote(f"{position} {location}")
+                api_url = f"https://jobsearch.api.jobtechdev.se/search?q={combined_q}&limit=15"
+
+                print(f"   🔗 {position} i {location}")
 
                 req = _urllib_req.Request(api_url, headers={
                     'Accept': 'application/json',
@@ -1075,53 +1322,56 @@ class JobMaster:
                 with _urllib_req.urlopen(req, timeout=10) as resp:
                     data = _json_lib.loads(resp.read().decode())
 
-                hits = data.get('hits', []) or data.get('jobs', []) or []
+                hits = data.get('hits', []) or []
+                total = data.get('total', {}).get('value', len(hits))
+                print(f"   📋 {len(hits)} träffar (totalt {total} i Sverige)")
 
                 for hit in hits:
-                    if len(all_jobs) >= max_jobs:
+                    if len(all_jobs) >= max_jobs or self.stop_requested:
                         break
 
-                    url = hit.get('webpage_url') or hit.get('url', '')
-                    title = hit.get('headline') or hit.get('title', 'Okänd titel')
-                    employer = hit.get('employer', {})
-                    company = (
-                        employer.get('name', 'Okänt företag')
-                        if isinstance(employer, dict)
-                        else str(employer)
-                    )
-                    workplace = hit.get('workplace_address', {})
-                    location = (
-                        workplace.get('municipality', '')
-                        if isinstance(workplace, dict)
-                        else ''
-                    )
+                    # Extrahera URL
+                    app_details = hit.get('application_details') or {}
+                    webpage = hit.get('webpage_url', '') or ''
+                    url = app_details.get('url', '') or webpage
+                    if not url:
+                        job_id = hit.get('id', '')
+                        url = f"https://arbetsformedlingen.se/platsbanken/annonser/{job_id}" if job_id else ''
 
-                    if not url or url in seen_urls or url in self.processed_urls:
+                    title = hit.get('headline', 'Okänd titel')
+                    employer = hit.get('employer') or {}
+                    company = employer.get('name', 'Okänt företag') if isinstance(employer, dict) else 'Okänt företag'
+
+                    workplace = hit.get('workplace_address') or {}
+                    municipality = workplace.get('municipality', '') if isinstance(workplace, dict) else ''
+                    job_location = municipality or location
+
+                    if not url:
                         continue
 
-                    # Location filter — accept when no municipality provided
-                    if location and not self.is_local_job(location):
-                        continue
-
-                    # Level filter
+                    # Level filter — relaxed: skip ONLY if clearly senior management
                     if not self.is_suitable_level(title):
                         print(f"   ⏭️  Hoppar över: {title} (för avancerad nivå)")
                         continue
 
-                    seen_urls.add(url)
-                    all_jobs.append({
+                    job = {
                         'title': title,
                         'company': company,
-                        'location': location or 'Sverige',
+                        'location': job_location,
                         'url': url,
-                        'source': 'Jobtech',
-                        'search_query': position,
+                        'source': 'Jobtech/AF',
+                        'search_query': f"{position} i {location}",
                         'found_date': datetime.now().isoformat(),
-                    })
-                    print(f"   ✅ {title} @ {company} - {location}")
+                    }
+                    if self._job_is_duplicate(job, seen_urls, seen_sigs):
+                        continue
+
+                    self._mark_job_seen(job, seen_urls, seen_sigs)
+                    all_jobs.append(job)
+                    print(f"   ✅ {title} @ {company} - {job_location}")
 
             except Exception as e:
-                print(f"   ⚠️  Jobtech-fel för '{position}': {e}")
+                print(f"   ⚠️  Jobtech-fel för '{position} i {location}': {e}")
                 continue
 
         print(f"\n📊 Jobtech: {len(all_jobs)} jobb hittade")
@@ -1130,11 +1380,11 @@ class JobMaster:
     def quick_ats_score(self, job_description: str, threshold: int) -> tuple:
         """Snabb ATS-bedömning via LLM innan dokumentgenerering.
         Returnerar (score: int, reasoning: str).
-        Vid fel returneras (100, 'fallback') så jobbet inte missas."""
+        Vid fel returneras (50, beskrivning) så jobbet inte automatiskt godkänns."""
         try:
             api_key = os.getenv('OPENAI_API_KEY', '')
             if not api_key:
-                return (100, 'Ingen API-nyckel — hoppar över filter')
+                return (50, 'Ingen API-nyckel — ATS-filter inaktivt')
 
             # Bygg kompakt CV-sammanfattning
             pi = getattr(self.resume_object, 'personal_information', {}) or {}
@@ -1166,11 +1416,11 @@ class JobMaster:
             text = resp.choices[0].message.content or ''
             import re
             m = re.search(r'Score:\s*(\d+)', text)
-            score = int(m.group(1)) if m else 100
+            score = int(m.group(1)) if m else 50
             reasoning = re.sub(r'Score:\s*\d+\s*', '', text).replace('Reasoning:', '').strip()
             return (min(100, max(0, score)), reasoning)
         except Exception as e:
-            return (100, f'Fel i ATS-check: {e}')
+            return (50, f'ATS-check misslyckades: {e}')
 
     # ------------------------------------------------------------------
     # Auto-apply helpers
@@ -1406,7 +1656,8 @@ class JobMaster:
 
             # Hämta jobbinformation
             print(f"\n🔗 Hämtar jobbinformation från: {job['url']}")
-            self.modern_facade.link_to_job(job['url'])
+            self._ensure_browser()  # Lazy init — startar browser om Jobtech-only sökning gjordes
+            self.modern_facade.link_to_job(job['url'], job_title=job.get('title', ''), job_company=job.get('company', ''))
 
             # ATS-filter: kontrollera matchning INNAN vi genererar dokument
             if ats_filter:
@@ -1421,10 +1672,10 @@ class JobMaster:
                     return False
                 print(f"   ✅ ATS-poäng OK — fortsätter med generering")
 
-            # Generera jobbanpassat CV (utan frågor för att spara tid)
+            # Generera jobbanpassat CV - AI anpassar automatiskt till jobbet
             _design = os.getenv("CV_DESIGN", "design_01_minimal")
             print(f"📝 Genererar jobbanpassat CV ({_design})...")
-            cv_base64, _ = self.modern_facade.create_resume_pdf_job_tailored(ask_questions=False)
+            cv_base64, _ = self.modern_facade.create_resume_pdf_job_tailored()
 
             _cv_design_slug = os.getenv("CV_DESIGN", "design_01_minimal")
             cv_path = job_folder / f"CV_{safe_company}_{safe_title}_{_cv_design_slug}.pdf"
@@ -1608,13 +1859,18 @@ class JobMaster:
             self.cleanup()
 
     def cleanup(self):
-        """Stäng browser"""
-        print("\n🧹 Stänger browser...")
-        if BROWSER_POOL_AVAILABLE:
-            cleanup_browser()
-        elif self.driver:
-            self.driver.quit()
-        print("✅ Systemet stängt")
+        """Stäng browser om den är öppen"""
+        if self.driver is None:
+            return
+        try:
+            if BROWSER_POOL_AVAILABLE:
+                cleanup_browser()
+            else:
+                self.driver.quit()
+        except Exception:
+            pass
+        finally:
+            self.driver = None
 
 
 def main():

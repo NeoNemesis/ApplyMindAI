@@ -204,14 +204,15 @@ CRITICAL RULES:
 1. KEEP 75% of the original text EXACTLY as written - only adapt up to 25%
 2. Preserve the user's authentic voice, style and personality
 3. Use the job description to identify which parts of the original letter to emphasize or adjust
-4. Naturally mention "{company_name}" and "{position_title}" where it fits
-5. DO NOT make the text more formal or add flowery language
-6. DO NOT write about skills or experience not present in the original letter
-7. Keep the same simple, honest and direct tone as the original
-8. Write ALWAYS in SWEDISH (language: sv) - NEVER use English
-9. Return ONLY the adapted letter body - NO salutation ("Hej!"), NO closing ("Med vänliga hälsningar")
-10. Use double line breaks (\\n\\n) to separate paragraphs
-11. NO error messages, NO job descriptions, JUST the adapted text
+4. Be SUBTLE about the company and position. Reference them at most ONCE in the entire letter, briefly and naturally (e.g. "rollen hos er" or a short phrase). NEVER write out the full company name + full job title together (avoid phrases like "att arbeta som [Full Position Title] på [Full Company Name]"). NEVER end the letter with a grand "möjligheten att arbeta som..." sentence.
+5. Do NOT mention or imply that the candidate owns a company, runs a business, is an entrepreneur, owns "aktiebolag", is "ägare", "CTO of their own company" or similar. Keep the framing strictly as an employed/freelance developer.
+6. DO NOT make the text more formal or add flowery language
+7. DO NOT write about skills or experience not present in the original letter
+8. Keep the same simple, honest and direct tone as the original
+9. Write ALWAYS in SWEDISH (language: sv) - NEVER use English
+10. Return ONLY the adapted letter body - NO salutation ("Hej!"), NO closing ("Med vänliga hälsningar")
+11. Use double line breaks (\\n\\n) to separate paragraphs
+12. NO error messages, NO job descriptions, JUST the adapted text
 
 ADAPTED COVER LETTER BODY (plain text with \\n\\n between paragraphs):"""
 
