@@ -730,8 +730,20 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
             # Profilbild
             profile_image_base64 = self._get_profile_image_base64()
             
-            # Ladda template
-            template_path = Path(__file__).parent / "improved_template.html"
+            # Ladda template — router baserat på CV_DESIGN env
+            import os
+            CV_TEMPLATE_MAP = {
+                'design_02_classic':      'improved_template.html',
+                'design_03_modern_green': 'template_modern_green.html',
+                'design_07_tech_modern':  'template_tech_modern.html',
+            }
+            chosen = os.getenv('CV_DESIGN', 'design_02_classic')
+            template_filename = CV_TEMPLATE_MAP.get(chosen, 'improved_template.html')
+            template_path = Path(__file__).parent / template_filename
+            if not template_path.exists():
+                logger.warning(f'CV template "{template_filename}" saknas, fallback till improved_template.html')
+                template_path = Path(__file__).parent / "improved_template.html"
+            logger.info(f'Använder CV-template: {template_path.name} (CV_DESIGN={chosen})')
             with open(template_path, 'r', encoding='utf-8') as f:
                 template = f.read()
             

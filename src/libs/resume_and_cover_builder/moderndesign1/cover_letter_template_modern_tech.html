@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=900, initial-scale=1.0">
+<title>Personligt brev - $full_name</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box;
+      -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  body { background:#0a0a0a; padding:0; margin:0; color:#e0e0e0;
+      font-family:'Inter','Helvetica Neue',Arial,sans-serif; }
+  .letter-container { width:900px; max-width:900px; background:#0a0a0a; margin:0 auto;
+      min-height:1200px; box-shadow:0 0 30px rgba(0,0,0,0.4); }
+  @media print { .letter-container { box-shadow:none; } body { background:#0a0a0a; } }
+
+  /* Top dark banner */
+  .top-banner { background:linear-gradient(135deg,#111 0%,#1a1a1a 100%); padding:2rem 2.5rem;
+      display:flex; justify-content:space-between; align-items:flex-start;
+      border-bottom:4px solid #4AE54A; }
+  .header-name h1 { font-size:1.6rem; font-weight:700; color:#fff; letter-spacing:-0.01em;
+      margin-bottom:0.2rem; }
+  .header-name .role { font-family:'JetBrains Mono','Menlo','Courier New',monospace; font-size:0.82rem;
+      color:#4AE54A; }
+  .header-name .role::before { content:'// '; color:#4AE54A; opacity:0.7; }
+  .header-contact { display:flex; flex-direction:column; gap:0.25rem; align-items:flex-end; }
+  .header-contact div { background:rgba(74,229,74,0.1); border:1px solid rgba(74,229,74,0.3);
+      color:#4AE54A; font-family:'JetBrains Mono','Menlo',monospace; font-size:0.74rem;
+      padding:0.2rem 0.7rem; border-radius:12px; }
+
+  /* Green job-info bar (date + meta) */
+  .meta-bar { background:#4AE54A; color:#111; padding:0.6rem 2.5rem; display:flex;
+      justify-content:space-between; align-items:center;
+      font-family:'JetBrains Mono','Menlo',monospace; font-size:0.82rem; font-weight:600; }
+  .meta-bar .label { letter-spacing:0.1em; text-transform:uppercase; }
+
+  /* Body */
+  .body-wrap { padding:2.2rem 2.5rem 2.5rem; background:#0a0a0a; }
+  .salutation { font-size:1rem; color:#fff; margin-bottom:1.4rem; font-weight:500; }
+  .body-content { font-size:0.95rem; color:#d4d4d4; line-height:1.7; text-align:left;
+      word-spacing:normal; hyphens:none; }
+  .body-content p { margin-bottom:1.1rem; }
+
+  /* Closing */
+  .closing { margin-top:2rem; padding-top:1.4rem; border-top:1px dashed #2a2a2a; }
+  .closing .sincerely { font-size:0.95rem; color:#bdbdbd; margin-bottom:1.2rem; }
+  .closing .signature { font-size:1.15rem; font-weight:700; color:#4AE54A;
+      font-family:'JetBrains Mono','Menlo',monospace; margin-bottom:0.6rem; }
+  .closing .signature::before { content:'$$ '; opacity:0.6; }
+  .attachment { font-size:0.78rem; color:#666; font-style:italic;
+      font-family:'JetBrains Mono','Menlo',monospace; }
+</style>
+</head>
+<body>
+<div class="letter-container">
+  <div class="top-banner">
+    <div class="header-name">
+      <h1>$full_name</h1>
+      <div class="role">$job_title</div>
+    </div>
+    <div class="header-contact">$contact_info</div>
+  </div>
+  <div class="meta-bar">
+    <span class="label">Personligt brev</span>
+    <span>$date</span>
+  </div>
+  <div class="body-wrap">
+    <div class="salutation">$salutation</div>
+    <div class="body-content">$section1_content</div>
+    <div class="closing">
+      <div class="sincerely">$closing_text</div>
+      <div class="signature">$full_name</div>
+      <div class="attachment">$attachment_text</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

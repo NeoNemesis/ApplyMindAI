@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1000, initial-scale=1.0">
+<title>CV - $full_name</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box;
+      -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  body { background:#0a0a0a; padding:0; margin:0; color:#e0e0e0;
+      font-family:'Inter','Helvetica Neue',Arial,sans-serif; }
+  .cv-container { width:1000px; max-width:1000px; background:#0a0a0a; margin:0 auto;
+      box-shadow:0 0 30px rgba(0,0,0,0.5); min-height:1400px; }
+  @media print { .cv-container { box-shadow:none; } body { background:#0a0a0a; } }
+
+  /* Top banner */
+  .top-banner { background:linear-gradient(135deg,#111 0%,#1a1a1a 100%); padding:2.5rem 2.5rem 2rem;
+      border-bottom:4px solid #4AE54A; display:flex; gap:2rem; align-items:center; }
+  .profile-image { width:120px; height:120px; border-radius:8px; overflow:hidden; flex-shrink:0;
+      border:2px solid #4AE54A; box-shadow:0 0 20px rgba(74,229,74,0.25); }
+  .profile-image img { width:100%; height:100%; object-fit:cover; }
+  .name-block h1 { font-size:2.4rem; font-weight:700; color:#fff; letter-spacing:-0.02em;
+      margin-bottom:0.25rem; line-height:1.1; }
+  .name-block h2 { font-family:'JetBrains Mono','Menlo','Courier New',monospace; font-size:0.95rem;
+      font-weight:500; color:#4AE54A; margin-bottom:0.8rem; }
+  .name-block h2::before { content:'$$ '; color:#4AE54A; opacity:0.6; }
+  .name-block p { font-size:0.92rem; color:#bdbdbd; line-height:1.6; max-width:600px;
+      text-align:left; word-spacing:normal; hyphens:none; }
+
+  /* Body — two cols */
+  .body-grid { display:grid; grid-template-columns:1fr 1.6fr; gap:0; }
+  @media print { .body-grid { display:table; table-layout:fixed; width:100%; } }
+
+  .left-col, .right-col { padding:2rem 2.2rem; }
+  .left-col { background:#101010; border-right:1px solid #1f1f1f; }
+  .right-col { background:#0a0a0a; }
+  @media print { .left-col, .right-col { display:table-cell; vertical-align:top; } }
+
+  .section { margin-bottom:1.7rem; }
+  .section-title { font-family:'JetBrains Mono','Menlo','Courier New',monospace; font-size:0.72rem;
+      letter-spacing:0.25em; text-transform:uppercase; color:#4AE54A;
+      border-bottom:1px dashed rgba(74,229,74,0.3); padding-bottom:0.5rem; margin-bottom:0.9rem; }
+  .section-title::before { content:'> '; opacity:0.7; }
+  .section *, .section li { font-size:0.86rem; line-height:1.55; color:#cccccc;
+      text-align:left; word-spacing:normal; hyphens:none; }
+  .section ul { list-style:none; padding:0; }
+  .section li { padding:0.18rem 0; }
+  .section strong, .section h4 { color:#fff; }
+
+  /* Experience */
+  .experience .section-title { color:#4AE54A; }
+  .experience-item { margin-bottom:1.3rem; padding-left:1rem; border-left:2px solid #4AE54A;
+      background:rgba(74,229,74,0.02); padding-top:0.4rem; padding-right:0.5rem; padding-bottom:0.4rem; }
+  .experience-item h4, .experience h4 { font-size:1rem; font-weight:700; color:#fff; margin-bottom:0.15rem;
+      font-family:'Inter',sans-serif; }
+  .experience-item .company, .experience .company {
+      font-family:'JetBrains Mono','Menlo',monospace; font-size:0.78rem; color:#4AE54A; margin-bottom:0.45rem; }
+  .experience-item p, .experience p, .experience-item li, .experience li {
+      font-size:0.86rem; color:#bdbdbd; line-height:1.55; text-align:left; word-spacing:normal; hyphens:none; }
+
+  .technical-skills { margin-top:1.5rem; padding-top:1.2rem; border-top:1px dashed #2a2a2a; }
+  .technical-skills h4 { font-family:'JetBrains Mono','Menlo',monospace; font-size:0.72rem;
+      letter-spacing:0.25em; text-transform:uppercase; color:#4AE54A; margin-bottom:0.85rem; }
+  .technical-skills h4::before { content:'> '; opacity:0.7; }
+  .technical-skills ul { list-style:none; display:flex; flex-wrap:wrap; gap:0.4rem; padding:0; }
+  .technical-skills li { font-size:0.74rem; padding:0.28rem 0.7rem; background:#161616;
+      border:1px solid rgba(74,229,74,0.3); border-radius:3px; color:#4AE54A;
+      font-family:'JetBrains Mono','Menlo',monospace; }
+</style>
+</head>
+<body>
+<div class="cv-container">
+  <div class="top-banner">
+    <div class="profile-image"><img src="data:image/png;base64,$profile_image" alt="Profile"></div>
+    <div class="name-block">
+      <h1>$full_name</h1>
+      <h2>$job_title</h2>
+      <p>$summary</p>
+    </div>
+  </div>
+  <div class="body-grid">
+    <div class="left-col">
+      <div class="section"><h3 class="section-title">$education_title</h3>$education_content</div>
+      <div class="section"><h3 class="section-title">$skills_title</h3>$skills_content</div>
+      <div class="section"><h3 class="section-title">$languages_title</h3>$languages_content</div>
+      <div class="section"><h3 class="section-title">$contact_title</h3>$contact_content</div>
+    </div>
+    <div class="right-col">
+      <div class="experience">
+        <h3 class="section-title">$experience_title</h3>
+        $experience_content
+        <div class="technical-skills">
+          <h4>$technical_skills_title</h4>
+          $technical_skills
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
