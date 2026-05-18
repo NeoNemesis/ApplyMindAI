@@ -5,7 +5,6 @@ Varje mapp har sin egen AI-modell och logik som är specialiserad för den desig
 """
 
 import os
-import inquirer
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from loguru import logger
@@ -113,16 +112,17 @@ class ModelManager:
                 choice_text = f"{model_info['name']} - {model_info['description']}"
                 choices.append((choice_text, model_id))
             
+            import inquirer as _inquirer
             questions = [
-                inquirer.List(
+                _inquirer.List(
                     "model",
                     message="Välj CV-modell/design:",
                     choices=[choice[0] for choice in choices],
                     default=choices[0][0] if choices else None
                 )
             ]
-            
-            answer = inquirer.prompt(questions)
+
+            answer = _inquirer.prompt(questions)
             if answer:
                 selected_text = answer['model']
                 # Hitta motsvarande model_id
@@ -166,16 +166,17 @@ class ModelManager:
             return templates[0]
         
         try:
+            import inquirer as _inquirer
             questions = [
-                inquirer.List(
+                _inquirer.List(
                     "template",
                     message=f"Välj mall för {model_info['name']}:",
                     choices=templates,
                     default=templates[0]
                 )
             ]
-            
-            answer = inquirer.prompt(questions)
+
+            answer = _inquirer.prompt(questions)
             if answer:
                 selected = answer['template']
                 self.selected_template = selected

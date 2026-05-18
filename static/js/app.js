@@ -77,15 +77,37 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ============================================================
    JOB SEARCH — SSE STREAM
    ============================================================ */
+function stopSearch() {
+  const stopBtn = document.getElementById('stop-btn');
+  if (stopBtn) {
+    stopBtn.disabled = true;
+    stopBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  }
+  fetch('/search/stop', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => {
+      const t = document.getElementById('terminal');
+      if (t) {
+        const span = document.createElement('span');
+        span.className = 'err';
+        span.textContent = '\n⛔ Stoppsignal skickad...\n';
+        t.appendChild(span);
+        t.scrollTop = t.scrollHeight;
+      }
+    });
+}
+
 function startSearch(formId) {
   const form    = document.getElementById(formId);
   const btn     = document.getElementById('start-btn');
+  const stopBtn = document.getElementById('stop-btn');
   const terminal = document.getElementById('terminal');
 
   if (!form || !btn || !terminal) return;
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Söker...';
+  if (stopBtn) { stopBtn.style.display = 'inline-block'; stopBtn.disabled = false; stopBtn.innerHTML = '<i class="bi bi-stop-fill"></i>'; }
   terminal.innerHTML = '';
 
   const data = new FormData(form);
@@ -126,10 +148,12 @@ function startSearch(formId) {
         appendTerminal(msg.text, 'err');
         evtSource.close();
         resetBtn(btn);
+        hideStopBtn();
       } else if (msg.type === 'done') {
         appendTerminal('\n✅ Sökning klar!\n', 'ok');
         evtSource.close();
         resetBtn(btn);
+        hideStopBtn();
         // Reload job count badge after 1s
         setTimeout(updateJobCount, 1000);
       }
@@ -138,6 +162,7 @@ function startSearch(formId) {
     evtSource.onerror = () => {
       evtSource.close();
       resetBtn(btn);
+      hideStopBtn();
     };
   })
   .catch(err => {
@@ -158,7 +183,12 @@ function appendTerminal(text, cls) {
 
 function resetBtn(btn) {
   btn.disabled = false;
-  btn.innerHTML = '<i class="bi bi-search me-2"></i>Starta Sökning';
+  btn.innerHTML = '<i class="bi bi-search me-2"></i>Starta sökning';
+}
+
+function hideStopBtn() {
+  const stopBtn = document.getElementById('stop-btn');
+  if (stopBtn) stopBtn.style.display = 'none';
 }
 
 function updateJobCount() {

@@ -10,13 +10,13 @@ from src.logger_config import logger
 def chrome_browser_options():
     logger.debug("Setting Chrome browser options")
     options = Options()
-    options.add_argument("--start-maximized")
+    # Kör UTAN headless — Indeed/LinkedIn detekterar headless och blockerar
+    # options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--ignore-certificate-errors")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1280,900")
     options.add_argument("--disable-extensions")
-    options.add_argument("--disable-gpu")  # Opzionale, utile in alcuni ambienti
-    options.add_argument("window-size=1200x800")
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-backgrounding-occluded-windows")
     options.add_argument("--disable-translate")
@@ -27,21 +27,39 @@ def chrome_browser_options():
     options.add_argument("--disable-autofill")
     options.add_argument("--disable-plugins")
     options.add_argument("--disable-animations")
-    options.add_argument("--disable-cache")
-    options.add_argument("--incognito")
-    # 🔒 SECURITY FIX: Removed --disable-web-security and --allow-file-access-from-files
-    # These flags disabled Same-Origin Policy and allowed file:// access
-    # PDF generation uses data: URLs which don't need these dangerous flags
-    logger.debug("Using Chrome in incognito mode with security enabled")
-    
+    options.add_argument("--ignore-certificate-errors")
+    # Realistisk user-agent (Chrome 124 på Windows 11)
+    options.add_argument(
+        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+    # Anti-bot-detektering
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    logger.debug("Chrome options set (visible window, stealth mode)")
     return options
 
 def init_browser() -> webdriver.Chrome:
     try:
         options = chrome_browser_options()
-        # Use webdriver_manager to handle ChromeDriver
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-        logger.debug("Chrome browser initialized successfully.")
+        service = ChromeService(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        # Dölj automation-signatur via CDP och JS
+        driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+            "userAgent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            )
+        })
+        driver.execute_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+            "Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3]});"
+            "Object.defineProperty(navigator, 'languages', {get: () => ['sv-SE','sv','en-US','en']});"
+        )
+        logger.debug("Chrome browser initialized (visible window, stealth mode).")
         return driver
     except Exception as e:
         logger.error(f"Failed to initialize browser: {str(e)}")

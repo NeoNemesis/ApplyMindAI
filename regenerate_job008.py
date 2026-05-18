@@ -12,10 +12,10 @@ sys.path.insert(0, str(PROJECT_DIR))
 from dotenv import load_dotenv
 load_dotenv()
 
-JOB_FOLDER = PROJECT_DIR / 'data_folder' / 'output' / 'job_master' / 'Job_008_Limetta AB_CMS- och webbutvecklare'
+JOB_FOLDER = PROJECT_DIR / 'data_folder' / 'output' / 'job_master' / 'Job_004_Academic Work Sweden AB_Fullstack-utvecklare till Rado'
 DESIGN  = 'design_02_classic'
-COMPANY = 'Limetta AB'
-TITLE   = 'CMS- och webbutvecklare'
+COMPANY = 'Academic Work Sweden AB'
+TITLE   = 'Fullstack-utvecklare till Rado'
 
 
 def read_env():
