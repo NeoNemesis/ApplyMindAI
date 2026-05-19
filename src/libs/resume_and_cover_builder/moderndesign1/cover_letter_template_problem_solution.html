@@ -2,59 +2,77 @@
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=900, initial-scale=1.0">
 <title>Personligt brev - $full_name</title>
 <style>
-  * { margin:0; padding:0; box-sizing:border-box;
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter','Helvetica Neue',Arial,sans-serif;
       -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-  body { background:#fff; padding:0; margin:0; color:#1a1a1a;
-      font-family:'Inter','Helvetica Neue',Arial,sans-serif; line-height:1.6; }
-  .letter-container { width:900px; max-width:900px; background:#fff; margin:0 auto; padding:3rem 3.2rem;
-      min-height:1200px; position:relative; }
-  .letter-container::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px;
-      background:linear-gradient(180deg,#4AE54A 0%,#1de9b6 100%); }
-  @media print { .letter-container { box-shadow:none; padding:2.2rem 2.5rem; } }
+  body { background:#fff; color:#1a1a1a; }
+  .letter { width:900px; max-width:900px; margin:0 auto; background:#fff; min-height:1200px;
+      padding:2.2rem 0 0 0; }
 
-  /* Header */
-  .header { display:flex; justify-content:space-between; align-items:flex-start;
-      padding-bottom:1.2rem; border-bottom:2px solid #4AE54A; margin-bottom:1.8rem; }
-  .header-name h1 { font-size:1.7rem; font-weight:700; color:#1a1a1a; margin-bottom:0.2rem; }
-  .header-name .role { font-size:0.85rem; color:#666; }
-  .header-contact { text-align:right; font-size:0.78rem; color:#666; line-height:1.5; }
-  .header-contact div { margin-bottom:0.15rem; }
+  /* Compact header */
+  .head { display:flex; justify-content:space-between; align-items:flex-end; padding:0 2.5rem 1.2rem;
+      border-bottom:3px solid #1a1a1a; }
+  .head h1 { font-size:1.7rem; font-weight:800; color:#1a1a1a; letter-spacing:-0.01em; }
+  .head .role { font-size:0.8rem; color:#666; margin-top:0.15rem; }
+  .head-contact { text-align:right; font-size:0.75rem; color:#666; line-height:1.5; }
 
-  .date-row { text-align:right; font-size:0.85rem; color:#888; margin-bottom:1.5rem; }
-  .salutation { font-size:1rem; color:#1a1a1a; margin-bottom:1.4rem; font-weight:500; }
+  .date-row { padding:0.8rem 2.5rem; text-align:right; font-size:0.78rem; color:#888;
+      background:#fafafa; border-bottom:1px solid #eee; }
 
-  /* Body */
-  .section-label { font-size:0.7rem; font-weight:700; letter-spacing:0.2em; text-transform:uppercase;
-      color:#4AE54A; margin-bottom:0.6rem; }
-  .body-content { font-size:0.95rem; color:#333; line-height:1.65; text-align:left;
+  /* TWO-COLUMN PROBLEM | LÖSNING */
+  .two-col { display:grid; grid-template-columns:1fr 1.5fr; gap:0; margin-top:0; }
+  .col-problem { background:#fef3f2; border-right:1px solid #fecdca; padding:1.8rem 1.8rem; }
+  .col-solution { background:#f0fdf4; padding:1.8rem 1.8rem; }
+
+  .col-label { font-size:0.7rem; font-weight:800; letter-spacing:0.22em; text-transform:uppercase;
+      margin-bottom:0.7rem; padding-bottom:0.5rem; }
+  .col-problem .col-label { color:#b42318; border-bottom:2px solid #f97066; }
+  .col-problem .col-label::before { content:'⚠ '; }
+  .col-solution .col-label { color:#067647; border-bottom:2px solid #4AE54A; }
+  .col-solution .col-label::before { content:'✓ '; }
+
+  .col-content { font-size:0.9rem; line-height:1.7; color:#1a1a1a; text-align:left;
       word-spacing:normal; hyphens:none; }
-  .body-content p { margin-bottom:1.1rem; }
-  .body-content p:first-of-type { position:relative; padding-left:1.2rem; border-left:3px solid #4AE54A;
-      background:rgba(74,229,74,0.04); padding:0.8rem 1rem; border-radius:0 6px 6px 0; }
+  .col-content p { margin-bottom:0.9rem; }
+  .col-content p:last-child { margin-bottom:0; }
+  .col-problem .col-content { font-style:italic; }
+
+  /* Salutation + body wrapper */
+  .salutation-row { padding:1.5rem 2.5rem 0.5rem; font-size:1rem; font-weight:500; color:#1a1a1a; }
 
   /* Closing */
-  .closing { margin-top:2rem; padding-top:1.4rem; border-top:1px solid #eee; }
-  .closing .sincerely { font-size:0.95rem; color:#1a1a1a; margin-bottom:1.2rem; }
-  .closing .signature { font-size:1.1rem; font-weight:700; color:#1a1a1a; margin-bottom:0.6rem; }
-  .attachment { font-size:0.78rem; color:#888; font-style:italic; }
+  .closing { padding:1.5rem 2.5rem 2.5rem; border-top:1px solid #eee; margin-top:1rem; }
+  .closing .sincerely { font-size:0.9rem; color:#1a1a1a; margin-bottom:1rem; }
+  .closing .signature { font-size:1.15rem; font-weight:800; color:#1a1a1a;
+      letter-spacing:-0.01em; margin-bottom:0.5rem; }
+  .closing .attachment { font-size:0.75rem; color:#888; font-style:italic; }
 </style>
 </head>
 <body>
-<div class="letter-container">
-  <div class="header">
-    <div class="header-name">
+<div class="letter">
+  <div class="head">
+    <div>
       <h1>$full_name</h1>
       <div class="role">$job_title</div>
     </div>
-    <div class="header-contact">$contact_info</div>
+    <div class="head-contact">$contact_info</div>
   </div>
   <div class="date-row">$date</div>
-  <div class="salutation">$salutation</div>
-  <div class="section-label">Min ansökan</div>
-  <div class="body-content">$section1_content</div>
+  <div class="salutation-row">$salutation</div>
+  <div class="two-col">
+    <div class="col-problem">
+      <div class="col-label">Problem</div>
+      <div class="col-content">
+        <p>Många utvecklarroller idag kräver bredd mellan backend, integrationer och DevOps, men kandidaterna har ofta antingen djup i en stack eller "kan lite av allt". Det är svårt att hitta någon som faktiskt levererar produktionssystem som används av riktiga kunder.</p>
+        <p>Företag tappar tid på utvecklare som bygger prototyper men inte tar dem hela vägen, eller som inte förstår hur AI-verktyg integreras utan att kompromissa med kvaliteten.</p>
+      </div>
+    </div>
+    <div class="col-solution">
+      <div class="col-label">Min lösning</div>
+      <div class="col-content">$section1_content</div>
+    </div>
+  </div>
   <div class="closing">
     <div class="sincerely">$closing_text</div>
     <div class="signature">$full_name</div>
