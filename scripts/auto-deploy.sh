@@ -26,6 +26,9 @@ SCRIPT_PATH="$(readlink -f "$0")"
 log()  { printf '[%s] %s\n' "$(date -Iseconds)" "$*" | tee -a "$LOG"; }
 fail() { log "❌ $*"; exit 1; }
 
+# Logga alla oväntade fel med radnummer
+trap 'log "❌ Fel på rad $LINENO — kommando: $BASH_COMMAND"' ERR
+
 # ── Lås mot parallella deploys ──────────────────────────────────────────
 exec 200>"$LOCK"
 flock -n 200 || fail "Annan deploy pågår redan — avbryter"
@@ -48,8 +51,12 @@ if [[ "$LOCAL" == "$REMOTE" && "$FORCE" != "1" ]]; then
 fi
 
 log "🚀 Ny commit hittad: ${LOCAL:0:7} → ${REMOTE:0:7}"
-log "▶ Drar senaste koden från GitHub"
-git pull --ff-only origin "$BRANCH"
+log "▶ Drar senaste koden från GitHub (hard reset)"
+# Använd fetch + reset istället för pull --ff-only så att lokala
+# ändringar (t.ex. direkta filediteringar på servern) aldrig blockerar deploy.
+git checkout -- .
+git clean -fd --quiet
+git reset --hard "origin/$BRANCH"
 
 # ── Om deploy-scriptet självt ändrades → exec om oss med ny version ────
 SCRIPT_SHA_AFTER=$(sha256sum "$SCRIPT_PATH" | cut -d' ' -f1)
