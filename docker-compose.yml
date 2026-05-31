@@ -9,6 +9,7 @@ services:
       - PYTHONIOENCODING=utf-8
     volumes:
       - applymind-instance:/app/instance
+      - ./data_folder:/app/data_folder
     networks:
       - applymind-net
       - taskit-net
