@@ -5,23 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Logga in — ApplyMind AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:       #4AE54A;
-      --green-glow:  rgba(74,229,74,0.18);
-      --bg:          #111111;
-      --surface:     #1a1a1a;
-      --surface2:    #222222;
-      --border:      #2a2a2a;
-      --border-focus:#404040;
-      --text:        #e8e8e8;
-      --muted:       #777777;
-      --error:       #EF4444;
-      --error-bg:    rgba(239,68,68,0.08);
+      --green:      #4AE54A;
+      --green-dim:  #2db82d;
+      --green-glow: rgba(74,229,74,0.15);
+      --green-glow2:rgba(74,229,74,0.08);
+      --bg:         #0a0a0a;
+      --surface:    rgba(20,20,20,0.85);
+      --border:     rgba(255,255,255,0.08);
+      --border-g:   rgba(74,229,74,0.3);
+      --text:       #f0f0f0;
+      --muted:      #666;
+      --error:      #EF4444;
     }
+
+    html, body { height: 100%; }
 
     body {
       background: var(--bg);
@@ -29,325 +31,598 @@
       font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
       min-height: 100dvh;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
+      overflow: hidden;
     }
 
-    /* Subtle grid background */
-    body::before {
-      content: '';
+    /* ── SPOTLIGHT CURSOR ──────────────────────── */
+    .spotlight {
       position: fixed;
       inset: 0;
-      background-image:
-        linear-gradient(rgba(74,229,74,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(74,229,74,0.03) 1px, transparent 1px);
-      background-size: 48px 48px;
       pointer-events: none;
       z-index: 0;
+      background: radial-gradient(600px circle at var(--mx, 50%) var(--my, 50%),
+        rgba(74,229,74,0.04) 0%,
+        transparent 70%);
     }
 
-    .login-card {
-      position: relative;
-      z-index: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 40px;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    /* ── ANIMATED ORBS ────────────────────────── */
+    /* tsparticles canvas */
+    #tsparticles {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
     }
+    #tsparticles canvas { display: block; }
 
-    /* Green top accent line */
-    .login-card::before {
-      content: '';
+    .orbs {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .orb {
       position: absolute;
-      top: 0; left: 10%; right: 10%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--green), transparent);
-      border-radius: 1px;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.35;
+      animation: drift linear infinite;
+    }
+    .orb-1 { width:500px;height:500px; background:radial-gradient(circle,#4AE54A,transparent 70%); top:-100px;left:-150px; animation-duration:25s; }
+    .orb-2 { width:400px;height:400px; background:radial-gradient(circle,#00d4aa,transparent 70%); bottom:-80px;right:-100px; animation-duration:30s; animation-delay:-8s; }
+    .orb-3 { width:300px;height:300px; background:radial-gradient(circle,#7c3aed,transparent 70%); top:40%;left:20%; animation-duration:35s; animation-delay:-15s; opacity:0.2; }
+
+    @keyframes drift {
+      0%   { transform: translate(0,0) scale(1); }
+      25%  { transform: translate(40px,-30px) scale(1.05); }
+      50%  { transform: translate(20px,50px) scale(0.95); }
+      75%  { transform: translate(-30px,20px) scale(1.03); }
+      100% { transform: translate(0,0) scale(1); }
     }
 
-    .logo {
+    /* ── LEFT PANEL ───────────────────────────── */
+    .left {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 64px;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .left-content { position: relative; z-index: 1; }
+
+    .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 32px;
+      margin-bottom: 56px;
+      animation: fadeUp 0.6s ease both;
+    }
+    .brand-icon {
+      width: 38px; height: 38px;
+      background: var(--green-glow);
+      border: 1px solid var(--border-g);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--green);
+    }
+    .brand-name { font-size:17px; font-weight:700; letter-spacing:-0.3px; }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--green-glow2);
+      border: 1px solid var(--border-g);
+      border-radius: 100px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 600;
+      margin-bottom: 20px;
+      animation: fadeUp 0.6s 0.1s ease both;
+    }
+    .hero-tag-dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse-dot 2s ease infinite;
+    }
+    @keyframes pulse-dot {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:0.4; transform:scale(0.7); }
     }
 
-    .logo-icon {
-      width: 36px;
-      height: 36px;
-      background: var(--green-glow);
-      border: 1px solid rgba(74,229,74,0.3);
-      border-radius: 9px;
+    .hero-heading {
+      font-size: clamp(32px, 3.5vw, 46px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1.5px;
+      margin-bottom: 20px;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+    .hero-heading .accent { color: var(--green); }
+
+    .typewriter-wrap {
+      font-size: clamp(14px, 1.5vw, 17px);
+      color: var(--muted);
+      margin-bottom: 48px;
+      min-height: 26px;
+      animation: fadeUp 0.6s 0.3s ease both;
+    }
+    .typewriter-text {
+      color: var(--text);
+      font-weight: 600;
+      border-right: 2px solid var(--green);
+      padding-right: 2px;
+      animation: blink 0.8s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{border-color:var(--green)} 50%{border-color:transparent} }
+
+    .stats {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 56px;
+      animation: fadeUp 0.6s 0.4s ease both;
+    }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat-val { font-size: 26px; font-weight: 800; letter-spacing: -0.8px; }
+    .stat-unit { color: var(--green); font-weight: 700; font-size: 14px; }
+    .stat-label { font-size: 12px; color: var(--muted); }
+
+    .cards-float {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      animation: fadeUp 0.6s 0.5s ease both;
+    }
+    .job-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      max-width: 360px;
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+    .job-card:hover { transform: translateX(6px); border-color: var(--border-g); }
+    .job-card:nth-child(1) { animation: floatCard 6s ease-in-out infinite; }
+    .job-card:nth-child(2) { animation: floatCard 6s ease-in-out -2s infinite; }
+    .job-card:nth-child(3) { animation: floatCard 6s ease-in-out -4s infinite; }
+    @keyframes floatCard {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-5px); }
+    }
+
+    .job-card-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .job-card-info { flex: 1; }
+    .job-card-title { font-size: 13px; font-weight: 600; }
+    .job-card-company { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .job-card-match {
+      font-size: 11px; font-weight: 700; color: var(--green);
+      background: var(--green-glow2);
+      border: 1px solid var(--border-g);
+      border-radius: 100px;
+      padding: 2px 8px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(20px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+
+    .left-divider {
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom,
+        transparent 0%,
+        rgba(74,229,74,0.15) 30%,
+        rgba(74,229,74,0.15) 70%,
+        transparent 100%);
+    }
+
+    /* ── RIGHT PANEL ──────────────────────────── */
+    .right {
+      width: 420px;
+      flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 40px 48px;
+      position: relative;
+      z-index: 1;
+      background: rgba(10,10,10,0.6);
+      backdrop-filter: blur(40px);
+    }
+
+    .form-wrap {
+      width: 100%;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+
+    .form-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 36px;
+    }
+    .form-logo-icon {
+      width: 32px; height: 32px;
+      background: var(--green-glow);
+      border: 1px solid var(--border-g);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
       color: var(--green);
     }
+    .form-logo-text { font-size: 15px; font-weight: 700; }
 
-    .logo-text {
-      font-size: 17px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.3px;
-    }
+    .form-title { font-size: 24px; font-weight: 800; letter-spacing: -0.6px; margin-bottom: 4px; }
+    .form-sub   { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
 
-    .logo-version {
-      font-size: 11px;
-      color: var(--muted);
-      font-weight: 400;
-    }
-
-    h1 {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-      letter-spacing: -0.4px;
-    }
-
-    .subtitle {
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 28px;
-    }
-
-    /* Error banner */
     .error-banner {
-      background: var(--error-bg);
-      border: 1px solid rgba(239,68,68,0.25);
+      background: rgba(239,68,68,0.08);
+      border: 1px solid rgba(239,68,68,0.2);
       border-radius: 8px;
       padding: 10px 14px;
       font-size: 13px;
       color: var(--error);
       margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex; align-items: center; gap: 8px;
       animation: shake 0.4s cubic-bezier(0.36,0.07,0.19,0.97);
     }
-
     @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%       { transform: translateX(-6px); }
-      40%       { transform: translateX(6px); }
-      60%       { transform: translateX(-4px); }
-      80%       { transform: translateX(4px); }
+      0%,100%{transform:translateX(0)}
+      20%{transform:translateX(-6px)}
+      40%{transform:translateX(6px)}
+      60%{transform:translateX(-4px)}
+      80%{transform:translateX(4px)}
     }
 
-    .form-group {
-      margin-bottom: 16px;
+    /* Floating label inputs */
+    .field {
+      position: relative;
+      margin-bottom: 20px;
     }
-
-    label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 6px;
-    }
-
-    input[type="email"],
-    input[type="text"],
-    input[type="password"] {
+    .field input {
       width: 100%;
-      background: var(--surface2);
+      background: rgba(255,255,255,0.04);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 11px 14px;
+      border-radius: 10px;
+      padding: 22px 14px 8px;
       font-size: 14px;
       font-family: inherit;
       color: var(--text);
       outline: none;
-      transition: border-color 160ms ease, box-shadow 160ms ease;
+      transition: border-color 200ms ease, box-shadow 200ms ease, background 200ms ease;
     }
-
-    input:focus {
-      border-color: var(--green);
+    .field input:focus {
+      border-color: var(--border-g);
       box-shadow: 0 0 0 3px var(--green-glow);
+      background: rgba(74,229,74,0.03);
     }
-
-    input::placeholder { color: var(--muted); }
-
-    .remember-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 18px 0 24px;
-    }
-
-    .remember-row input[type="checkbox"] {
-      width: 15px;
-      height: 15px;
-      accent-color: var(--green);
-      cursor: pointer;
-    }
-
-    .remember-row label {
-      font-size: 13px;
+    .field label {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
       color: var(--muted);
+      pointer-events: none;
+      transition: all 200ms ease;
+      font-weight: 400;
       text-transform: none;
       letter-spacing: 0;
-      margin: 0;
-      cursor: pointer;
-      font-weight: 400;
     }
+    .field input:focus ~ label,
+    .field input:not(:placeholder-shown) ~ label {
+      top: 10px;
+      transform: translateY(0);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--green);
+    }
+
+    .row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 8px 0 28px;
+    }
+    .remember-label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; color: var(--muted); cursor: pointer;
+    }
+    .remember-label input[type="checkbox"] { accent-color: var(--green); width:13px; height:13px; }
+    .row-actions a { font-size: 12px; color: var(--muted); text-decoration: none; transition: color 150ms; }
+    .row-actions a:hover { color: var(--green); }
 
     .btn-login {
       width: 100%;
+      position: relative;
+      overflow: hidden;
       background: var(--green);
-      color: #111;
+      color: #0a0a0a;
       border: none;
-      border-radius: 8px;
-      padding: 12px;
+      border-radius: 10px;
+      padding: 13px;
       font-size: 14px;
       font-weight: 700;
       font-family: inherit;
       cursor: pointer;
-      transition: background 160ms ease, transform 100ms ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+      transition: transform 120ms ease, box-shadow 200ms ease;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-
-    .btn-login:hover   { background: #38c438; }
-    .btn-login:active  { transform: scale(0.98); }
-    .btn-login:disabled {
-      background: #2a3d2a;
-      color: #4a6b4a;
-      cursor: not-allowed;
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(74,229,74,0.4);
     }
+    .btn-login:active { transform: scale(0.98); box-shadow: none; }
+    .btn-login:disabled { background: #1a2e1a; color: #3a5a3a; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    .footer-text {
-      text-align: center;
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 24px;
-      line-height: 1.6;
+    .btn-shimmer {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%);
+      transform: translateX(-100%);
+      transition: none;
     }
+    .btn-login:hover .btn-shimmer { transform: translateX(100%); transition: transform 0.5s ease; }
 
-    .footer-text a {
-      color: var(--green);
-      text-decoration: none;
-      opacity: 0.8;
-    }
-
-    .footer-text a:hover { opacity: 1; }
-
-    /* Spinner for loading state */
     .spinner {
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(0,0,0,0.3);
-      border-top-color: #111;
+      width: 15px; height: 15px;
+      border: 2px solid rgba(0,0,0,0.25);
+      border-top-color: #0a0a0a;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: spin 0.65s linear infinite;
       display: none;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .btn-login.loading .spinner { display: block; }
     .btn-login.loading .btn-text { display: none; }
 
-    @media (prefers-reduced-motion: reduce) {
-      .error-banner { animation: none; }
-      .spinner { animation: none; }
+    .footer-links {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+    }
+    .footer-links a { color: var(--muted); text-decoration: none; transition: color 150ms; }
+    .footer-links a:hover { color: var(--green); }
+
+    @media (max-width: 768px) {
+      body { overflow: auto; }
+      .left { display: none; }
+      .right { width: 100%; min-height: 100dvh; background: transparent; backdrop-filter: none; padding: 32px 24px; }
     }
   </style>
 </head>
 <body>
-  <div class="login-card">
 
-    <div class="logo">
-      <div class="logo-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      </div>
-      <div>
-        <div class="logo-text">ApplyMind AI</div>
-        <div class="logo-version">Jobbansökan automation</div>
-      </div>
-    </div>
+  <div class="spotlight" id="spotlight"></div>
+  <div id="tsparticles"></div>
+  <div class="orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
 
-    <h1>Logga in</h1>
-    <p class="subtitle">Ange dina uppgifter för att fortsätta.</p>
+  <!-- LEFT PANEL -->
+  <div class="left">
+    <div class="left-content">
 
-    {% if error %}
-    <div class="error-banner" role="alert">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      {{ error }}
-    </div>
-    {% endif %}
-
-    <form method="POST" action="{{ url_for('auth.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}"
-          id="login-form" novalidate>
-
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
-
-      <div class="form-group">
-        <label for="email">E-post eller användarnamn</label>
-        <input
-          type="text"
-          id="email"
-          name="email"
-          autocomplete="username"
-          placeholder="din@epost.se"
-          required
-          {% if error %}autofocus{% endif %}
-          value="{{ request.form.get('email', '') }}"
-        >
-      </div>
-
-      <div class="form-group">
-        <label for="password">Lösenord</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          autocomplete="current-password"
-          placeholder="••••••••"
-          required
-          {% if not error %}autofocus{% endif %}
-        >
-      </div>
-
-      <div class="remember-row" style="justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <input type="checkbox" id="remember" name="remember"
-                 {% if request.form.get('remember') %}checked{% endif %}>
-          <label for="remember" style="margin:0;">Kom ihåg mig i 30 dagar</label>
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </div>
-        <a href="/auth/forgot-password" style="font-size:12px;color:var(--muted);text-decoration:none;">Glömt lösenordet?</a>
+        <span class="brand-name">ApplyMind AI</span>
       </div>
 
-      <button type="submit" class="btn-login" id="login-btn"
-              {% if rate_wait %}disabled{% endif %}>
-        <span class="spinner" aria-hidden="true"></span>
-        <span class="btn-text">
-          {% if rate_wait %}
-            Vänta {{ rate_wait }}s...
-          {% else %}
-            Logga in
-          {% endif %}
-        </span>
-      </button>
-    </form>
+      <div class="hero-tag">
+        <div class="hero-tag-dot"></div>
+        AI-driven jobbsökning
+      </div>
 
-    <p class="footer-text">
-      Inget konto? Kontakta administratören.<br>
-      <a href="/">← Tillbaka till startsidan</a>
-    </p>
+      <h1 class="hero-heading">
+        Hitta ditt<br>
+        <span class="accent">drömjobb</span><br>
+        med AI.
+      </h1>
+
+      <div class="typewriter-wrap">
+        Söker efter: <span class="typewriter-text" id="tw"></span>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val"><span id="cnt-jobs">0</span><span class="stat-unit">+</span></div>
+          <div class="stat-label">Jobb granskade</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val"><span id="cnt-match">0</span><span class="stat-unit">%</span></div>
+          <div class="stat-label">Matchningsgrad</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val"><span id="cnt-cv">0</span><span class="stat-unit">s</span></div>
+          <div class="stat-label">CV-generering</div>
+        </div>
+      </div>
+
+      <div class="cards-float">
+        <div class="job-card">
+          <div class="job-card-icon" style="background:rgba(74,229,74,0.1);">🧑‍💻</div>
+          <div class="job-card-info">
+            <div class="job-card-title">Frontend Developer</div>
+            <div class="job-card-company">Spotify · Stockholm</div>
+          </div>
+          <div class="job-card-match">96% match</div>
+        </div>
+        <div class="job-card">
+          <div class="job-card-icon" style="background:rgba(0,212,170,0.1);">📊</div>
+          <div class="job-card-info">
+            <div class="job-card-title">Data Scientist</div>
+            <div class="job-card-company">Klarna · Stockholm</div>
+          </div>
+          <div class="job-card-match">91% match</div>
+        </div>
+        <div class="job-card">
+          <div class="job-card-icon" style="background:rgba(124,58,237,0.1);">⚡</div>
+          <div class="job-card-info">
+            <div class="job-card-title">Product Manager</div>
+            <div class="job-card-company">Volvo Cars · Göteborg</div>
+          </div>
+          <div class="job-card-match">88% match</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="left-divider"></div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right">
+    <div class="form-wrap">
+
+      <div class="form-logo">
+        <div class="form-logo-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <span class="form-logo-text">ApplyMind AI</span>
+      </div>
+
+      <h1 class="form-title">Välkommen tillbaka</h1>
+      <p class="form-sub">Logga in för att fortsätta din jobbsökning.</p>
+
+      {% if error %}
+      <div class="error-banner" role="alert">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="POST"
+            action="{{ url_for('auth.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}"
+            id="login-form" novalidate>
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+        <div class="field">
+          <input type="text" id="email" name="email" placeholder=" "
+                 autocomplete="username" required
+                 value="{{ request.form.get('email', '') }}">
+          <label for="email">E-post eller användarnamn</label>
+        </div>
+
+        <div class="field">
+          <input type="password" id="password" name="password" placeholder=" "
+                 autocomplete="current-password" required>
+          <label for="password">Lösenord</label>
+        </div>
+
+        <div class="row-actions">
+          <label class="remember-label">
+            <input type="checkbox" name="remember"
+                   {% if request.form.get('remember') %}checked{% endif %}>
+            Kom ihåg mig
+          </label>
+          <a href="/auth/forgot-password">Glömt lösenordet?</a>
+        </div>
+
+        <button type="submit" class="btn-login" id="login-btn"
+                {% if rate_wait %}disabled{% endif %}>
+          <span class="btn-shimmer"></span>
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="btn-text">
+            {% if rate_wait %}Vänta {{ rate_wait }}s…{% else %}Logga in{% endif %}
+          </span>
+        </button>
+      </form>
+
+      <div class="footer-links">
+        <a href="/">← Tillbaka till startsidan</a>
+      </div>
+
+    </div>
   </div>
 
   <script>
+    // Spotlight cursor
+    const spotlight = document.getElementById('spotlight');
+    document.addEventListener('mousemove', function(e) {
+      spotlight.style.setProperty('--mx', e.clientX + 'px');
+      spotlight.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    // Typewriter
+    var roles = [
+      'Frontend Developer',
+      'Backend Engineer',
+      'Data Scientist',
+      'Product Manager',
+      'UX Designer',
+      'DevOps Engineer',
+      'ML Engineer',
+      'Full Stack Developer'
+    ];
+    var ri = 0, ci = 0, deleting = false;
+    var tw = document.getElementById('tw');
+    function type() {
+      var word = roles[ri];
+      if (!deleting) {
+        tw.textContent = word.slice(0, ++ci);
+        if (ci === word.length) {
+          deleting = true;
+          setTimeout(type, 1800);
+          return;
+        }
+        setTimeout(type, 60 + Math.random() * 40);
+      } else {
+        tw.textContent = word.slice(0, --ci);
+        if (ci === 0) {
+          deleting = false;
+          ri = (ri + 1) % roles.length;
+          setTimeout(type, 300);
+          return;
+        }
+        setTimeout(type, 35);
+      }
+    }
+    setTimeout(type, 800);
+
+    // Counter animation
+    function animateCount(id, target, duration) {
+      var el = document.getElementById(id);
+      var start = null;
+      function step(ts) {
+        if (!start) start = ts;
+        var p = Math.min((ts - start) / duration, 1);
+        var ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(ease * target);
+        if (p < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    setTimeout(function() {
+      animateCount('cnt-jobs', 2400, 1800);
+      animateCount('cnt-match', 94, 1400);
+      animateCount('cnt-cv', 8, 1000);
+    }, 500);
+
+    // Login loading state
     document.getElementById('login-form').addEventListener('submit', function() {
-      const btn = document.getElementById('login-btn');
+      var btn = document.getElementById('login-btn');
       if (!btn.disabled) {
         btn.classList.add('loading');
         btn.disabled = true;
@@ -355,21 +630,57 @@
     });
 
     {% if rate_wait and rate_wait > 0 %}
-    // Countdown timer
-    let wait = {{ rate_wait }};
-    const btn = document.getElementById('login-btn');
-    const txtEl = btn.querySelector('.btn-text');
-    const timer = setInterval(() => {
-      wait--;
-      if (wait <= 0) {
+    var wait = {{ rate_wait }};
+    var btn = document.getElementById('login-btn');
+    var txtEl = btn.querySelector('.btn-text');
+    var timer = setInterval(function() {
+      if (--wait <= 0) {
         clearInterval(timer);
         btn.disabled = false;
         txtEl.textContent = 'Logga in';
       } else {
-        txtEl.textContent = 'Vänta ' + wait + 's...';
+        txtEl.textContent = 'Vänta ' + wait + 's…';
       }
     }, 1000);
     {% endif %}
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@3/tsparticles.bundle.min.js"></script>
+  <script>
+    tsParticles.load({
+      id: "tsparticles",
+      options: {
+        background: { color: { value: "transparent" } },
+        fullScreen: { enable: false },
+        fpsLimit: 60,
+        particles: {
+          number: { value: 80, density: { enable: true, width: 1280, height: 800 } },
+          color: { value: "#4AE54A" },
+          opacity: {
+            value: { min: 0.05, max: 0.6 },
+            animation: { enable: true, speed: 1.5, sync: false }
+          },
+          size: {
+            value: { min: 0.8, max: 2.2 },
+            animation: { enable: false }
+          },
+          move: {
+            enable: true,
+            speed: { min: 0.2, max: 0.7 },
+            direction: "none",
+            random: true,
+            straight: false,
+            outModes: { default: "out" }
+          },
+          shape: { type: "circle" }
+        },
+        detectRetina: true,
+        interactivity: {
+          events: { onHover: { enable: true, mode: "bubble" } },
+          modes: { bubble: { distance: 120, size: 3, opacity: 0.8, duration: 0.4 } }
+        }
+      }
+    });
   </script>
 </body>
 </html>
