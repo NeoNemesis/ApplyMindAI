@@ -703,10 +703,74 @@ def letter_template_select():
 
 @app.route('/cover-letter/template/preview/<template_key>')
 def letter_template_preview(template_key):
-    tmpl_file = BASE_DIR / 'static' / 'letter_templates' / f'template_{template_key}.html'
-    if not tmpl_file.exists():
+    """Renderar brev-mallen med användarens RIKTIGA data från plain_text_resume.yaml.
+
+    Förut: serverade en statisk dummy-HTML från static/letter_templates/ med
+    "Anna Karlsson"-data, helt orelaterad till hur det faktiska brevet ser ut.
+
+    Nu: laddar samma mall som cover_letter_generator använder vid riktig
+    generering, substituerar med Victor's data, returnerar färdig HTML.
+    """
+    LETTER_TEMPLATE_FILES = {
+        'nordic_minimal':   'cover_letter_template_clean.html',
+        'problem_solution': 'cover_letter_template_problem_solution.html',
+        'modern_tech':      'cover_letter_template_modern_tech.html',
+    }
+    template_file = LETTER_TEMPLATE_FILES.get(template_key)
+    if not template_file:
         return "Mall hittades inte", 404
-    return tmpl_file.read_text(encoding='utf-8')
+
+    template_path = BASE_DIR / 'src' / 'libs' / 'resume_and_cover_builder' / 'moderndesign1' / template_file
+    if not template_path.exists():
+        return "Mall-fil saknas", 404
+
+    template_text = template_path.read_text(encoding='utf-8')
+    content = _build_letter_preview_content()
+    from string import Template
+    return Template(template_text).safe_substitute(content)
+
+
+def _build_letter_preview_content() -> dict:
+    """Bygger dict med alla brev-placeholders ifyllda med Victor's data."""
+    from datetime import datetime
+    resume = load_yaml(RESUME_YAML) or {}
+    pi = resume.get('personal_information', {}) or {}
+
+    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
+    email = pi.get('email', '')
+    phone = pi.get('phone', '')
+    address = pi.get('address', '')
+    zip_code = pi.get('zip_code', '')
+    city = pi.get('city', '')
+    website = pi.get('website', '')
+
+    contact_parts = []
+    if email:   contact_parts.append(f'<div>{email}</div>')
+    if phone:   contact_parts.append(f'<div>{phone}</div>')
+    if address or city: contact_parts.append(f'<div>{", ".join(p for p in [address, f"{zip_code} {city}".strip()] if p)}</div>')
+    if website: contact_parts.append(f'<div>{website}</div>')
+    contact_info = '\n'.join(contact_parts)
+
+    months_sv = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
+                 'juli', 'augusti', 'september', 'oktober', 'november', 'december']
+    now = datetime.now()
+    date_str = f"{now.day} {months_sv[now.month-1]} {now.year}"
+
+    # cover_letter_profile = full brevtext från YAML
+    body_text = resume.get('cover_letter_profile', '') or 'Här visas ditt personliga brev när du har fyllt i cover_letter_profile i CV-formuläret.'
+    paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
+    section1 = '\n'.join(f'<p>{p}</p>' for p in paragraphs)
+
+    return {
+        'full_name': full_name,
+        'job_title': 'Systemutvecklare | Fullstackutvecklare',
+        'contact_info': contact_info,
+        'date': date_str,
+        'salutation': 'Bästa rekryteringsteam,',
+        'section1_content': section1,
+        'closing_text': 'Med vänlig hälsning,',
+        'attachment_text': 'Bilaga: Curriculum Vitae',
+    }
 
 @app.route('/cover-letter/save', methods=['POST'])
 def cover_letter_save():
@@ -1637,13 +1701,135 @@ def design_save():
 
 @app.route('/preview/pdf/<design_key>')
 def preview_design_pdf(design_key):
-    """Return the HTML template file for full preview"""
-    info = DESIGNS.get(design_key)
-    if info and info.get('template'):
-        tmpl = BASE_DIR / 'static' / 'design_templates' / info['template']
-        if tmpl.exists():
-            return send_file(str(tmpl.resolve()), mimetype='text/html')
-    return 'Ingen förhandsgranskning tillgänglig', 404
+    """Renderar CV-mallen med Victor's RIKTIGA data från plain_text_resume.yaml.
+
+    Förut: serverade en statisk dummy-HTML från static/design_templates/ med
+    "Anna Karlsson"-data, helt orelaterad till hur det faktiska CV:t ser ut.
+
+    Nu: laddar samma mall som improved_generator använder vid riktig generering,
+    substituerar med riktig CV-data, returnerar färdig HTML.
+    """
+    CV_TEMPLATE_FILES = {
+        'design_02_classic':      'improved_template.html',
+        'design_03_modern_green': 'template_modern_green.html',
+        'design_07_tech_modern':  'template_tech_modern.html',
+    }
+    template_file = CV_TEMPLATE_FILES.get(design_key)
+    if not template_file:
+        # Bakåtkompat: fallback till gamla statiska previews för okända keys
+        info = DESIGNS.get(design_key)
+        if info and info.get('template'):
+            tmpl = BASE_DIR / 'static' / 'design_templates' / info['template']
+            if tmpl.exists():
+                return send_file(str(tmpl.resolve()), mimetype='text/html')
+        return 'Ingen förhandsgranskning tillgänglig', 404
+
+    template_path = BASE_DIR / 'src' / 'libs' / 'resume_and_cover_builder' / 'moderndesign1' / template_file
+    if not template_path.exists():
+        return 'Mall-fil saknas', 404
+
+    template_text = template_path.read_text(encoding='utf-8')
+    content = _build_cv_preview_content()
+    from string import Template
+    return Template(template_text).safe_substitute(content)
+
+
+def _build_cv_preview_content() -> dict:
+    """Bygger dict med alla CV-placeholders ifyllda med Victor's riktiga data."""
+    resume = load_yaml(RESUME_YAML) or {}
+    pi = resume.get('personal_information', {}) or {}
+
+    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
+    summary = resume.get('professional_summary', '') or 'Fullstack-utvecklare med erfarenhet av produktionssystem.'
+    job_title = 'Systemutvecklare | Fullstackutvecklare'
+
+    # Education
+    edu_html = []
+    for edu in (resume.get('education_details') or []):
+        level = edu.get('education_level', 'Utbildning')
+        inst = edu.get('institution', '')
+        edu_html.append(
+            f'<div class="education-item" style="margin-bottom:0.7rem">• {level}'
+            f'<br><div class="institution" style="font-size:0.78rem;opacity:0.75">{inst}</div></div>'
+        )
+    education_content = '\n'.join(edu_html) or '<div class="education-item">• Utbildning saknas i YAML</div>'
+
+    # Skills (certifications + interests-tags)
+    skills_items = []
+    for cert in (resume.get('certifications') or []):
+        skills_items.append(f'<div style="margin-bottom:0.4rem">• {cert.get("name", "")}</div>')
+    skills_content = '\n'.join(skills_items) or '<div>• Webbutveckling I &amp; II</div><div>• Databasteknik i SQL</div><div>• B-Körkort</div>'
+
+    # Languages
+    lang_html = []
+    for lang in (resume.get('languages') or []):
+        lang_html.append(f'<div style="margin-bottom:0.4rem">• {lang.get("language", "")} <em style="opacity:0.7">({lang.get("proficiency", "")})</em></div>')
+    languages_content = '\n'.join(lang_html) or '<div>• Svenska (Modersmål)</div>'
+
+    # Contact
+    contact_lines = []
+    if pi.get('email'):   contact_lines.append(f'<div style="margin-bottom:0.3rem">📧 {pi["email"]}</div>')
+    if pi.get('phone'):   contact_lines.append(f'<div style="margin-bottom:0.3rem">📱 {pi["phone"]}</div>')
+    if pi.get('address') or pi.get('city'):
+        addr = ', '.join(p for p in [pi.get('address', ''), f"{pi.get('zip_code', '')} {pi.get('city', '')}".strip()] if p)
+        contact_lines.append(f'<div style="margin-bottom:0.3rem">📍 {addr}</div>')
+    if pi.get('website'): contact_lines.append(f'<div style="margin-bottom:0.3rem">🌐 {pi["website"]}</div>')
+    contact_content = '\n'.join(contact_lines) or '<div>Kontakt saknas i YAML</div>'
+
+    # Experience (komprimerad — ta upp till 3 senaste)
+    exp_html = []
+    for exp in (resume.get('experience_details') or [])[:4]:
+        position = exp.get('position', '')
+        company = exp.get('company', '')
+        period = exp.get('employment_period', '')
+        resp_items = []
+        for r in (exp.get('key_responsibilities') or [])[:3]:
+            text = r.get('responsibility', r) if isinstance(r, dict) else r
+            resp_items.append(f'<li>{text}</li>')
+        bullets = ''.join(resp_items)
+        exp_html.append(
+            f'<div class="experience-item">'
+            f'<h4>{position}</h4>'
+            f'<div class="company">{company} ({period})</div>'
+            f'<ul style="padding-left:1.1rem;margin-top:0.3rem">{bullets}</ul>'
+            f'</div>'
+        )
+    experience_content = '\n'.join(exp_html) or '<div>Erfarenheter saknas i YAML</div>'
+
+    # Technical skills (programming languages + tools)
+    tech_items = set()
+    tech = resume.get('technical_skills', {}) or {}
+    for category_key in ('software', 'operating_systems', 'additional'):
+        for item in (tech.get(category_key) or []):
+            # Splitta på komma så taggar blir individuella chips
+            for part in str(item).split(','):
+                p = part.strip()
+                if p and len(p) < 35:
+                    tech_items.add(p)
+    tech_html = '<ul style="list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:0.4rem">'
+    for t in sorted(tech_items)[:30]:
+        tech_html += f'<li>{t}</li>'
+    tech_html += '</ul>'
+
+    return {
+        'profile_image': '',
+        'full_name': full_name,
+        'job_title': job_title,
+        'summary': summary,
+        'education_title': 'UTBILDNING',
+        'education_content': education_content,
+        'skills_title': 'ÖVRIGA KUNSKAPER',
+        'skills_content': skills_content,
+        'languages_title': 'SPRÅK',
+        'languages_content': languages_content,
+        'contact_title': 'KONTAKT',
+        'contact_content': contact_content,
+        'experience_title': 'YRKESERFARENHET',
+        'experience_content': experience_content,
+        'technical_skills_title': 'Tekniska Färdigheter',
+        'technical_skills': tech_html,
+        'download_text': 'Ladda ner som PDF',
+    }
 
 
 # ============================================================

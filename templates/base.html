@@ -24,7 +24,7 @@
           <span class="status-dot ms-1" title="System redo"></span>
         {% endif %}
       </span>
-      <span class="brand-version">v2.1</span>
+      <span class="brand-version">v2.2</span>
     </div>
   </div>
 
@@ -40,10 +40,6 @@
     <a href="/cover-letter" class="nav-link {% if request.path == '/cover-letter' %}active{% endif %}">
       <i class="bi bi-file-earmark-text"></i>
       <span>{{ t.nav_cover_letter }}</span>
-    </a>
-    <a href="/cover-letter/templates" class="nav-link {% if request.path.startswith('/cover-letter/template') %}active{% endif %}" style="padding-left:36px;font-size:0.82rem;">
-      <i class="bi bi-palette"></i>
-      <span>Brevdesigner</span>
     </a>
     <a href="/search" class="nav-link {% if request.path.startswith('/search') %}active{% endif %}">
       <i class="bi bi-search"></i>

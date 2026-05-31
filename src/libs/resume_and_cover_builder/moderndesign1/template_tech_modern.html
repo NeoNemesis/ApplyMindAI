@@ -2,98 +2,131 @@
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=1000, initial-scale=1.0">
 <title>CV - $full_name</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box;
       -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-  body { background:#0a0a0a; padding:0; margin:0; color:#e0e0e0;
-      font-family:'Inter','Helvetica Neue',Arial,sans-serif; }
-  .cv-container { width:1000px; max-width:1000px; background:#0a0a0a; margin:0 auto;
-      box-shadow:0 0 30px rgba(0,0,0,0.5); min-height:1400px; }
-  @media print { .cv-container { box-shadow:none; } body { background:#0a0a0a; } }
+  body { background:#0d1117; color:#c9d1d9;
+      font-family:'JetBrains Mono','Fira Code','Menlo','Consolas',monospace; }
+  .cv { width:1000px; max-width:1000px; margin:0 auto; background:#0d1117; min-height:1400px;
+      border:1px solid #30363d; border-radius:8px; overflow:hidden; }
 
-  /* Top banner */
-  .top-banner { background:linear-gradient(135deg,#111 0%,#1a1a1a 100%); padding:2.5rem 2.5rem 2rem;
-      border-bottom:4px solid #4AE54A; display:flex; gap:2rem; align-items:center; }
-  .profile-image { width:120px; height:120px; border-radius:8px; overflow:hidden; flex-shrink:0;
-      border:2px solid #4AE54A; box-shadow:0 0 20px rgba(74,229,74,0.25); }
-  .profile-image img { width:100%; height:100%; object-fit:cover; }
-  .name-block h1 { font-size:2.4rem; font-weight:700; color:#fff; letter-spacing:-0.02em;
-      margin-bottom:0.25rem; line-height:1.1; }
-  .name-block h2 { font-family:'JetBrains Mono','Menlo','Courier New',monospace; font-size:0.95rem;
-      font-weight:500; color:#4AE54A; margin-bottom:0.8rem; }
-  .name-block h2::before { content:'$$ '; color:#4AE54A; opacity:0.6; }
-  .name-block p { font-size:0.92rem; color:#bdbdbd; line-height:1.6; max-width:600px;
+  /* Terminal window chrome */
+  .term-titlebar { background:#161b22; border-bottom:1px solid #30363d; padding:0.7rem 1rem;
+      display:flex; align-items:center; gap:0.5rem; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .dot.red { background:#ff5f56; }
+  .dot.yellow { background:#ffbd2e; }
+  .dot.green { background:#27c93f; }
+  .term-titlebar .path { margin-left:1rem; color:#8b949e; font-size:0.78rem; }
+
+  /* Code editor body */
+  .code-body { padding:2rem 2.2rem; font-size:0.85rem; line-height:1.7; }
+
+  /* Header block — looks like a function declaration */
+  .header-block { background:#161b22; border:1px solid #30363d; border-radius:6px;
+      padding:1.5rem 1.8rem; margin-bottom:2rem; }
+  .header-block .comment { color:#8b949e; font-size:0.78rem; margin-bottom:0.5rem; }
+  .header-block .comment::before { content:'// '; }
+  .header-block h1 { color:#58a6ff; font-size:1.8rem; font-weight:700; letter-spacing:-0.02em;
+      margin-bottom:0.3rem; font-family:'Inter','Helvetica Neue',sans-serif; }
+  .header-block h1::before { content:'const '; color:#ff7b72; }
+  .header-block h1::after { content:' = {'; color:#c9d1d9; font-weight:400; }
+  .header-block .role { color:#7ee787; font-size:0.95rem; margin:0.3rem 0 0.8rem 2rem; }
+  .header-block .role::before { content:'role: "'; color:#a5d6ff; font-weight:400; }
+  .header-block .role::after { content:'",'; color:#c9d1d9; }
+  .header-block .summary { color:#c9d1d9; font-size:0.88rem; line-height:1.7; margin-left:2rem;
+      text-align:left; word-spacing:normal; hyphens:none;
+      font-family:'Inter','Helvetica Neue',sans-serif; }
+  .header-block .summary::before { content:'summary: `'; color:#a5d6ff; }
+  .header-block .summary::after { content:'`,'; color:#c9d1d9; }
+  .header-block .close-brace { color:#c9d1d9; margin-top:0.8rem; }
+  .header-block .close-brace::before { content:'};'; }
+
+  /* Sections — looks like methods */
+  .section-block { background:#161b22; border:1px solid #30363d; border-radius:6px;
+      padding:1.3rem 1.6rem; margin-bottom:1.3rem; }
+  .section-header { color:#d2a8ff; font-size:0.92rem; font-weight:700; margin-bottom:0.9rem;
+      padding-bottom:0.5rem; border-bottom:1px dashed #30363d; }
+  .section-header::before { content:'function '; color:#ff7b72; }
+  .section-header::after { content:'() {'; color:#c9d1d9; font-weight:400; }
+  .section-body { padding-left:1.8rem;
+      font-family:'Inter','Helvetica Neue',sans-serif; color:#c9d1d9; font-size:0.88rem; line-height:1.6;
       text-align:left; word-spacing:normal; hyphens:none; }
+  .section-body div, .section-body li { padding:0.2rem 0; }
+  .section-body ul { list-style:none; padding:0; }
+  .section-body h4 { color:#79c0ff; font-size:0.95rem; font-weight:700; margin-bottom:0.15rem;
+      font-family:'Inter','Helvetica Neue',sans-serif; }
+  .section-body .company, .section-body .institution {
+      color:#7ee787; font-size:0.78rem; font-family:'JetBrains Mono','Menlo',monospace;
+      margin-bottom:0.4rem; }
+  .section-close { color:#c9d1d9; margin-top:0.5rem; }
+  .section-close::before { content:'}'; }
 
-  /* Body — two cols */
-  .body-grid { display:grid; grid-template-columns:1fr 1.6fr; gap:0; }
-  @media print { .body-grid { display:table; table-layout:fixed; width:100%; } }
-
-  .left-col, .right-col { padding:2rem 2.2rem; }
-  .left-col { background:#101010; border-right:1px solid #1f1f1f; }
-  .right-col { background:#0a0a0a; }
-  @media print { .left-col, .right-col { display:table-cell; vertical-align:top; } }
-
-  .section { margin-bottom:1.7rem; }
-  .section-title { font-family:'JetBrains Mono','Menlo','Courier New',monospace; font-size:0.72rem;
-      letter-spacing:0.25em; text-transform:uppercase; color:#4AE54A;
-      border-bottom:1px dashed rgba(74,229,74,0.3); padding-bottom:0.5rem; margin-bottom:0.9rem; }
-  .section-title::before { content:'> '; opacity:0.7; }
-  .section *, .section li { font-size:0.86rem; line-height:1.55; color:#cccccc;
-      text-align:left; word-spacing:normal; hyphens:none; }
-  .section ul { list-style:none; padding:0; }
-  .section li { padding:0.18rem 0; }
-  .section strong, .section h4 { color:#fff; }
-
-  /* Experience */
-  .experience .section-title { color:#4AE54A; }
-  .experience-item { margin-bottom:1.3rem; padding-left:1rem; border-left:2px solid #4AE54A;
-      background:rgba(74,229,74,0.02); padding-top:0.4rem; padding-right:0.5rem; padding-bottom:0.4rem; }
-  .experience-item h4, .experience h4 { font-size:1rem; font-weight:700; color:#fff; margin-bottom:0.15rem;
-      font-family:'Inter',sans-serif; }
-  .experience-item .company, .experience .company {
-      font-family:'JetBrains Mono','Menlo',monospace; font-size:0.78rem; color:#4AE54A; margin-bottom:0.45rem; }
-  .experience-item p, .experience p, .experience-item li, .experience li {
-      font-size:0.86rem; color:#bdbdbd; line-height:1.55; text-align:left; word-spacing:normal; hyphens:none; }
-
-  .technical-skills { margin-top:1.5rem; padding-top:1.2rem; border-top:1px dashed #2a2a2a; }
-  .technical-skills h4 { font-family:'JetBrains Mono','Menlo',monospace; font-size:0.72rem;
-      letter-spacing:0.25em; text-transform:uppercase; color:#4AE54A; margin-bottom:0.85rem; }
-  .technical-skills h4::before { content:'> '; opacity:0.7; }
-  .technical-skills ul { list-style:none; display:flex; flex-wrap:wrap; gap:0.4rem; padding:0; }
-  .technical-skills li { font-size:0.74rem; padding:0.28rem 0.7rem; background:#161616;
-      border:1px solid rgba(74,229,74,0.3); border-radius:3px; color:#4AE54A;
+  /* Tech skills — array literal */
+  .tech-block { background:#161b22; border:1px solid #30363d; border-radius:6px;
+      padding:1.3rem 1.6rem; margin-top:1.3rem; }
+  .tech-block .label { color:#79c0ff; margin-bottom:0.6rem; }
+  .tech-block .label::before { content:'const skills = ['; color:#ff7b72; }
+  .tech-block ul { list-style:none; padding:0 0 0 1.5rem; display:flex; flex-wrap:wrap; gap:0.3rem; }
+  .tech-block li { font-size:0.78rem; padding:0.25rem 0.7rem; background:#0d1117;
+      border:1px solid #30363d; border-radius:3px; color:#7ee787;
       font-family:'JetBrains Mono','Menlo',monospace; }
+  .tech-block li::before { content:'"'; color:#a5d6ff; }
+  .tech-block li::after { content:'",'; color:#a5d6ff; }
+  .tech-block .close { color:#ff7b72; margin-top:0.5rem; padding-left:0; }
+  .tech-block .close::before { content:'];'; }
 </style>
 </head>
 <body>
-<div class="cv-container">
-  <div class="top-banner">
-    <div class="profile-image"><img src="data:image/png;base64,$profile_image" alt="Profile"></div>
-    <div class="name-block">
-      <h1>$full_name</h1>
-      <h2>$job_title</h2>
-      <p>$summary</p>
-    </div>
+<div class="cv">
+  <div class="term-titlebar">
+    <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+    <span class="path">~/cv/$full_name — bash — 80×40</span>
   </div>
-  <div class="body-grid">
-    <div class="left-col">
-      <div class="section"><h3 class="section-title">$education_title</h3>$education_content</div>
-      <div class="section"><h3 class="section-title">$skills_title</h3>$skills_content</div>
-      <div class="section"><h3 class="section-title">$languages_title</h3>$languages_content</div>
-      <div class="section"><h3 class="section-title">$contact_title</h3>$contact_content</div>
+  <div class="code-body">
+    <div class="header-block">
+      <div class="comment">$$ cat profile.js</div>
+      <h1>$full_name</h1>
+      <div class="role">$job_title</div>
+      <div class="summary">$summary</div>
+      <div class="close-brace"></div>
     </div>
-    <div class="right-col">
-      <div class="experience">
-        <h3 class="section-title">$experience_title</h3>
-        $experience_content
-        <div class="technical-skills">
-          <h4>$technical_skills_title</h4>
-          $technical_skills
-        </div>
-      </div>
+
+    <div class="section-block">
+      <div class="section-header">$experience_title</div>
+      <div class="section-body">$experience_content</div>
+      <div class="section-close"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header">$education_title</div>
+      <div class="section-body">$education_content</div>
+      <div class="section-close"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header">$skills_title</div>
+      <div class="section-body">$skills_content</div>
+      <div class="section-close"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header">$languages_title</div>
+      <div class="section-body">$languages_content</div>
+      <div class="section-close"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-header">$contact_title</div>
+      <div class="section-body">$contact_content</div>
+      <div class="section-close"></div>
+    </div>
+
+    <div class="tech-block">
+      <div class="label">$technical_skills_title</div>
+      $technical_skills
+      <div class="close"></div>
     </div>
   </div>
 </div>

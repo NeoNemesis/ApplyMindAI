@@ -35,19 +35,19 @@
           ('design_07_tech_modern',   'Tech Modern',   'Dark theme, monospace + grön accent. För developer/devops-roller.')
         ] %}
 
-        <div class="design-picker-scroll" id="design-picker">
+        <div class="design-picker-grid" id="design-picker">
           {% for design_key, design_label, design_desc in design_list %}
           <div class="design-card {% if current_design == design_key %}selected{% endif %}"
                data-design="{{ design_key }}"
                data-desc="{{ design_desc }}"
                onclick="selectCvDesign('{{ design_key }}')">
-            <div class="design-thumb-placeholder">
-              <img src="/static/previews/{{ design_key }}.png"
-                   alt="{{ design_label }}"
-                   class="design-thumb"
-                   onerror="this.style.display='none';">
+            <div class="design-thumb-frame">
+              <iframe src="/preview/pdf/{{ design_key }}" loading="lazy"
+                      scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+              <div class="thumb-overlay"></div>
             </div>
             <div class="design-name">{{ design_label }}</div>
+            <div class="design-desc">{{ design_desc }}</div>
             <button type="button" class="design-preview-btn"
                     onclick="event.stopPropagation();openDesignPreview('cv','{{ design_key }}','{{ design_label }}')">
               <i class="bi bi-eye"></i> Förhandsgranska
@@ -77,19 +77,19 @@
           ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.')
         ] %}
 
-        <div class="design-picker-scroll" id="letter-picker">
+        <div class="design-picker-grid" id="letter-picker">
           {% for letter_key, letter_label, letter_desc in letter_list %}
           <div class="design-card {% if current_letter == letter_key %}selected{% endif %}"
                data-letter="{{ letter_key }}"
                data-desc="{{ letter_desc }}"
                onclick="selectLetterTemplate('{{ letter_key }}')">
-            <div class="design-thumb-placeholder">
-              <img src="/static/previews/letter_{{ letter_key }}.png"
-                   alt="{{ letter_label }}"
-                   class="design-thumb"
-                   onerror="this.style.display='none';">
+            <div class="design-thumb-frame">
+              <iframe src="/cover-letter/template/preview/{{ letter_key }}" loading="lazy"
+                      scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+              <div class="thumb-overlay"></div>
             </div>
             <div class="design-name">{{ letter_label }}</div>
+            <div class="design-desc">{{ letter_desc }}</div>
             <button type="button" class="design-preview-btn"
                     onclick="event.stopPropagation();openDesignPreview('letter','{{ letter_key }}','{{ letter_label }}')">
               <i class="bi bi-eye"></i> Förhandsgranska
@@ -409,17 +409,124 @@ Tips:
 </div>
 
 <style>
-.design-card { position:relative; }
+/* Picker grid — verkligt responsiv */
+.design-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1100px) { .design-picker-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .design-picker-grid { grid-template-columns: 1fr; } }
+
+.design-picker-grid .design-card {
+  position: relative;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-input);
+  cursor: pointer;
+  overflow: hidden;
+  transition: all .18s;
+  display: flex;
+  flex-direction: column;
+}
+.design-picker-grid .design-card:hover {
+  border-color: rgba(74,229,74,0.55);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+.design-picker-grid .design-card.selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(74,229,74,0.18);
+}
+
+/* Live thumbnail = miniaturized iframe of real preview */
+.design-thumb-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 900 / 1100;        /* portrait-ish like an A4 */
+  overflow: hidden;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+.design-thumb-frame iframe {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1000px;                    /* match template width */
+  height: 1400px;                   /* match template min-height */
+  border: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  transform: scale(0.28);           /* fits 280px-ish card width */
+}
+.thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 75%, rgba(0,0,0,0.15) 100%);
+  pointer-events: none;
+}
+/* Allow zooming the iframe in larger cards */
+@media (min-width: 1400px) {
+  .design-thumb-frame iframe { transform: scale(0.32); }
+}
+@media (max-width: 600px) {
+  .design-thumb-frame { aspect-ratio: 900 / 700; }
+  .design-thumb-frame iframe { transform: scale(0.42); }
+}
+
+.design-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  padding: 10px 12px 2px;
+}
+.design-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  padding: 0 12px 10px;
+  flex: 1;
+}
+
+.design-card.selected::before {
+  content: '✓ Vald';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--green);
+  color: #0a0a0a;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 10px;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
 .design-preview-btn {
-  display:block; width:100%; margin-top:6px; padding:4px 8px;
-  font-size:0.7rem; background:transparent; color:var(--text-muted);
-  border:1px solid var(--border); border-radius:4px; cursor:pointer;
-  transition:all .15s;
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  padding: 7px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
 }
 .design-preview-btn:hover {
-  background:rgba(74,229,74,0.08); color:var(--green); border-color:rgba(74,229,74,0.4);
+  background: rgba(74,229,74,0.08);
+  color: var(--green);
+  border-color: rgba(74,229,74,0.45);
 }
-.design-card.selected .design-preview-btn { border-color:rgba(74,229,74,0.5); color:var(--green); }
+.design-card.selected .design-preview-btn {
+  border-color: rgba(74,229,74,0.5);
+  color: var(--green);
+  background: rgba(74,229,74,0.04);
+}
 </style>
 
 {% endblock %}
