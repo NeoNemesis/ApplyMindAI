@@ -2,7 +2,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 
 db = SQLAlchemy()
 ph = PasswordHasher(memory_cost=65536, time_cost=3, parallelism=1)
@@ -62,6 +63,36 @@ class User(UserMixin, db.Model):
 
     def __repr__(self) -> str:
         return f"<User {self.username} ({self.role})>"
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = "password_reset_token"
+
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
+    token      = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used       = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+    @classmethod
+    def create_for_user(cls, user_id: int) -> "PasswordResetToken":
+        # Invalidate existing tokens for this user
+        cls.query.filter_by(user_id=user_id, used=False).delete()
+        token = cls(
+            user_id    = user_id,
+            token      = secrets.token_urlsafe(48),
+            expires_at = datetime.utcnow() + timedelta(hours=1),
+        )
+        db.session.add(token)
+        db.session.commit()
+        return token
+
+    @property
+    def is_valid(self) -> bool:
+        return not self.used and datetime.utcnow() < self.expires_at
 
 
 class AuditLog(db.Model):
