@@ -27,6 +27,8 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
+      width: 100%;
+      height: 100%;
     }
 
     .page {
@@ -98,6 +100,8 @@
     }
 
     #sp-beam {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
     }
@@ -304,61 +308,125 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/tsparticles@3/tsparticles.bundle.min.js"></script>
   <script>
-    var GREEN = "#4AE54A";
+    // ── Full-page background sparkles (canvas) ──────────────────────────
+    (function() {
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+      document.getElementById('sp-bg').appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var W, H, particles = [];
 
-    // Background — full page, low density, slow twinkle
-    tsParticles.load({
-      id: "sp-bg",
-      options: {
-        background: { color: { value: "transparent" } },
-        fullScreen: { enable: false },
-        fpsLimit: 60,
-        particles: {
-          color: { value: GREEN },
-          number: { value: 100, density: { enable: true, width: 1920, height: 1080 } },
-          opacity: {
-            value: { min: 0.1, max: 1 },
-            animation: { enable: true, speed: 0.5, sync: false, startValue: "random" }
-          },
-          size: { value: { min: 0.6, max: 1.4 } },
-          move: { enable: true, speed: { min: 0.1, max: 0.5 }, direction: "none", random: true, outModes: { default: "out" } },
-          shape: { type: "circle" }
-        },
-        interactivity: {
-          events: { onClick: { enable: true, mode: "push" } },
-          modes: { push: { quantity: 4 } }
-        },
-        detectRetina: true
+      function resize() {
+        W = canvas.width  = window.innerWidth  * dpr;
+        H = canvas.height = window.innerHeight * dpr;
+        canvas.style.width  = window.innerWidth  + 'px';
+        canvas.style.height = window.innerHeight + 'px';
       }
-    });
 
-    // Beam — high density under title, fast twinkle
-    tsParticles.load({
-      id: "sp-beam",
-      options: {
-        background: { color: { value: "transparent" } },
-        fullScreen: { enable: false },
-        fpsLimit: 120,
-        particles: {
-          color: { value: GREEN },
-          number: { value: 1200, density: { enable: true, width: 400, height: 400 } },
-          opacity: {
-            value: { min: 0.1, max: 1 },
-            animation: { enable: true, speed: 4, sync: false, startValue: "random" }
-          },
-          size: { value: { min: 0.4, max: 1 } },
-          move: { enable: true, speed: { min: 0.1, max: 1 }, direction: "none", random: false, outModes: { default: "out" } },
-          shape: { type: "circle" }
-        },
-        interactivity: {
-          events: { onClick: { enable: true, mode: "push" } },
-          modes: { push: { quantity: 4 } }
-        },
-        detectRetina: true
+      function rand(a, b) { return a + Math.random() * (b - a); }
+
+      function spawn() {
+        return {
+          x:    rand(0, W),
+          y:    rand(0, H),
+          r:    rand(0.6, 1.4) * dpr,
+          op:   rand(0.1, 1),
+          dop:  rand(0.002, 0.008) * (Math.random() < 0.5 ? 1 : -1),
+          vx:   rand(-0.15, 0.15) * dpr,
+          vy:   rand(-0.15, 0.15) * dpr
+        };
       }
-    });
+
+      resize();
+      window.addEventListener('resize', function() { resize(); particles = []; init(); });
+
+      function init() {
+        var n = Math.round((W * H) / (1920 * 1080 / 100 * dpr * dpr));
+        n = Math.max(60, Math.min(n, 200));
+        for (var i = 0; i < n; i++) particles.push(spawn());
+      }
+      init();
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#4AE54A';
+        for (var i = 0; i < particles.length; i++) {
+          var p = particles[i];
+          p.op += p.dop;
+          if (p.op > 1)   { p.op = 1;   p.dop = -Math.abs(p.dop); }
+          if (p.op < 0.1) { p.op = 0.1; p.dop =  Math.abs(p.dop); }
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < -5)  p.x = W + 5;
+          if (p.x > W+5) p.x = -5;
+          if (p.y < -5)  p.y = H + 5;
+          if (p.y > H+5) p.y = -5;
+          ctx.globalAlpha = p.op;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, 6.2832);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
+
+    // ── Beam sparkles under title (canvas, high density) ─────────────────
+    (function() {
+      var beam = document.getElementById('sp-beam');
+      var canvas = document.createElement('canvas');
+      canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+      beam.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      var dpr = window.devicePixelRatio || 1;
+      var W, H, particles = [];
+
+      function resize() {
+        W = canvas.width  = beam.offsetWidth  * dpr;
+        H = canvas.height = beam.offsetHeight * dpr;
+      }
+
+      function rand(a, b) { return a + Math.random() * (b - a); }
+
+      function spawn() {
+        return {
+          x:   rand(0, W),
+          y:   rand(0, H),
+          r:   rand(0.4, 1.0) * dpr,
+          op:  rand(0.1, 1),
+          dop: rand(0.01, 0.03) * (Math.random() < 0.5 ? 1 : -1),
+          vx:  rand(-0.3, 0.3) * dpr,
+          vy:  rand(-0.3, 0.3) * dpr
+        };
+      }
+
+      resize();
+      for (var i = 0; i < 800; i++) particles.push(spawn());
+
+      function draw() {
+        resize();
+        ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#4AE54A';
+        for (var i = 0; i < particles.length; i++) {
+          var p = particles[i];
+          p.op += p.dop;
+          if (p.op > 1)   { p.op = 1;   p.dop = -Math.abs(p.dop); }
+          if (p.op < 0.1) { p.op = 0.1; p.dop =  Math.abs(p.dop); }
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+          if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+          ctx.globalAlpha = p.op;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, 6.2832);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(draw);
+      }
+      draw();
+    })();
 
     document.getElementById('login-form').addEventListener('submit', function() {
       var btn = document.getElementById('login-btn');
