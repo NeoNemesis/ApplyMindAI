@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — ApplyMind AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #4AE54A; --green-dim: rgba(74,229,74,0.1);
+      --bg: #111; --surface: #1a1a1a; --surface2: #222;
+      --border: #2a2a2a; --text: #e8e8e8; --muted: #777;
+      --error: #EF4444; --success: #4AE54A; --warning: #F59E0B;
+      --radius: 10px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; min-height: 100dvh; }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; height: 56px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .topbar-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--green); text-decoration: none; }
+    .admin-badge { font-size: 10px; font-weight: 600; padding: 2px 7px; background: rgba(239,68,68,0.12); color: #EF4444; border: 1px solid rgba(239,68,68,0.2); border-radius: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+    .topbar-right a { color: var(--muted); text-decoration: none; font-size: 13px; }
+    .topbar-right a:hover { color: var(--text); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 24px; }
+
+    /* Flash messages */
+    .flash { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .flash-success { background: rgba(74,229,74,0.08); border: 1px solid rgba(74,229,74,0.2); color: var(--success); }
+    .flash-error   { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: var(--error); }
+
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+    .stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; }
+    .stat-tile .val { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.04em; }
+    .stat-tile .lbl { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* Section card */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 24px; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+    .card-title { font-size: 14px; font-weight: 600; }
+
+    /* Create user form */
+    .create-form { padding: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr 120px auto; gap: 10px; align-items: end; }
+    .form-field label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+    .form-field input, .form-field select {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 7px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+      color: var(--text); outline: none;
+    }
+    .form-field input:focus, .form-field select:focus { border-color: var(--green); }
+    .form-field select option { background: var(--surface2); }
+
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 7px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; text-decoration: none; transition: all 120ms ease; white-space: nowrap; }
+    .btn:active { transform: scale(0.97); }
+    .btn-green  { background: var(--green); color: #111; }
+    .btn-green:hover { background: #38c438; }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { color: var(--text); border-color: #444; }
+    .btn-danger { background: rgba(239,68,68,0.1); color: var(--error); border: 1px solid rgba(239,68,68,0.2); }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); }
+    .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+    /* Users table */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { padding: 10px 20px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-admin   { background: rgba(239,68,68,0.1); color: #EF4444; }
+    .badge-user    { background: rgba(59,130,246,0.1); color: #3B82F6; }
+    .badge-active  { background: rgba(74,229,74,0.1); color: var(--green); }
+    .badge-inactive{ background: rgba(107,114,128,0.1); color: #9CA3AF; }
+
+    .user-name { font-weight: 600; }
+    .user-email { color: var(--muted); font-size: 12px; }
+    .actions { display: flex; gap: 6px; }
+
+    /* Audit log */
+    .audit-item { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; }
+    .audit-item:last-child { border-bottom: none; }
+    .audit-time { color: var(--muted); white-space: nowrap; flex-shrink: 0; width: 130px; }
+    .audit-action { color: var(--green); font-weight: 600; flex-shrink: 0; width: 140px; }
+    .audit-detail { color: var(--muted); }
+
+    @media (max-width: 768px) {
+      .stats-row { grid-template-columns: 1fr; }
+      .create-form { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/admin" class="topbar-brand">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    ApplyMind AI
+  </a>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="admin-badge">Admin</span>
+  </div>
+  <div class="topbar-right">
+    <span>{{ current_user.username }}</span>
+    <a href="/">← Till appen</a>
+    <a href="/auth/logout">Logga ut</a>
+  </div>
+</div>
+
+<div class="container">
+  <h1>Användarhantering</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in messages %}
+      <div class="flash flash-{{ 'success' if cat == 'success' else 'error' }}">
+        {{ msg }}
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-tile">
+      <div class="val">{{ users|length }}</div>
+      <div class="lbl">Totalt antal konton</div>
+    </div>
+    <div class="stat-tile">
+      <div class="val">{{ users|selectattr('is_active')|list|length }}</div>
+      <div class="lbl">Aktiva konton</div>
+    </div>
+    <div class="stat-tile">
+      <div class="val">{{ users|selectattr('last_login')|list|length }}</div>
+      <div class="lbl">Har loggat in</div>
+    </div>
+  </div>
+
+  <!-- Create user -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Skapa nytt konto</span>
+    </div>
+    <form class="create-form" method="POST" action="{{ url_for('admin.create_user') }}">
+      <div class="form-field">
+        <label for="new-username">Användarnamn</label>
+        <input type="text" id="new-username" name="username" placeholder="anna_k" required autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label for="new-email">E-post</label>
+        <input type="email" id="new-email" name="email" placeholder="anna@exempel.se" required autocomplete="off">
+      </div>
+      <div class="form-field">
+        <label for="new-password">Lösenord</label>
+        <input type="password" id="new-password" name="password" placeholder="Min 8 tecken" required autocomplete="new-password" minlength="8">
+      </div>
+      <div class="form-field">
+        <label for="new-role">Roll</label>
+        <select id="new-role" name="role">
+          <option value="user">Användare</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-field" style="align-self:end;">
+        <button type="submit" class="btn btn-green" style="width:100%;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Skapa
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Users table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Alla konton ({{ users|length }})</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Användare</th>
+          <th>Roll</th>
+          <th>Status</th>
+          <th>Skapad</th>
+          <th>Senast inloggad</th>
+          <th>Åtgärder</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td>
+            <div class="user-name">{{ user.username }}</div>
+            <div class="user-email">{{ user.email }}</div>
+          </td>
+          <td>
+            <span class="badge badge-{{ user.role }}">{{ user.role }}</span>
+          </td>
+          <td>
+            <span class="badge badge-{{ 'active' if user.is_active else 'inactive' }}">
+              {{ 'Aktiv' if user.is_active else 'Inaktiv' }}
+            </span>
+          </td>
+          <td style="color:var(--muted);">
+            {{ user.created_at.strftime('%Y-%m-%d') if user.created_at else '—' }}
+          </td>
+          <td style="color:var(--muted);">
+            {{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Aldrig' }}
+          </td>
+          <td>
+            <div class="actions">
+              {% if user.id != current_user.id %}
+              <form method="POST" action="{{ url_for('admin.toggle_user', user_id=user.id) }}" style="display:inline;">
+                <button type="submit" class="btn btn-outline btn-sm">
+                  {{ 'Inaktivera' if user.is_active else 'Aktivera' }}
+                </button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}" style="display:inline;"
+                    onsubmit="return confirm('Radera {{ user.username }} och ALL deras data? Det går inte att ångra.');">
+                <button type="submit" class="btn btn-danger btn-sm">Radera</button>
+              </form>
+              {% else %}
+              <span style="color:var(--muted);font-size:11px;">Ditt konto</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Audit log -->
+  {% if audit_logs %}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Aktivitetslogg (senaste 20)</span>
+    </div>
+    {% for log in audit_logs %}
+    <div class="audit-item">
+      <span class="audit-time">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+      <span class="audit-action">{{ log.action }}</span>
+      <span class="audit-detail">{{ log.detail or '—' }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+</body>
+</html>

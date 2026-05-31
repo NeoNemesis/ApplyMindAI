@@ -44,7 +44,7 @@ class SimpleCoverLetterGenerator:
         """Standard personligt brev om inget annat finns"""
         return """Hej!
 
-Jag heter Victor Vilches och är en nyfiken systemutvecklare med ett stort intresse för teknik. Jag gillar att förstå hur system fungerar och att hitta lösningar på tekniska utmaningar.
+Jag är en nyfiken systemutvecklare med ett stort intresse för teknik. Jag gillar att förstå hur system fungerar och att hitta lösningar på tekniska utmaningar.
 
 Min bakgrund består av dataingenjörsutbildning vid Gävle högskola, kompletterat med kurser på olika universitet för att vidga mina perspektiv inom området. Även om jag inte har formell arbetslivserfarenhet som systemutvecklare har jag byggt upp mycket praktisk erfarenhet genom egenutvecklade projekt. Jag har arbetat med att utveckla webbapplikationer, automatiseringsagenter och säkerhetssystem för pentesting. På senaste tiden har jag särskilt fokuserat på att utforska AI och automatiseringsverktyg, vilket har öppnat nya intressanta områden att fördjupa mig i.
 
@@ -55,7 +55,7 @@ Jag är van att arbeta både självständigt och i samarbete med andra. Jag tar 
 Jag kan gärna dela med mig av mina projekt och tillhandahålla referenser på begäran.
 
 Med vänliga hälsningar,
-Victor Vilches"""
+[Ditt namn]"""
 
     def generate_simple_cover_letter(
         self,
@@ -178,9 +178,9 @@ Returnera ENDAST brevet, ingen header."""
         # Säkerställ att det slutar med signatur
         if "Med vänliga hälsningar" not in letter and "Sincerely" not in letter:
             if language == 'sv':
-                letter += "\n\nMed vänliga hälsningar,\nVictor Vilches"
+                letter += "\n\nMed vänliga hälsningar,\n[Ditt namn]"
             else:
-                letter += "\n\nSincerely,\nVictor Vilches"
+                letter += "\n\nSincerely,\n[Your name]"
 
         return letter
 

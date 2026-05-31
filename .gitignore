@@ -1,5 +1,4 @@
 # ApplyMind AI - Git Ignore File
-# Created by Victor Vilches
 
 # Sensitive data - NEVER commit these
 data_folder/secrets.yaml
@@ -11,10 +10,19 @@ data_folder/log/
 data_folder/processed_jobs.txt
 data_folder/tracker_status.json
 data_folder/profile.png
+data_folder/profil.jpg
+data_folder/profil_no_bg.png
 data_folder/reference_cv.txt
+data_folder/reference_cv.pdf
 data_folder/reference_cover_letter.txt
 data_folder/reference_cover_letter.pdf
 data_folder/linkedin_cookies.json
+data_folder/cv_interview_data.json
+data_folder/user_preferences.json
+
+# Personal profile images - never commit
+assets/victorvilches.png
+assets/Vilchesab.png
 
 # Python
 __pycache__/
@@ -120,3 +128,10 @@ GEMINI.md
 JobCraftAI-*.md
 WORK-SESSION-SUMMARY.md
 working-outline.md
+# Auth & DB
+instance/
+*.db
+.env.production
+
+# Docker
+.env.docker

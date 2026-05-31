@@ -256,7 +256,7 @@ ADAPTED COVER LETTER BODY (plain text with \\n\\n between paragraphs):"""
     def _get_fallback_content(self, company_name: str, position_title: str) -> dict:
         """Fallback innehåll - enkel och ärlig stil"""
         if self.language == 'en':
-            text = f"""My name is Victor Vilches and I am a curious system developer with a strong interest in technology. I enjoy understanding how systems work and finding solutions to technical challenges.
+            text = f"""I am a curious system developer with a strong interest in technology. I enjoy understanding how systems work and finding solutions to technical challenges.
 
 My background consists of higher education in computer engineering, programming, web development and databases at Gävle University, Uppsala University and Luleå University of Technology. Although I don't have formal work experience as a system developer, I have built up practical experience through self-developed projects.
 
@@ -264,7 +264,7 @@ When I read about the {position_title} position at {company_name}, I recognize m
 
 I value working in a team where knowledge sharing and collaboration are in focus, as I believe you develop best when you can both give and receive knowledge. My drive is about continuous development and constantly learning new things."""
         else:
-            text = f"""Jag heter Victor Vilches och är en nyfiken systemutvecklare med ett stort intresse för teknik. Jag gillar att förstå hur system fungerar och att hitta lösningar på tekniska utmaningar.
+            text = f"""Jag är en nyfiken systemutvecklare med ett stort intresse för teknik. Jag gillar att förstå hur system fungerar och att hitta lösningar på tekniska utmaningar.
 
 Min bakgrund består av högskolestudier inom dataingenjörskap, programmering, webbutveckling och databaser vid Gävle högskola, Uppsala universitet och Luleå Tekniska Universitet. Även om jag inte har formell arbetslivserfarenhet som systemutvecklare har jag byggt upp mycket praktisk erfarenhet genom egenutvecklade projekt.
 

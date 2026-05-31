@@ -29,8 +29,6 @@ class CorrectModernDesign1Generator:
             from .isolated_utils import image_to_base64
             
             possible_paths = [
-                "assets/victorvilches.png",
-                "assets/Vilchesab.png",
                 "data_folder/profil_no_bg.png",
                 "data_folder/profil.jpg",
                 "data_folder/profile.png"
@@ -73,10 +71,10 @@ class CorrectModernDesign1Generator:
         try:
             personal_info = self.resume_object.personal_information
             if not personal_info:
-                return "Victor Vilches C.", "DATAINGENJÖR"
+                return "[Name]", "DATAINGENJÖR"
             
-            name = getattr(personal_info, 'name', 'Victor')
-            surname = getattr(personal_info, 'surname', 'Vilches')
+            name = getattr(personal_info, 'name', '')
+            surname = getattr(personal_info, 'surname', '')
             full_name = f"{name} {surname} C."
             
             translations = self._get_translations()[self.language]
@@ -87,7 +85,7 @@ class CorrectModernDesign1Generator:
         except Exception as e:
             logger.error(f"❌ Fel vid personlig info: {e}")
             translations = self._get_translations()[self.language]
-            return "Victor Vilches C.", translations['job_title']
+            return "[Name]", translations['job_title']
     
     def _generate_education_section(self) -> str:
         """Genererar utbildningssektion"""
@@ -173,10 +171,10 @@ class CorrectModernDesign1Generator:
             if not personal_info:
                 return self._get_fallback_contact()
             
-            email = getattr(personal_info, 'email', 'victorvilches@protonmail.com')
-            phone = getattr(personal_info, 'phone', '707978547')
-            address = getattr(personal_info, 'address', 'Kvarnängsgatan 24, Uppsala')
-            website = getattr(personal_info, 'website', 'vilchesab.se')
+            email = getattr(personal_info, 'email', '')
+            phone = getattr(personal_info, 'phone', '')
+            address = getattr(personal_info, 'address', '')
+            website = getattr(personal_info, 'website', '')
             
             return f'''<div class="contact-item">
                 <span class="icon">📧</span>{email}
@@ -227,16 +225,16 @@ class CorrectModernDesign1Generator:
     def _get_fallback_contact(self) -> str:
         """Fallback kontakt"""
         return '''<div class="contact-item">
-            <span class="icon">📧</span>victorvilches@protonmail.com
+            <span class="icon">📧</span>email@example.com
         </div>
         <div class="contact-item">
-            <span class="icon">📱</span>070-797 85 47
+            <span class="icon">📱</span>+46-XXX-XXX-XXX
         </div>
         <div class="contact-item">
-            <span class="icon">📍</span>Kvarnängsgatan 24, Uppsala
+            <span class="icon">📍</span>[Address], [City]
         </div>
         <div class="contact-item">
-            <span class="icon">🌐</span>vilchesab.se
+            <span class="icon">🌐</span>[website]
         </div>'''
     
     def generate_complete_cv_html(self, job_description: Optional[str] = None) -> str:

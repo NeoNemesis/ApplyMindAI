@@ -35,8 +35,6 @@ class SmartDataModernDesign1Generator:
             from .isolated_utils import image_to_base64
             
             possible_paths = [
-                "assets/victorvilches.png",
-                "assets/Vilchesab.png",
                 "data_folder/profil_no_bg.png",
                 "data_folder/profil.jpg",
                 "data_folder/profile.png"
@@ -174,11 +172,11 @@ class SmartDataModernDesign1Generator:
             if not personal_info:
                 return self._generate_standard_contact()
             
-            email = getattr(personal_info, 'email', 'victorvilches@protonmail.com')
-            phone = getattr(personal_info, 'phone', '070-797 85 47')
-            address = getattr(personal_info, 'address', 'Kvarnängsgatan 24')
-            city = getattr(personal_info, 'city', 'Uppsala')
-            website = getattr(personal_info, 'website', 'vilchesab.se')
+            email = getattr(personal_info, 'email', '')
+            phone = getattr(personal_info, 'phone', '')
+            address = getattr(personal_info, 'address', '')
+            city = getattr(personal_info, 'city', '')
+            website = getattr(personal_info, 'website', '')
             
             # Formatera adress
             full_address = f"{address}, {city}"
@@ -351,11 +349,11 @@ class SmartDataModernDesign1Generator:
             translations = self._get_translations()[self.language]
             
             if not personal_info:
-                return "Victor Vilches C.", translations['job_title'], translations['summary']
+                return "[Name]", translations['job_title'], translations['summary']
             
             # Bygg fullständigt namn från riktig data
-            name = getattr(personal_info, 'name', 'Victor')
-            surname = getattr(personal_info, 'surname', 'Vilches')
+            name = getattr(personal_info, 'name', '')
+            surname = getattr(personal_info, 'surname', '')
             full_name = f"{name} {surname} C."
             
             job_title = translations['job_title']
@@ -366,7 +364,7 @@ class SmartDataModernDesign1Generator:
         except Exception as e:
             logger.error(f"❌ Fel vid personlig info: {e}")
             translations = self._get_translations()[self.language]
-            return "Victor Vilches C.", translations['job_title'], translations['summary']
+            return "[Name]", translations['job_title'], translations['summary']
     
     
     def generate_complete_modern_design1_html(self, job_description: Optional[str] = None) -> str:
@@ -621,7 +619,7 @@ class SmartDataModernDesign1Generator:
             </div>'''
     
     def _generate_standard_contact(self) -> str:
-        return '''            <div class="contact-item">📧 victorvilches@protonmail.com</div>
-            <div class="contact-item">📱 070-797 85 47</div>
-            <div class="contact-item">📍 Kvarnängsgatan 24, Uppsala</div>
-            <div class="contact-item">🌐 vilchesab.se</div>'''
+        return '''            <div class="contact-item">📧 email@example.com</div>
+            <div class="contact-item">📱 +46-XXX-XXX-XXX</div>
+            <div class="contact-item">📍 [Address], [City]</div>
+            <div class="contact-item">🌐 [website]</div>'''

@@ -1,0 +1,36 @@
+version: '3.8'
+
+# ApplyMind AI — vilchesapp.com
+# Körs bredvid Taskit på Hetzner 46.62.249.87
+# Nginx för SSL hanteras av /opt/nginx/ (delad med Taskit)
+
+services:
+  applymind-web:
+    build: .
+    container_name: applymind-web
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      - FLASK_ENV=production
+      - PYTHONIOENCODING=utf-8
+    volumes:
+      - applymind-uploads:/app/instance/uploads
+    networks:
+      - applymind-net
+    # Exponeras BARA till nginx, inte direkt till internet
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/auth/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  applymind-uploads:
+    name: applymind-uploads
+
+networks:
+  applymind-net:
+    name: applymind-net
