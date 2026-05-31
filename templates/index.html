@@ -3,302 +3,360 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+<div class="bento-dashboard">
 
-<!-- Hero Banner -->
-<div class="hero-banner mt-2">
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+  <!-- Page header row -->
+  <div class="bento-header">
     <div>
-      <h1 class="hero-title">
+      <h1 class="bento-heading">
         {% if t.dash_welcome is defined %}{{ t.dash_welcome }}{% else %}Välkommen tillbaka{% endif %}
       </h1>
-      <p class="hero-subtitle">
-        <i class="bi bi-calendar3 me-1"></i>
-        <span id="today-date"></span>
-        <script>
-          document.getElementById('today-date').textContent = new Date().toLocaleDateString('sv-SE', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
-        </script>
-      </p>
+      <p class="bento-heading-sub" id="today-date"></p>
     </div>
-    <div class="d-flex gap-2 align-items-center flex-wrap">
-      <a href="/search" class="btn btn-green btn-sm">
-        <i class="bi bi-search me-1"></i>
-        {% if t.dash_new_search is defined %}{{ t.dash_new_search }}{% else %}Ny sökning{% endif %}
-      </a>
-      {% if scheduler_cfg is defined and scheduler_cfg.enabled and scheduler_cfg.next_run_label %}
-      <span class="badge" style="background:var(--card);border:1px solid var(--border);color:var(--text-muted);font-size:0.75rem;padding:6px 12px;border-radius:8px;">
-        <i class="bi bi-alarm me-1" style="color:var(--green)"></i>
-        Nästa sökning: {{ scheduler_cfg.next_run_label }}
-      </span>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
-<!-- Stat cards -->
-<div class="row g-3 mb-3">
-
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-briefcase-fill"></i></div>
-      <div>
-        <div class="stat-value">{{ stats.total_folders }}</div>
-        <div class="stat-label">
-          {% if t.dash_total is defined %}{{ t.dash_total }}{% else %}Ansökningar totalt{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon stat-icon-teal">
-        <i class="bi bi-file-earmark-text-fill"></i>
-      </div>
-      <div>
-        <div class="stat-value">{{ stats.jobs_with_letter }}</div>
-        <div class="stat-label">
-          {% if t.dash_with_letter is defined %}{{ t.dash_with_letter }}{% else %}Med personligt brev{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon stat-icon-blue">
-        <i class="bi bi-cpu-fill"></i>
-      </div>
-      <div>
-        <div class="stat-value">{{ stats.total_calls }}</div>
-        <div class="stat-label">
-          {% if t.dash_ai_calls is defined %}{{ t.dash_ai_calls }}{% else %}AI-anrop{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-6 col-md-3">
-    <div class="stat-card">
-      <div class="stat-icon stat-icon-yellow">
-        <i class="bi bi-currency-dollar"></i>
-      </div>
-      <div>
-        <div class="stat-value">${{ "%.2f"|format(stats.total_cost) }}</div>
-        <div class="stat-label">
-          {% if t.dash_ai_cost is defined %}{{ t.dash_ai_cost }}{% else %}AI-kostnad totalt{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Quick actions row -->
-<div class="d-flex flex-wrap gap-2 mb-4">
-  <a href="/search" class="btn btn-green">
-    <i class="bi bi-search me-2"></i>
-    {% if t.dash_quickstart is defined %}{{ t.dash_quickstart }}{% else %}Sök nya jobb{% endif %}
-  </a>
-  <a href="/cv" class="btn btn-outline-green">
-    <i class="bi bi-person-vcard me-2"></i>
-    {% if t.dash_edit_cv is defined %}{{ t.dash_edit_cv }}{% else %}Redigera CV{% endif %}
-  </a>
-  <a href="/cover-letter" class="btn btn-outline-green">
-    <i class="bi bi-file-earmark-text me-2"></i>
-    {% if t.dash_edit_letter is defined %}{{ t.dash_edit_letter }}{% else %}Redigera personligt brev{% endif %}
-  </a>
-  <a href="/jobs" class="btn btn-outline-secondary">
-    <i class="bi bi-briefcase me-2"></i>
-    {% if t.dash_view_all is defined %}{{ t.dash_view_all }}{% else %}Visa alla ansökningar{% endif %}
-  </a>
-  <a href="/tracker" class="btn btn-outline-secondary">
-    <i class="bi bi-kanban me-2"></i>Jobbspårare
-  </a>
-</div>
-
-<!-- Recent jobs -->
-<div class="card">
-  <div class="card-header d-flex align-items-center justify-content-between">
-    <span>
-      <i class="bi bi-clock-history me-2 text-green"></i>
-      {% if t.dash_recent is defined %}{{ t.dash_recent }}{% else %}Senaste ansökningar{% endif %}
-    </span>
-    <a href="/jobs" class="btn btn-sm btn-outline-green">
-      {% if t.dash_view_all is defined %}{{ t.dash_view_all }}{% else %}Visa alla{% endif %}
+    <a href="/search" class="bento-action-btn bento-action-btn--primary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      {% if t.dash_new_search is defined %}{{ t.dash_new_search }}{% else %}Ny sökning{% endif %}
     </a>
   </div>
-  <div class="card-body p-0">
-    {% if recent_jobs %}
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead>
-          <tr>
-            <th>{% if t.dash_col_title is defined %}{{ t.dash_col_title }}{% else %}Titel{% endif %}</th>
-            <th>{% if t.dash_col_company is defined %}{{ t.dash_col_company }}{% else %}Företag{% endif %}</th>
-            <th>{% if t.dash_col_location is defined %}{{ t.dash_col_location }}{% else %}Plats{% endif %}</th>
-            <th>{% if t.dash_col_date is defined %}{{ t.dash_col_date }}{% else %}Datum{% endif %}</th>
-            <th>{% if t.dash_col_docs is defined %}{{ t.dash_col_docs }}{% else %}Dokument{% endif %}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for job in recent_jobs %}
-          <tr>
-            <td class="fw-medium">{{ job.title[:45] }}{% if job.title|length > 45 %}…{% endif %}</td>
-            <td>{{ job.company }}</td>
-            <td><small class="text-muted">{{ job.location }}</small></td>
-            <td><small class="text-muted">{{ job.date }}</small></td>
-            <td>
-              {% if job.has_letter %}
-                <span class="badge-letter"><i class="bi bi-file-earmark-check me-1"></i>CV + Brev</span>
-              {% elif job.has_cv %}
-                <span class="badge-no-letter"><i class="bi bi-file-earmark me-1"></i>Bara CV</span>
-              {% else %}
-                <span class="badge-status-pending">Pågående</span>
-              {% endif %}
-            </td>
-            <td>
-              <div class="d-flex gap-1">
+
+  <div class="bento-grid">
+
+    <!-- HERO: total applications -->
+    <div class="bento-tile bento-tile--hero">
+      <div class="bento-hero-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        {% if t.dash_total is defined %}{{ t.dash_total }}{% else %}Ansökningar totalt{% endif %}
+      </div>
+      <div class="bento-counter" data-target="{{ stats.total_folders }}">0</div>
+      <div class="bento-counter-sub">jobb applicerade hittills</div>
+      <div class="sparkline" aria-hidden="true">
+        <div class="sparkline-bar" style="height:35%"></div>
+        <div class="sparkline-bar" style="height:55%"></div>
+        <div class="sparkline-bar" style="height:40%"></div>
+        <div class="sparkline-bar" style="height:70%"></div>
+        <div class="sparkline-bar" style="height:50%"></div>
+        <div class="sparkline-bar" style="height:85%"></div>
+        <div class="sparkline-bar" style="height:100%"></div>
+      </div>
+    </div>
+
+    <!-- STAT 2: with letter -->
+    <div class="bento-tile bento-tile--stat2">
+      <div class="bento-stat-icon bento-stat-icon--teal">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="bento-stat-value" data-target="{{ stats.jobs_with_letter }}">0</div>
+      <div class="bento-stat-label">{% if t.dash_with_letter is defined %}{{ t.dash_with_letter }}{% else %}Med personligt brev{% endif %}</div>
+    </div>
+
+    <!-- STAT 3: AI cost -->
+    <div class="bento-tile bento-tile--stat3">
+      <div class="bento-stat-icon bento-stat-icon--yellow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="bento-stat-value">${{ "%.2f"|format(stats.total_cost) }}</div>
+      <div class="bento-stat-label">{% if t.dash_ai_cost is defined %}{{ t.dash_ai_cost }}{% else %}AI-kostnad{% endif %}</div>
+    </div>
+
+    <!-- STAT 4: AI calls -->
+    <div class="bento-tile bento-tile--stat4">
+      <div class="bento-stat-icon bento-stat-icon--blue">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="bento-stat-value" data-target="{{ stats.total_calls }}">0</div>
+      <div class="bento-stat-label">{% if t.dash_ai_calls is defined %}{{ t.dash_ai_calls }}{% else %}AI-anrop{% endif %}</div>
+    </div>
+
+    <!-- PLATFORM donut chart -->
+    <div class="bento-tile bento-tile--platform">
+      <div class="bento-chart-label">Plattformar</div>
+      <div class="bento-loading" id="platform-loading">
+        <div class="spinner"></div>
+        <span>Laddar...</span>
+      </div>
+      <canvas id="chart-platforms" class="bento-canvas" style="display:none;"></canvas>
+    </div>
+
+    <!-- TABLE: recent jobs -->
+    <div class="bento-tile bento-tile--table">
+      <div class="bento-table-header">
+        <div class="bento-table-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          {% if t.dash_recent is defined %}{{ t.dash_recent }}{% else %}Senaste ansökningar{% endif %}
+        </div>
+        <a href="/jobs" class="bento-action-btn bento-action-btn--compact">
+          Visa alla
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+
+      {% if recent_jobs %}
+      <div class="bento-table-scroll">
+        <table class="bento-data-table">
+          <thead>
+            <tr>
+              <th>{% if t.dash_col_title is defined %}{{ t.dash_col_title }}{% else %}Titel{% endif %}</th>
+              <th>Företag</th>
+              <th>Datum</th>
+              <th>Dokument</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in recent_jobs %}
+            <tr>
+              <td class="col-title">{{ job.title[:40] }}{% if job.title|length > 40 %}&hellip;{% endif %}</td>
+              <td class="col-muted">{{ job.company }}</td>
+              <td class="col-muted">{{ job.date }}</td>
+              <td>
+                {% if job.has_letter %}
+                  <span class="badge-pulse badge-full">
+                    <span class="badge-pulse-dot" aria-hidden="true"></span>CV + Brev
+                  </span>
+                {% elif job.has_cv %}
+                  <span class="badge-pulse badge-cv">
+                    <span class="badge-pulse-dot" aria-hidden="true"></span>Bara CV
+                  </span>
+                {% else %}
+                  <span class="badge-pulse badge-pending">
+                    <span class="badge-pulse-dot" aria-hidden="true"></span>Pågående
+                  </span>
+                {% endif %}
+              </td>
+              <td class="col-actions">
                 {% if job.cv_file %}
                   <a href="/download/{{ job.folder }}/{{ job.cv_file }}"
-                     class="btn btn-sm btn-outline-green" title="Ladda ner CV">
-                    <i class="bi bi-download"></i>
+                     class="icon-btn"
+                     aria-label="Ladda ner CV för {{ job.title }}"
+                     title="Ladda ner CV">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   </a>
                 {% endif %}
                 {% if job.url %}
-                  <a href="{{ job.url }}" target="_blank"
-                     class="btn btn-sm btn-outline-secondary" title="Öppna jobb">
-                    <i class="bi bi-box-arrow-up-right"></i>
+                  <a href="{{ job.url }}"
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     class="icon-btn"
+                     aria-label="Öppna jobbannonsen för {{ job.title }}"
+                     title="Öppna jobb">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                   </a>
                 {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="bento-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        <p>Inga ansökningar ännu</p>
+        <a href="/search" class="bento-action-btn bento-action-btn--primary">Sök ditt första jobb</a>
+      </div>
+      {% endif %}
     </div>
-    {% else %}
-      <div class="p-5 text-center text-muted">
-        <i class="bi bi-inbox fs-1 d-block mb-3" style="opacity:0.3;"></i>
-        <p class="mb-2">Inga ansökningar ännu.</p>
-        <a href="/search" class="btn btn-green btn-sm">
-          <i class="bi bi-search me-1"></i>Sök ditt första jobb
+
+    <!-- WEEKLY bar chart -->
+    <div class="bento-tile bento-tile--weekly">
+      <div class="bento-chart-label">Ansökningar per vecka</div>
+      <div class="bento-loading" id="weekly-loading">
+        <div class="spinner"></div>
+        <span>Laddar...</span>
+      </div>
+      <canvas id="chart-weekly" class="bento-canvas" style="display:none;"></canvas>
+    </div>
+
+    <!-- QUICK ACTIONS -->
+    <div class="bento-tile bento-tile--actions">
+      <div class="bento-chart-label">Snabbåtgärder</div>
+      <div class="bento-actions">
+        <a href="/search" class="bento-action-btn bento-action-btn--primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          {% if t.dash_quickstart is defined %}{{ t.dash_quickstart }}{% else %}Sök nya jobb{% endif %}
+        </a>
+        <a href="/cv" class="bento-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          {% if t.dash_edit_cv is defined %}{{ t.dash_edit_cv }}{% else %}Redigera CV{% endif %}
+        </a>
+        <a href="/cover-letter" class="bento-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          {% if t.dash_edit_letter is defined %}{{ t.dash_edit_letter }}{% else %}Personligt brev{% endif %}
+        </a>
+        <a href="/tracker" class="bento-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Jobbspårare
+        </a>
+        <a href="/jobs" class="bento-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          {% if t.dash_view_all is defined %}{{ t.dash_view_all }}{% else %}Alla ansökningar{% endif %}
+        </a>
+        <a href="/settings" class="bento-action-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Inställningar
         </a>
       </div>
-    {% endif %}
+    </div>
+
   </div>
 </div>
-
-<!-- Statistics section -->
-<div class="mt-4">
-  <div class="card">
-    <div class="card-header d-flex align-items-center justify-content-between">
-      <span><i class="bi bi-bar-chart-fill me-2" style="color:var(--green)"></i>Ansökningsstatistik</span>
-      <span id="stats-loading" class="text-muted small">
-        <span class="spinner-border spinner-border-sm me-1" style="width:.8rem;height:.8rem"></span>Laddar...
-      </span>
-    </div>
-    <div class="card-body">
-      <div class="row g-3" id="stats-charts-row" style="display:none">
-        <div class="col-md-6">
-          <div style="background:var(--bg-input,#1a1a1a);border-radius:8px;padding:16px">
-            <div class="small fw-semibold mb-2 text-muted">Ansökningar per vecka</div>
-            <canvas id="chart-weekly" height="180"></canvas>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <div style="background:var(--bg-input,#1a1a1a);border-radius:8px;padding:16px">
-            <div class="small fw-semibold mb-2 text-muted">Plattformar</div>
-            <canvas id="chart-platforms" height="180"></canvas>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <div style="background:var(--bg-input,#1a1a1a);border-radius:8px;padding:16px">
-            <div class="small fw-semibold mb-2 text-muted">ATS-poäng fördelning</div>
-            <canvas id="chart-ats" height="180"></canvas>
-          </div>
-        </div>
-        <div class="col-md-6">
-          <div style="background:var(--bg-input,#1a1a1a);border-radius:8px;padding:16px">
-            <div class="small fw-semibold mb-2 text-muted">Ansökningsstatus</div>
-            <canvas id="chart-tracker" height="180"></canvas>
-          </div>
-        </div>
-      </div>
-      <div id="stats-empty" class="text-center py-4 text-muted" style="display:none">
-        <i class="bi bi-bar-chart fs-1 d-block mb-2" style="opacity:0.3"></i>
-        <p>Ingen statistik ännu — sök ditt första jobb!</p>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script>
-Chart.defaults.color = '#888';
-Chart.defaults.borderColor = '#333';
-const _G = '#4AE54A';
-const _COLORS = ['#4AE54A','#1de9b6','#64b5f6','#ffcc02','#ff7070','#ce93d8'];
-let _ch = {};
+// ── Today's date ──────────────────────────────────────────────
+document.getElementById('today-date').textContent =
+  new Date().toLocaleDateString('sv-SE', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 
-function _dc(id) { if (_ch[id]) { _ch[id].destroy(); delete _ch[id]; } }
+// ── Staggered tile entrance ───────────────────────────────────
+const tiles = document.querySelectorAll('.bento-tile');
+tiles.forEach(function(tile, i) {
+  setTimeout(function() {
+    tile.classList.add('is-visible');
+  }, i * 60);
+});
 
-function initCharts(d) {
-  document.getElementById('stats-loading').style.display = 'none';
-  const hasData = d.weekly.values.some(v=>v>0) || d.tracker_status.values.some(v=>v>0) || d.platforms.values.some(v=>v>0);
-  if (!hasData) {
-    document.getElementById('stats-empty').style.display = '';
-    return;
+// ── Counter animation (requestAnimationFrame, ease-out-cubic) ─
+function animateCounter(el, target, duration) {
+  var start = performance.now();
+  duration = duration || 1200;
+
+  function update(now) {
+    var elapsed  = now - start;
+    var progress = Math.min(elapsed / duration, 1);
+    var eased    = 1 - Math.pow(1 - progress, 3);
+    var current  = Math.round(eased * target);
+    el.textContent = current.toLocaleString('sv-SE');
+    if (progress < 1) {
+      requestAnimationFrame(update);
+    } else {
+      el.textContent = target.toLocaleString('sv-SE');
+    }
   }
-  document.getElementById('stats-charts-row').style.display = '';
 
-  _dc('weekly');
-  _ch['weekly'] = new Chart(document.getElementById('chart-weekly'), {
+  requestAnimationFrame(update);
+}
+
+// Kick counters after the first tiles become visible
+setTimeout(function() {
+  document.querySelectorAll('[data-target]').forEach(function(el) {
+    var target = parseInt(el.dataset.target, 10);
+    if (!isNaN(target)) {
+      animateCounter(el, target);
+    }
+  });
+}, 200);
+
+// ── Chart.js global defaults ──────────────────────────────────
+var GREEN   = '#4AE54A';
+var TEAL    = '#1de9b6';
+var BLUE    = '#64b5f6';
+var YELLOW  = '#ffcc02';
+var RED     = '#ff7070';
+var PURPLE  = '#b388ff';
+var PALETTE = [GREEN, TEAL, BLUE, PURPLE, YELLOW, RED];
+
+Chart.defaults.color       = '#888888';
+Chart.defaults.borderColor = '#3a3a3a';
+Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.animation   = { duration: 800, easing: 'easeOutQuart' };
+
+var charts = {};
+
+function destroyChart(id) {
+  if (charts[id]) {
+    charts[id].destroy();
+    delete charts[id];
+  }
+}
+
+function showCharts(d) {
+  var hasData = d.weekly.values.some(function(v) { return v > 0; }) ||
+                d.platforms.values.some(function(v) { return v > 0; });
+
+  document.getElementById('weekly-loading').style.display   = 'none';
+  document.getElementById('platform-loading').style.display = 'none';
+
+  if (!hasData) return;
+
+  var weeklyCanvas   = document.getElementById('chart-weekly');
+  var platformCanvas = document.getElementById('chart-platforms');
+  weeklyCanvas.style.display   = '';
+  platformCanvas.style.display = '';
+
+  destroyChart('weekly');
+  charts['weekly'] = new Chart(weeklyCanvas, {
     type: 'bar',
-    data: { labels: d.weekly.labels, datasets: [{ label: 'Ansökningar', data: d.weekly.values,
-      backgroundColor: _G+'66', borderColor: _G, borderWidth:1, borderRadius:4 }]},
-    options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
+    data: {
+      labels: d.weekly.labels,
+      datasets: [{
+        label: 'Ansökningar',
+        data: d.weekly.values,
+        backgroundColor: GREEN + '30',
+        borderColor: GREEN,
+        borderWidth: 1.5,
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { maxRotation: 0 }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1 },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        }
+      }
+    }
   });
 
-  _dc('platforms');
-  _ch['platforms'] = new Chart(document.getElementById('chart-platforms'), {
+  destroyChart('platforms');
+  charts['platforms'] = new Chart(platformCanvas, {
     type: 'doughnut',
-    data: { labels: d.platforms.labels, datasets: [{ data: d.platforms.values,
-      backgroundColor: _COLORS, borderWidth:0 }]},
-    options: { responsive:true, cutout:'60%',
-      plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}} }
-  });
-
-  _dc('ats');
-  _ch['ats'] = new Chart(document.getElementById('chart-ats'), {
-    type: 'bar',
-    data: { labels: d.ats_distribution.labels, datasets: [{ label:'Jobb', data: d.ats_distribution.values,
-      backgroundColor:['#ff7070aa','#ff9944aa','#ffcc02aa','#4AE54Aaa','#4AE54A'], borderWidth:0, borderRadius:4 }]},
-    options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{stepSize:1}}} }
-  });
-
-  _dc('tracker');
-  _ch['tracker'] = new Chart(document.getElementById('chart-tracker'), {
-    type: 'doughnut',
-    data: { labels: d.tracker_status.labels, datasets: [{ data: d.tracker_status.values,
-      backgroundColor:['#4AE54A','#64b5f6','#ffcc02','#ff7070','#888'], borderWidth:0 }]},
-    options: { responsive:true, cutout:'60%',
-      plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:11}}}} }
+    data: {
+      labels: d.platforms.labels,
+      datasets: [{
+        data: d.platforms.values,
+        backgroundColor: PALETTE,
+        borderWidth: 0,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { boxWidth: 8, padding: 12 }
+        }
+      }
+    }
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  fetch('/api/stats/detailed').then(r=>r.json()).then(d => {
-    if (d.ok) initCharts(d);
-    else { document.getElementById('stats-loading').style.display='none'; document.getElementById('stats-empty').style.display=''; }
-  }).catch(() => {
-    document.getElementById('stats-loading').style.display='none';
-    document.getElementById('stats-empty').style.display='';
+fetch('/api/stats/detailed')
+  .then(function(r) { return r.json(); })
+  .then(function(d) { if (d.ok) showCharts(d); })
+  .catch(function() {
+    var ids = ['weekly-loading', 'platform-loading'];
+    ids.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
   });
-});
 </script>
 {% endblock %}

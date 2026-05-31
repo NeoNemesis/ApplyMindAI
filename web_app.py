@@ -54,7 +54,44 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET', 'applymind-ai-secret-2026')
+app.secret_key = os.environ.get('FLASK_SECRET', 'applymind-ai-dev-secret-change-in-prod-2026')
+
+# ── Database + Auth ───────────────────────────────────────────
+from models import db, User, AuditLog
+from flask_login import LoginManager, current_user, login_required
+from auth import auth_bp
+
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL',
+    f"sqlite:///{BASE_DIR / 'instance' / 'applymind.db'}"
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['REMEMBER_COOKIE_SECURE']   = os.environ.get('FLASK_ENV') == 'production'
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SAMESITE']  = 'Lax'
+app.config['SESSION_COOKIE_HTTPONLY']  = True
+
+db.init_app(app)
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'auth.login'
+login_manager.login_message = 'Du måste logga in för att komma åt den sidan.'
+login_manager.login_message_category = 'warning'
+
+@login_manager.user_loader
+def load_user(user_id: str):
+    return User.query.get(int(user_id))
+
+app.register_blueprint(auth_bp)
+
+from admin import admin_bp
+app.register_blueprint(admin_bp)
+
+# Create DB tables on first run
+with app.app_context():
+    (BASE_DIR / 'instance').mkdir(exist_ok=True)
+    db.create_all()
 
 # ── i18n helpers ─────────────────────────────────────────────
 from src.i18n import get_translations, LANGUAGE_NAMES
@@ -72,25 +109,76 @@ def load_language():
 @app.context_processor
 def inject_globals():
     return dict(
-        t         = getattr(g, 't', get_translations('sv')),
-        lang      = getattr(g, 'lang', 'sv'),
-        languages = LANGUAGE_NAMES,
-        app_name  = 'ApplyMind AI',
+        t            = getattr(g, 't', get_translations('sv')),
+        lang         = getattr(g, 'lang', 'sv'),
+        languages    = LANGUAGE_NAMES,
+        app_name     = 'ApplyMind AI',
+        current_user = current_user,
     )
 
 # ============================================================
-# PATHS
+# PATHS — per-user helpers
 # ============================================================
+# Legacy global paths (used as fallback / for unauthenticated contexts)
 DATA_DIR        = BASE_DIR / 'data_folder'
 OUTPUT_DIR      = DATA_DIR / 'output' / 'job_master'
-RESUME_YAML     = DATA_DIR / 'plain_text_resume.yaml'
-PREFS_YAML      = DATA_DIR / 'work_preferences.yaml'
-COVER_LETTER    = DATA_DIR / 'reference_cover_letter.txt'
-PROCESSED_JOBS  = OUTPUT_DIR / 'processed_jobs.json'
-FOUND_JOBS      = OUTPUT_DIR / 'found_jobs.json'
-OPENAI_CALLS    = OUTPUT_DIR / 'open_ai_calls.json'
-TRACKER_FILE    = DATA_DIR / 'tracker_status.json'
-SCHEDULER_FILE  = DATA_DIR / 'scheduler_config.json'
+
+INSTANCE_UPLOADS = BASE_DIR / 'instance' / 'uploads'
+
+
+def _user_data_dir(user_id: int | None = None) -> Path:
+    """Return per-user data directory, creating it if needed."""
+    uid = user_id
+    if uid is None:
+        try:
+            from flask_login import current_user as _cu
+            if _cu.is_authenticated:
+                uid = _cu.id
+        except Exception:
+            pass
+    if uid is None:
+        return DATA_DIR          # legacy fallback
+    path = INSTANCE_UPLOADS / f'user_{uid}' / 'data'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _user_output_dir(user_id: int | None = None) -> Path:
+    """Return per-user output/job_master directory, creating it if needed."""
+    uid = user_id
+    if uid is None:
+        try:
+            from flask_login import current_user as _cu
+            if _cu.is_authenticated:
+                uid = _cu.id
+        except Exception:
+            pass
+    if uid is None:
+        return OUTPUT_DIR        # legacy fallback
+    path = INSTANCE_UPLOADS / f'user_{uid}' / 'output' / 'job_master'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _u(filename: str) -> Path:
+    """Shortcut: per-user data dir + filename."""
+    return _user_data_dir() / filename
+
+
+def _o(filename: str) -> Path:
+    """Shortcut: per-user output dir + filename."""
+    return _user_output_dir() / filename
+
+
+# Named path helpers (replace hardcoded globals in route handlers)
+def RESUME_YAML()     -> Path: return _u('plain_text_resume.yaml')
+def PREFS_YAML()      -> Path: return _u('work_preferences.yaml')
+def COVER_LETTER()    -> Path: return _u('reference_cover_letter.txt')
+def PROCESSED_JOBS()  -> Path: return _o('processed_jobs.json')
+def FOUND_JOBS()      -> Path: return _o('found_jobs.json')
+def OPENAI_CALLS()    -> Path: return _o('open_ai_calls.json')
+def TRACKER_FILE()    -> Path: return _u('tracker_status.json')
+def SCHEDULER_FILE()  -> Path: return _u('scheduler_config.json')
 
 # ============================================================
 # SEARCH STATE (thread-safe via lock)
@@ -150,8 +238,8 @@ _SCHEDULER_DEFAULTS = {
 
 def load_scheduler_config() -> dict:
     try:
-        if SCHEDULER_FILE.exists():
-            data = json.loads(SCHEDULER_FILE.read_text(encoding='utf-8'))
+        if SCHEDULER_FILE().exists():
+            data = json.loads(SCHEDULER_FILE().read_text(encoding='utf-8'))
             cfg = dict(_SCHEDULER_DEFAULTS)
             cfg.update(data)
             return cfg
@@ -162,7 +250,7 @@ def load_scheduler_config() -> dict:
 def save_scheduler_config(updates: dict):
     cfg = load_scheduler_config()
     cfg.update(updates)
-    SCHEDULER_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
+    SCHEDULER_FILE().write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
 
 def _next_run_label(cfg: dict) -> str:
     """Compute a human-readable 'nästa sökning' string from scheduler config."""
@@ -228,7 +316,7 @@ def _scheduler_loop():
                 save_scheduler_config({'last_run_date': today_str})
 
                 # Load saved preferences and fire search
-                prefs = load_yaml(PREFS_YAML) or {}
+                prefs = load_yaml(PREFS_YAML()) or {}
                 platforms  = prefs.get('platforms', ['indeed', 'jobtech'])
                 max_jobs   = prefs.get('max_jobs', 10)
                 locations  = prefs.get('locations', ['Uppsala'])
@@ -326,7 +414,7 @@ def load_json(path):
 def load_tracker() -> dict:
     """Load tracker status dict {folder: {status, notes, updated}}"""
     try:
-        with open(TRACKER_FILE, 'r', encoding='utf-8') as f:
+        with open(TRACKER_FILE(), 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception:
         return {}
@@ -334,8 +422,8 @@ def load_tracker() -> dict:
 
 def save_tracker(data: dict):
     """Save tracker status dict"""
-    TRACKER_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(TRACKER_FILE, 'w', encoding='utf-8') as f:
+    TRACKER_FILE().parent.mkdir(parents=True, exist_ok=True)
+    with open(TRACKER_FILE(), 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
@@ -445,7 +533,7 @@ def parse_openai_calls(path) -> tuple:
 
 def get_stats():
     """Get application statistics"""
-    processed   = load_json(PROCESSED_JOBS)
+    processed   = load_json(PROCESSED_JOBS())
     folders     = get_job_folders()
 
     jobs_with_letter = sum(
@@ -453,7 +541,7 @@ def get_stats():
         if any(p.name.startswith('Personligt_Brev') for p in f.iterdir() if p.is_file())
     )
 
-    total_calls, total_cost = parse_openai_calls(OPENAI_CALLS) if OPENAI_CALLS.exists() else (0, 0.0)
+    total_calls, total_cost = parse_openai_calls(OPENAI_CALLS()) if OPENAI_CALLS().exists() else (0, 0.0)
 
     return {
         'total_folders':     len(folders),
@@ -469,13 +557,45 @@ def get_stats():
 # ============================================================
 
 # ============================================================
+# AUTH CHECK — require login for all app routes
+# ============================================================
+_PUBLIC_ENDPOINTS = {'auth.login', 'auth.logout', 'landing', 'static'}
+_PUBLIC_PREFIXES  = ['/auth/', '/static/']
+
+@app.before_request
+def require_login():
+    """Redirect to login unless the route is public."""
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return None
+    if any(request.path.startswith(p) for p in _PUBLIC_PREFIXES):
+        return None
+    if not current_user.is_authenticated:
+        return redirect(url_for('auth.login', next=request.path))
+    return None
+
+
+# ============================================================
 # SETUP CHECK — redirect new users to wizard
 # ============================================================
 @app.before_request
 def check_setup():
-    allowed = ['/setup', '/static', '/api/found-jobs']
+    # Skip auth routes
+    if request.endpoint in _PUBLIC_ENDPOINTS:
+        return None
+    allowed = ['/setup', '/static', '/api/found-jobs', '/auth/']
     if not is_setup_complete() and not any(request.path.startswith(p) for p in allowed):
         return redirect(url_for('setup'))
+
+
+# ============================================================
+# ROUTES — LANDING PAGE (public)
+# ============================================================
+@app.route('/landing')
+def landing():
+    """Public landing page. Authenticated users go straight to dashboard."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    return render_template('landing.html')
 
 
 # ============================================================
@@ -506,7 +626,7 @@ MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
 @app.route('/cv')
 def cv_editor():
-    resume = load_yaml(RESUME_YAML)
+    resume = load_yaml(RESUME_YAML())
     has_photo = PROFILE_PHOTO_PATH.exists()
     return render_template('cv.html', resume=resume,
                            has_profile_photo=has_photo,
@@ -571,7 +691,7 @@ def cv_delete_photo():
 
 @app.route('/cv/save', methods=['POST'])
 def cv_save():
-    resume = load_yaml(RESUME_YAML)
+    resume = load_yaml(RESUME_YAML())
 
     # Personal information
     resume['personal_information'] = {
@@ -663,7 +783,7 @@ def cv_save():
     if languages:
         resume['languages'] = languages
 
-    save_yaml(RESUME_YAML, resume)
+    save_yaml(RESUME_YAML(), resume)
     flash('CV sparat!', 'success')
     return redirect(url_for('cv_editor'))
 
@@ -674,8 +794,8 @@ def cv_save():
 
 @app.route('/cover-letter')
 def cover_letter():
-    content = COVER_LETTER.read_text(encoding='utf-8') if COVER_LETTER.exists() else ''
-    resume  = load_yaml(RESUME_YAML)
+    content = COVER_LETTER().read_text(encoding='utf-8') if COVER_LETTER().exists() else ''
+    resume  = load_yaml(RESUME_YAML())
     profile = resume.get('cover_letter_profile', '')
     return render_template('cover_letter.html', content=content, profile=profile)
 
@@ -733,7 +853,7 @@ def letter_template_preview(template_key):
 def _build_letter_preview_content() -> dict:
     """Bygger dict med alla brev-placeholders ifyllda med Victor's data."""
     from datetime import datetime
-    resume = load_yaml(RESUME_YAML) or {}
+    resume = load_yaml(RESUME_YAML()) or {}
     pi = resume.get('personal_information', {}) or {}
 
     full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
@@ -775,13 +895,13 @@ def _build_letter_preview_content() -> dict:
 @app.route('/cover-letter/save', methods=['POST'])
 def cover_letter_save():
     content = request.form.get('content', '')
-    COVER_LETTER.write_text(content, encoding='utf-8')
+    COVER_LETTER().write_text(content, encoding='utf-8')
 
     profile = request.form.get('profile', '')
     if profile:
-        resume = load_yaml(RESUME_YAML)
+        resume = load_yaml(RESUME_YAML())
         resume['cover_letter_profile'] = profile
-        save_yaml(RESUME_YAML, resume)
+        save_yaml(RESUME_YAML(), resume)
 
     flash('Personligt brev sparat!', 'success')
     return redirect(url_for('cover_letter'))
@@ -793,7 +913,7 @@ def cover_letter_save():
 
 @app.route('/search')
 def search():
-    prefs = load_yaml(PREFS_YAML)
+    prefs = load_yaml(PREFS_YAML())
     env = read_env()
     current_cv_design = env.get('CV_DESIGN', 'design_02_classic')
     current_letter_template = env.get('LETTER_TEMPLATE', 'nordic_minimal')
@@ -871,14 +991,14 @@ def search_run():
             write_env({'LETTER_TEMPLATE': letter_template})
 
         # Update preferences YAML
-        prefs = load_yaml(PREFS_YAML)
+        prefs = load_yaml(PREFS_YAML())
         prefs['remote']    = remote
         prefs['hybrid']    = hybrid
         prefs['onsite']    = onsite
         prefs['locations'] = locations
         if positions:
             prefs['positions'] = positions
-        save_yaml(PREFS_YAML, prefs)
+        save_yaml(PREFS_YAML(), prefs)
 
         # Reset state
         search_state = {
@@ -1109,11 +1229,11 @@ def batch_evaluate():
         sys.stderr = OutputCapture()
 
         try:
-            if not FOUND_JOBS.exists():
+            if not FOUND_JOBS().exists():
                 search_queue.put(('error', '❌ Inga sparade jobb hittades. Gör en sökning först.\n'))
                 return
 
-            jobs = json.loads(FOUND_JOBS.read_text(encoding='utf-8'))
+            jobs = json.loads(FOUND_JOBS().read_text(encoding='utf-8'))
             if not jobs:
                 search_queue.put(('output', '❌ Jobbfilen är tom. Gör en ny sökning.\n'))
                 search_queue.put(('done', None))
@@ -1289,7 +1409,7 @@ def api_delete_job():
     # Säkerställ att URL:en finns i processed_jobs.json (blockerar framtida sökningar)
     if job_url:
         try:
-            existing = json.loads(PROCESSED_JOBS.read_text(encoding='utf-8')) if PROCESSED_JOBS.exists() else []
+            existing = json.loads(PROCESSED_JOBS().read_text(encoding='utf-8')) if PROCESSED_JOBS().exists() else []
         except Exception:
             existing = []
 
@@ -1303,7 +1423,7 @@ def api_delete_job():
                 'status':         'rejected',
                 'processed_date': datetime.now().isoformat(),
             })
-            PROCESSED_JOBS.write_text(
+            PROCESSED_JOBS().write_text(
                 json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
             )
         else:
@@ -1314,7 +1434,7 @@ def api_delete_job():
                     j['status'] = 'rejected'
                     changed = True
             if changed:
-                PROCESSED_JOBS.write_text(
+                PROCESSED_JOBS().write_text(
                     json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
                 )
 
@@ -1394,7 +1514,7 @@ def api_stats():
 def api_stats_detailed():
     """Aggregated stats for dashboard charts."""
     try:
-        processed = load_json(PROCESSED_JOBS)
+        processed = load_json(PROCESSED_JOBS())
         folders   = get_job_folders()
         tracker   = load_tracker()
         now       = datetime.now()
@@ -1515,8 +1635,8 @@ def api_scheduler_save():
 @app.route('/api/found-jobs')
 def api_found_jobs():
     """Return found_jobs.json + which have been processed"""
-    found     = load_json(FOUND_JOBS)
-    processed = load_json(PROCESSED_JOBS)
+    found     = load_json(FOUND_JOBS())
+    processed = load_json(PROCESSED_JOBS())
     proc_urls = {j.get('url', '') for j in processed}
     folders   = get_job_folders()
     # Build a set of processed titles+companies
@@ -1736,7 +1856,7 @@ def preview_design_pdf(design_key):
 
 def _build_cv_preview_content() -> dict:
     """Bygger dict med alla CV-placeholders ifyllda med Victor's riktiga data."""
-    resume = load_yaml(RESUME_YAML) or {}
+    resume = load_yaml(RESUME_YAML()) or {}
     pi = resume.get('personal_information', {}) or {}
 
     full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
@@ -1928,14 +2048,14 @@ def setup_upload_cv():
 
 def _cv_text_to_yaml(cv_text: str):
     """Use AI to parse free-text CV into our YAML structure, or store as summary"""
-    resume = load_yaml(RESUME_YAML)
+    resume = load_yaml(RESUME_YAML())
     env    = read_env()
     api_key = env.get('OPENAI_API_KEY') or env.get('ANTHROPIC_API_KEY') or env.get('GOOGLE_API_KEY', '')
 
     if not api_key and env.get('LLM_PROVIDER') != 'ollama':
         # No AI — just store as professional summary
         resume['professional_summary'] = cv_text[:2000]
-        save_yaml(RESUME_YAML, resume)
+        save_yaml(RESUME_YAML(), resume)
         return
 
     try:
@@ -1971,17 +2091,17 @@ def _cv_text_to_yaml(cv_text: str):
     except Exception:
         resume['professional_summary'] = cv_text[:2000]
 
-    save_yaml(RESUME_YAML, resume)
+    save_yaml(RESUME_YAML(), resume)
 
 
 @app.route('/setup/save-cover-letter', methods=['POST'])
 def setup_save_cover_letter_route():
     content = request.form.get('content', '').strip()
     if content:
-        COVER_LETTER.write_text(content, encoding='utf-8')
-        resume = load_yaml(RESUME_YAML)
+        COVER_LETTER().write_text(content, encoding='utf-8')
+        resume = load_yaml(RESUME_YAML())
         resume['cover_letter_profile'] = request.form.get('profile', '')
-        save_yaml(RESUME_YAML, resume)
+        save_yaml(RESUME_YAML(), resume)
     flash('Personligt brev sparat! Setup klar.', 'success')
     return redirect(url_for('index'))
 
@@ -2031,33 +2151,309 @@ def settings_save():
 # ============================================================
 # ROUTES — ATS SCORE
 # ============================================================
+#
+# Designprincip: härma riktiga ATS:er (Workday/Teamtailor/Greenhouse) som gör
+# literal keyword-matching, men lägg ovanpå en kalibrerad rekryterar-bedömning
+# för transferable skills och soft skills. Slutpoängen är deterministiskt
+# viktad — LLM:en sätter inte ett "magiskt" 0-100-värde.
 
-def _build_ats_prompt(cv_text: str, job_description: str, job_title: str, company: str) -> str:
-    return f"""Du är en expert på rekrytering och ATS-system (Applicant Tracking Systems).
-Analysera hur väl följande CV matchar jobbeskrivningen.
+def _build_keyword_extraction_prompt(job_description: str, job_title: str, company: str) -> str:
+    """Pass 1: extrahera nyckelord och hårda krav från annonsen (LLM, temp=0)."""
+    return f"""Du analyserar en jobbannons för att extrahera nyckelorden som en ATS skulle söka efter.
 
 JOBBTITEL: {job_title}
 FÖRETAG: {company}
 
-JOBBESKRIVNING:
-{job_description[:3000]}
+ANNONS:
+{job_description[:8000]}
 
-CV-SAMMANFATTNING:
-{cv_text[:3000]}
+EXTRAHERA ENDAST KONKRETA, MATCHBARA TERMER. Det MÅSTE vara en av:
+✓ Specifik teknologi/verktyg/ramverk: "Node.js", "React", "Kubernetes", "PostgreSQL", "Solvens II"
+✓ Specifik metodik: "Scrum", "TDD", "Domain-Driven Design"
+✓ Specifik domän: "försäkring", "industriell riskbedömning", "fintech"
+✓ Specifik certifiering: "AWS Certified Solutions Architect", "B-körkort", "SC-säkerhetsklass"
+✓ Specifikt språk: "svenska", "engelska", "tyska"
+✓ Specifikt antal år: "5 års erfarenhet av Java", "minst 3 år backend"
+✓ Specifik utbildningsnivå: "civilingenjörsexamen", "kandidatexamen i datavetenskap"
 
-Svara ENDAST med ett JSON-objekt i detta exakta format (inga kommentarer, ingen markdown):
+EXTRAHERA ALDRIG generiska/icke-matchbara fyllnadsord:
+✗ "teknisk kompetens", "erfarenhet av utveckling", "webbutveckling" (för vagt — vilken sorts?)
+✗ "engagerad", "motiverad", "ansvarstagande", "team", "samarbete" — dessa hör hemma i soft_skills
+✗ "kommunikationsförmåga", "problemlösare", "drivkraft"
+✗ Hela meningar eller långa fraser ("erfarenhet av att arbeta i agila team")
+
+Om annonsen INTE innehåller några konkreta termer ovan → returnera tomma listor (`[]`).
+Det är bättre att returnera färre konkreta termer än att hitta på fyllnadsord.
+
+Klassificera varje konkret term:
+- must_have: explicit krav ("krav:", "du har", "minst X år", "ska kunna"). Utan dessa filtreras kandidaten bort.
+- should_have: starkt meriterande ("vi söker dig som", "vi vill att du har erfarenhet av").
+- nice_to_have: bonus ("meriterande", "plus om", "gärna").
+
+För varje term, lista SYNONYMER och vanliga skrivvarianter — var GENERÖS, inte snål.
+Bättre att inkludera 6-10 varianter än att missa matchningar p.g.a. för smala synonymer.
+
+OBLIGATORISKA REGLER:
+- Om termen är ENGELSK → ge svenska översättningen som synonym
+  (Fullstack Developer → MÅSTE inkludera "fullstackutvecklare", "fullstack-utvecklare";
+   Backend Developer → "backendutvecklare"; Project Manager → "projektledare")
+- Om termen är SVENSK → ge engelska översättningen
+  (utvecklare → "developer"; ingenjör → "engineer")
+- Inkludera skrivvarianter med/utan punkt/bindestreck (Node.js → ["nodejs", "node js", "node"];
+  CI/CD → ["ci cd", "cicd"]; multi-tenant → ["multitenant", "multi tenant"])
+- Förkortningar OCH fullformer i båda riktningar (PostgreSQL → ["postgres", "psql"];
+  K8s → ["kubernetes"]; TS → ["typescript"]; JS → ["javascript"])
+- Tidsuttryck i siffror och bokstäver (5 års → ["5 år", "fem år", "5+ år", "minst 5 år"])
+- KATEGORI-SYNONYMER för breda termer:
+  * "AI-verktyg" → ["openai", "claude", "anthropic", "llm", "gpt", "chatgpt", "copilot", "ai"]
+  * "cloud" → ["aws", "azure", "gcp", "google cloud", "moln"]
+  * "agila utvecklingsmetoder" → ["agile", "agila", "scrum", "kanban", "sprint", "iteration"]
+  * "frontend" → ["react", "vue", "angular", "svelte", "ui", "användargränssnitt"]
+  * "backend" → ["api", "rest", "server", "node", "python", "java", "c#", ".net"]
+  * "DevOps" → ["docker", "kubernetes", "ci/cd", "github actions", "gitlab ci", "jenkins"]
+  Lista de KONKRETA tekniker som tillhör kategorin — så CV som har "Docker" matchar "DevOps".
+- "Minst X år" → ALDRIG hård-blockera på exakt formulering. Inkludera "X år", "X+ år",
+  "flera år", "flerårig erfarenhet", "X år av", och utan siffra om CV listar år-spann
+  (2020-2024 = 4 års erfarenhet).
+
+HÅRDA BLOCKERARE: krav som diskvalificerar (svenskt medborgarskap, körkort, säkerhetsklass,
+specifik certifiering, minimiantal år av en specifik teknologi).
+
+SOFT SKILLS samlas separat (samarbete, kommunikation, ledarskap, problemlösning).
+
+Svara ENDAST med JSON (ingen markdown, inga kommentarer):
 {{
-  "score": <heltal 0-100>,
-  "matched_skills": [<lista med kompetenser som matchar, max 8>],
-  "missing_skills": [<lista med kompetenser som saknas, max 6>],
-  "recommendations": [<2-4 konkreta förbättringsförslag på svenska>],
-  "summary": "<1-2 meningar sammanfattning på svenska>"
+  "must_have":   [{{"term": "...", "synonyms": ["...", "..."]}}],
+  "should_have": [{{"term": "...", "synonyms": ["..."]}}],
+  "nice_to_have":[{{"term": "...", "synonyms": ["..."]}}],
+  "hard_requirements": [{{"requirement": "...", "match_terms": ["...", "..."]}}],
+  "soft_skills": ["samarbete", "kommunikation"]
 }}"""
 
 
+def _build_recruiter_assessment_prompt(
+    cv_text: str, job_description: str, job_title: str, company: str,
+    keyword_summary: str
+) -> str:
+    """Pass 3: kalibrerad rekryterar-bedömning av transferable + soft skills (LLM, temp=0.1)."""
+    return f"""Du är en senior rekryterare. Det deterministiska keyword-matchning är redan gjort
+(se sammanfattning nedan). Din uppgift är att bedöma TVÅ saker som inte syns i keyword-matchningen:
+
+1. TRANSFERABLE SKILLS (0-100): Kandidatens indirekta matchningar. T.ex. "multi-tenant SaaS-arkitektur"
+   är direkt överförbart till "industriella risksystem" eftersom båda kräver distribuerad systemdesign,
+   skalbarhet och hög tillförlitlighet. Premiera djupa konceptuella matchningar, inte ytliga.
+
+2. SOFT SKILLS (0-100): Hur väl CV:t signalerar samarbete, kommunikation, problemlösning,
+   ledarskap utifrån vad jobbet faktiskt kräver.
+
+Du ska OCKSÅ ge 2-4 KONKRETA REKOMMENDATIONER. Varje rekommendation MÅSTE:
+- Peka på en specifik del av CV:t att redigera (t.ex. "experience_details[0].key_responsibilities")
+- Ge ett föreslaget exakt formuleringstext-snippet på svenska
+- Vara handlingsbar inom 5 minuter (inte "skaffa certifiering")
+
+KALIBRERINGSEXEMPEL (transferable):
+- 90+: Tidigare arbete löste konceptuellt samma problem som jobbet beskriver
+- 75-89: Solida överförbara mönster men inom annan domän
+- 50-74: Vissa relevanta paralleller men kräver konceptuellt språng
+- <50: Få överförbara element
+
+JOBBTITEL: {job_title}
+FÖRETAG: {company}
+
+ANNONS (full text):
+{job_description[:8000]}
+
+KEYWORD-MATCHNING (redan beräknad):
+{keyword_summary}
+
+CV (full text):
+{cv_text[:10000]}
+
+Svara ENDAST med JSON (ingen markdown):
+{{
+  "transferable_score": <0-100>,
+  "transferable_reasoning": "<en mening på svenska>",
+  "soft_skills_score": <0-100>,
+  "soft_skills_reasoning": "<en mening på svenska>",
+  "recommendations": [
+    {{
+      "action": "<vad göra på svenska>",
+      "where":  "<sektion i CV att redigera, t.ex. 'experience_details[0]'>",
+      "suggested_text": "<exakt text att lägga till/byta ut på svenska>"
+    }}
+  ],
+  "summary": "<1-2 meningars helhetsbedömning på svenska>"
+}}"""
+
+
+def _normalize_for_match(text: str) -> str:
+    """Lowercase utan att rasera svenska tecken — ATS:er är case-insensitive men ÅÄÖ-känsliga."""
+    return text.lower()
+
+
+def _find_keyword(term: str, synonyms: list, cv_lower: str) -> tuple:
+    """Sök efter term + synonymer i CV-text. Returnerar (found: bool, found_as: str|None).
+
+    Smart boundary för korta termer: använder en boundary som funkar med
+    specialtecken (#, +, .). Standard \\b räknar # som non-word så regex
+    \\bC#\\b matchar aldrig 'C#,' eller 'C# ' — eftersom \\b kräver ord-tecken
+    på fel sida. Vi använder istället lookaround: termen omges av antingen
+    sträng-början/-slut, whitespace, eller specifik punktuation (komma,
+    semikolon, parentes osv).
+    """
+    # Boundary-set: vi vill INTE matcha mitten av andra ord (t.ex. "go" i "good"),
+    # men ACCEPTERA att termen omges av punktuation/whitespace eller är vid
+    # textens kant.
+    boundary_left  = r'(?:^|[\s,;:()/\[\]{}"\'\-])'
+    boundary_right = r'(?=$|[\s,;:.()/\[\]{}"\'\-+#])'
+
+    candidates = [term] + (synonyms or [])
+    for c in candidates:
+        if not c:
+            continue
+        c_norm = _normalize_for_match(c.strip())
+        if not c_norm:
+            continue
+        if len(c_norm) <= 4:
+            pattern = boundary_left + re.escape(c_norm) + boundary_right
+            if re.search(pattern, cv_lower):
+                return (True, c)
+        else:
+            if c_norm in cv_lower:
+                return (True, c)
+    return (False, None)
+
+
+def _match_keyword_list(keyword_specs: list, cv_lower: str) -> list:
+    """Returnera lista av {term, synonyms, found, found_as} för varje keyword-spec."""
+    results = []
+    for spec in (keyword_specs or []):
+        if not isinstance(spec, dict):
+            continue
+        term = (spec.get('term') or '').strip()
+        if not term:
+            continue
+        synonyms = spec.get('synonyms') or []
+        found, found_as = _find_keyword(term, synonyms, cv_lower)
+        results.append({
+            'term': term,
+            'synonyms': synonyms,
+            'found': found,
+            'found_as': found_as,
+        })
+    return results
+
+
+def _match_hard_requirements(hard_reqs: list, cv_lower: str) -> list:
+    """Hårda krav matchas via 'match_terms' — minst ett måste hittas för att räknas som uppfyllt."""
+    results = []
+    for req in (hard_reqs or []):
+        if not isinstance(req, dict):
+            continue
+        requirement = (req.get('requirement') or '').strip()
+        if not requirement:
+            continue
+        terms = req.get('match_terms') or []
+        found, found_as = _find_keyword(requirement, terms, cv_lower)
+        results.append({
+            'requirement': requirement,
+            'match_terms': terms,
+            'satisfied': found,
+            'found_as': found_as,
+        })
+    return results
+
+
+def _pct(matched: int, total: int) -> int:
+    """Procent matchade, eller 100 om kategorin är tom (saknar negativ påverkan)."""
+    if total <= 0:
+        return 100
+    return round(matched / total * 100)
+
+
+def _soften_pct(pct: int, matched: int) -> int:
+    """Mjuk poängkurva för keyword-matchning.
+
+    Rak procent är för brant: 2/6 = 33% straffar hårt även om kandidaten
+    har de viktigaste 2. Vi använder sqrt-kurvan så delvis matchning får
+    skäligt erkännande:
+        0/N   →   0%
+        1/N   →  ~floor 20% (om något matchades så får man en bas)
+        N/2   →  ~71%
+        N/N   → 100%
+    Detta lättar på strikheten — användarens explicita feedback efter att
+    44/100 ansågs för lågt för en kandidat med starka transferable skills.
+    """
+    if matched <= 0:
+        return 0
+    # sqrt-kurva
+    ratio = pct / 100.0
+    softened = round((ratio ** 0.5) * 100)
+    # Bas-floor: minst 20 om något matchades alls (signalvärde att kandidaten
+    # inte är helt off-topic)
+    return max(20, softened)
+
+
+def _compute_composite_score(must_pct: int, should_pct: int,
+                             transferable: int, soft_skills: int,
+                             must_total: int, hard_blockers_unsatisfied: int,
+                             must_matched: int = 0, should_matched: int = 0) -> int:
+    """Viktad slutpoäng — uppdaterad för MJUKARE strikhet (v2.5):
+
+    - Must-have-vikt sänkt 50% → 40% (mindre brant straff för specifika tech-keywords)
+    - Should-have oförändrat (25%)
+    - Transferable upp 15% → 20% (verklig passform belönas)
+    - Soft skills upp 10% → 15%
+    - sqrt-kurva via _soften_pct: 2/6 = 33%→57% istället för rakt 33%
+    - Bas-floor på 20% om minst 1 matchning (ingen "0" från kraschpoäng)
+    - Hard-blocker-straff sänkt 15 → 10 per blockerare
+    - Om inga must-have keywords finns flyttas vikten över till should_have
+    """
+    if must_total == 0:
+        weights = {'must': 0.0, 'should': 0.55, 'transferable': 0.28, 'soft': 0.17}
+    else:
+        weights = {'must': 0.40, 'should': 0.25, 'transferable': 0.20, 'soft': 0.15}
+
+    soft_must_pct   = _soften_pct(must_pct,   must_matched)
+    soft_should_pct = _soften_pct(should_pct, should_matched)
+
+    raw = (
+        soft_must_pct  * weights['must']        +
+        soft_should_pct* weights['should']      +
+        transferable   * weights['transferable']+
+        soft_skills    * weights['soft']
+    )
+    penalty = hard_blockers_unsatisfied * 10
+    return max(0, min(100, round(raw - penalty)))
+
+
+def _build_keyword_summary_for_llm(must_matches: list, should_matches: list,
+                                   nice_matches: list, hard_matches: list,
+                                   must_pct: int, should_pct: int) -> str:
+    """Kompakt textsammanfattning av keyword-matchning att skicka till rekryterar-LLM:en."""
+    def _fmt(items, label):
+        if not items:
+            return f"{label}: (inga)"
+        found = [i['term'] for i in items if i['found']]
+        missing = [i['term'] for i in items if not i['found']]
+        return (f"{label} ({len(found)}/{len(items)} matchade):\n"
+                f"  ✓ {', '.join(found) if found else '—'}\n"
+                f"  ✗ {', '.join(missing) if missing else '—'}")
+
+    blockers_unsat = [h['requirement'] for h in hard_matches if not h['satisfied']]
+    blocker_line = (f"\nHÅRDA BLOCKERARE EJ UPPFYLLDA: {', '.join(blockers_unsat)}"
+                    if blockers_unsat else "\nHÅRDA BLOCKERARE: alla uppfyllda")
+    return (
+        f"{_fmt(must_matches, 'MUST-HAVE')} ({must_pct}%)\n\n"
+        f"{_fmt(should_matches, 'SHOULD-HAVE')} ({should_pct}%)\n\n"
+        f"{_fmt(nice_matches, 'NICE-TO-HAVE')}"
+        f"{blocker_line}"
+    )
+
+
 def _get_cv_text() -> str:
-    """Extract plain text summary from resume YAML for ATS analysis"""
-    resume = load_yaml(RESUME_YAML)
+    """Extract plain text summary from resume YAML for ATS analysis (legacy fallback)."""
+    resume = load_yaml(RESUME_YAML())
     parts = []
     pi = resume.get('personal_information', {})
     if pi.get('name'):
@@ -2065,7 +2461,6 @@ def _get_cv_text() -> str:
     if resume.get('professional_summary'):
         parts.append(f"Sammanfattning: {resume['professional_summary']}")
 
-    # technical_skills är en dict med undernycklar (software, operating_systems, etc.)
     tech = resume.get('technical_skills', {})
     all_skills = []
     if isinstance(tech, dict):
@@ -2075,14 +2470,12 @@ def _get_cv_text() -> str:
     if all_skills:
         parts.append(f"Tekniska kompetenser: {', '.join(str(s) for s in all_skills)}")
 
-    # experience_details (inte work_experience)
     for exp in resume.get('experience_details', [])[:5]:
         if isinstance(exp, dict):
             pos = exp.get('position', '')
             comp = exp.get('company', '')
             period = exp.get('employment_period', '')
             parts.append(f"Erfarenhet: {pos} på {comp} ({period})")
-            # Inkludera nyckelansvar och tekniker
             for resp in exp.get('key_responsibilities', [])[:3]:
                 if isinstance(resp, dict):
                     parts.append(f"  - {resp.get('responsibility', '')}")
@@ -2092,7 +2485,6 @@ def _get_cv_text() -> str:
             if skills_acq:
                 parts.append(f"  Tekniker: {', '.join(str(s) for s in skills_acq[:8])}")
 
-    # education_details (inte education)
     for edu in resume.get('education_details', [])[:3]:
         if isinstance(edu, dict):
             level = edu.get('education_level', '')
@@ -2106,9 +2498,199 @@ def _get_cv_text() -> str:
     return '\n'.join(parts)
 
 
+def _get_cv_full_text(job_folder: Path) -> str:
+    """Hämta så fullständig CV-text som möjligt för keyword-matchning.
+
+    Prio 1: Den genererade jobb-skräddarsydda CV-PDF:n i job_folder (det är den
+            text en riktig ATS skulle skanna). Matchar både CV.pdf och CV_*.pdf.
+    Prio 2: Utökad YAML-dump utan trunkering (alla erfarenheter, alla ansvar,
+            kurser från utbildning, cover_letter_profile).
+    """
+    cv_pdfs = sorted(
+        [f for f in job_folder.glob('CV*.pdf') if f.is_file()],
+        key=lambda f: f.stat().st_mtime, reverse=True
+    )
+    if cv_pdfs:
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(cv_pdfs[0]))
+            text = '\n'.join(page.extract_text() or '' for page in reader.pages).strip()
+            if text:
+                return text
+        except Exception:
+            pass
+
+    # Fallback: full YAML-dump (utan att kapa till 3-5 entries som _get_cv_text).
+    # Inkluderar professional_summary, cover_letter_profile, alla erfarenheter,
+    # alla kurser/spec från utbildning, projekt — för att maximera literal-träffar.
+    resume = load_yaml(RESUME_YAML())
+    parts = []
+    pi = resume.get('personal_information', {})
+    if pi.get('name'):
+        parts.append(f"{pi.get('name','')} {pi.get('surname','')}")
+    # Vissa CV-mallar visar en titel/rubrik som "FULLSTACKUTVECKLARE" — försök
+    # läsa både vanliga nyckelnamn och fall tillbaka på senaste rolltiteln.
+    for key in ('headline', 'subtitle', 'title', 'role_title', 'profession'):
+        v = pi.get(key) if isinstance(pi, dict) else None
+        if v:
+            parts.append(str(v))
+    exp_list = resume.get('experience_details', []) or []
+    if exp_list and isinstance(exp_list[0], dict):
+        first_pos = exp_list[0].get('position', '')
+        if first_pos:
+            parts.append(first_pos)
+
+    if resume.get('professional_summary'):
+        parts.append(resume['professional_summary'])
+    if resume.get('cover_letter_profile'):
+        parts.append(str(resume['cover_letter_profile']))
+
+    tech = resume.get('technical_skills', {})
+    if isinstance(tech, dict):
+        for cat, vals in tech.items():
+            if isinstance(vals, list) and vals:
+                parts.append(f"{cat}: {', '.join(str(s) for s in vals)}")
+
+    for exp in exp_list:
+        if not isinstance(exp, dict):
+            continue
+        parts.append(
+            f"\n{exp.get('position', '')} — {exp.get('company', '')} "
+            f"({exp.get('employment_period', '')})"
+        )
+        for resp in exp.get('key_responsibilities', []) or []:
+            if isinstance(resp, dict):
+                parts.append(f"- {resp.get('responsibility', '')}")
+            elif isinstance(resp, str):
+                parts.append(f"- {resp}")
+        skills_acq = exp.get('skills_acquired', []) or []
+        if skills_acq:
+            parts.append(f"Tekniker: {', '.join(str(s) for s in skills_acq)}")
+
+    for edu in resume.get('education_details', []) or []:
+        if not isinstance(edu, dict):
+            continue
+        parts.append(
+            f"\n{edu.get('education_level','')} {edu.get('field_of_study','')} "
+            f"— {edu.get('institution','')}"
+        )
+        ai = edu.get('additional_info') or {}
+        if isinstance(ai, dict):
+            for v in ai.values():
+                if v:
+                    parts.append(str(v))
+
+    for proj in resume.get('projects', []) or []:
+        if isinstance(proj, dict):
+            parts.append(f"\nProjekt: {proj.get('name','')} — {proj.get('description','')}")
+
+    return '\n'.join(parts)
+
+
+# Kända signaturer för bot-fallback-beskrivningar genererade av modern_facade.py
+# när scrapern blockerats av captcha eller fått tom text.
+_PLACEHOLDER_PATTERNS = [
+    'vi söker en engagerad medarbetare',
+    'tjänsten kräver teknisk kompetens och erfarenhet av webbutveckling',
+]
+
+
+def _is_placeholder_description(text: str) -> bool:
+    """Returnera True om beskrivningen är en känd bot-fallback eller för kort/innehållslös
+    för att meningsfullt analyseras."""
+    if not text:
+        return True
+    t = text.strip().lower()
+    # Kortare än 400 tecken indikerar att riktig annonstext inte hämtades
+    # (riktiga annonser är typiskt 1500-5000 tecken).
+    if len(t) < 400:
+        return True
+    if any(p in t for p in _PLACEHOLDER_PATTERNS):
+        return True
+    return False
+
+
+def _extract_url_from_job_info(job_folder: Path) -> str:
+    """Hämta sparad jobb-URL från job_info.txt (rad-format 'Indeed URL:', 'LinkedIn URL:' osv)."""
+    info = job_folder / 'job_info.txt'
+    if not info.exists():
+        return ''
+    for line in info.read_text(encoding='utf-8').split('\n'):
+        if ' URL:' in line:
+            url = line.split(' URL:', 1)[1].strip()
+            if url.startswith('http'):
+                return url
+    return ''
+
+
+def _fetch_job_description_from_url(url: str) -> str:
+    """Försök hämta annonsen direkt från URL:en med browser-headers (en shot, kort timeout).
+    Returnerar ren text om vi får > 800 tecken meningsfull innehåll, annars tom sträng.
+    Detta körs server-side när scraper-fallback detekteras så användaren slipper klistra in."""
+    if not url:
+        return ''
+    try:
+        import requests
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return ''
+
+    headers = {
+        'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                       'AppleWebKit/537.36 (KHTML, like Gecko) '
+                       'Chrome/124.0.0.0 Safari/537.36'),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        if r.status_code != 200:
+            return ''
+        soup = BeautifulSoup(r.text, 'html.parser')
+        for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
+            tag.decompose()
+        # Föredra konkreta annons-containers om de finns (Indeed/LinkedIn/Teamtailor)
+        for sel in ['#jobDescriptionText', '.jobsearch-jobDescriptionText',
+                    '.show-more-less-html', '[data-test-id="job-description"]',
+                    'article', 'main']:
+            el = soup.select_one(sel)
+            if el:
+                text = ' '.join(el.get_text(' ', strip=True).split())
+                if len(text) > 800:
+                    return text[:10000]
+        # Fallback: hela body
+        text = ' '.join(soup.get_text(' ', strip=True).split())
+        if len(text) > 800:
+            return text[:10000]
+    except Exception:
+        return ''
+    return ''
+
+
+def _llm_json_call(prompt_text: str, temperature: float) -> dict:
+    """Anropa LLM och parsa JSON-svar. Strippar markdown-fences."""
+    from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+
+    llm    = get_llm(temperature=temperature)
+    prompt = ChatPromptTemplate.from_messages([("human", "{prompt}")])
+    chain  = prompt | llm | StrOutputParser()
+    raw    = chain.invoke({'prompt': prompt_text})
+    raw    = re.sub(r'^```(?:json)?', '', raw.strip(), flags=re.MULTILINE)
+    raw    = re.sub(r'```$', '', raw.strip(), flags=re.MULTILINE)
+    return json.loads(raw.strip())
+
+
 @app.route('/api/ats-score/generate', methods=['POST'])
 def api_ats_generate():
-    """Generate ATS score for a job folder using LLM"""
+    """Generate ATS score via 3-pass pipeline:
+       1) LLM extraherar keywords + hårda krav från annons
+       2) Deterministisk keyword-matchning i full CV-text
+       3) LLM bedömer transferable + soft skills, ger konkreta rekommendationer
+       Slutpoäng är viktad formel — inte LLM-satt."""
     data   = request.get_json(silent=True) or {}
     folder = data.get('folder', '').strip()
 
@@ -2119,7 +2701,6 @@ def api_ats_generate():
     if not job_folder.exists():
         return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
 
-    # Check cache first (unless force regenerate)
     score_file = job_folder / 'ats_score.json'
     if score_file.exists() and not data.get('force'):
         try:
@@ -2127,56 +2708,127 @@ def api_ats_generate():
         except Exception:
             pass
 
-    # Load job description
     desc_file = job_folder / 'job_description.txt'
-    if desc_file.exists():
-        job_description = desc_file.read_text(encoding='utf-8').strip()
-    else:
-        job_description = ''
+    job_description = desc_file.read_text(encoding='utf-8').strip() if desc_file.exists() else ''
 
-    # Parse job metadata
     job = parse_job_folder(job_folder)
     job_title = job.get('title', '')
     company   = job.get('company', '')
 
     if not job_description:
-        # No description saved — return a placeholder encouraging future use
         return jsonify({
             'ok': False,
             'error': 'Ingen jobbeskrivning sparad för detta jobb. Kommande jobb sparas automatiskt.',
             'no_description': True
         }), 422
 
-    # Build CV text
-    cv_text = _get_cv_text()
+    if _is_placeholder_description(job_description):
+        # Auto-fetch: försök hämta annonsen direkt från sparad URL.
+        # Användaren ska inte behöva fylla i något — en knapptryckning räcker.
+        url = _extract_url_from_job_info(job_folder)
+        fetched = _fetch_job_description_from_url(url) if url else ''
+        if fetched and not _is_placeholder_description(fetched):
+            job_description = fetched
+            desc_file.write_text(fetched, encoding='utf-8')
+        else:
+            return jsonify({
+                'ok': False,
+                'error': ('Annonstexten är inte fullständigt sparad och kunde inte hämtas automatiskt '
+                          '(källsidan blockerade förfrågan). Försök igen senare.'),
+                'placeholder_detected': True,
+            }), 422
+
+    cv_text = _get_cv_full_text(job_folder)
     if not cv_text:
         return jsonify({'ok': False, 'error': 'CV saknas — fyll i ditt CV först'}), 422
 
-    # Call LLM
     try:
-        from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import StrOutputParser
+        # ── Pass 1: Keyword-extraktion (temp=0 för deterministisk extraktion)
+        kw = _llm_json_call(
+            _build_keyword_extraction_prompt(job_description, job_title, company),
+            temperature=0.0
+        )
 
-        llm    = get_llm(temperature=0.1)
-        prompt = ChatPromptTemplate.from_messages([
-            ("human", "{prompt}")
-        ])
-        chain  = prompt | llm | StrOutputParser()
-        raw    = chain.invoke({'prompt': _build_ats_prompt(cv_text, job_description, job_title, company)})
+        # ── Pass 2: Deterministisk matchning
+        cv_lower = _normalize_for_match(cv_text)
+        must_matches   = _match_keyword_list(kw.get('must_have', []),   cv_lower)
+        should_matches = _match_keyword_list(kw.get('should_have', []), cv_lower)
+        nice_matches   = _match_keyword_list(kw.get('nice_to_have', []), cv_lower)
+        hard_matches   = _match_hard_requirements(kw.get('hard_requirements', []), cv_lower)
 
-        # Strip markdown fences if present
-        raw = re.sub(r'^```(?:json)?', '', raw.strip(), flags=re.MULTILINE)
-        raw = re.sub(r'```$', '', raw.strip(), flags=re.MULTILINE)
-        result = json.loads(raw.strip())
+        must_found    = sum(1 for m in must_matches   if m['found'])
+        should_found  = sum(1 for m in should_matches if m['found'])
+        nice_found    = sum(1 for m in nice_matches   if m['found'])
+        must_pct      = _pct(must_found,   len(must_matches))
+        should_pct    = _pct(should_found, len(should_matches))
+        nice_pct      = _pct(nice_found,   len(nice_matches))
+        blockers_unsat = sum(1 for h in hard_matches if not h['satisfied'])
 
-        # Validate and clamp score
-        result['score'] = max(0, min(100, int(result.get('score', 0))))
-        result['folder'] = folder
+        # ── Pass 3: Rekryterar-bedömning (transferable + soft skills + rekommendationer)
+        kw_summary = _build_keyword_summary_for_llm(
+            must_matches, should_matches, nice_matches, hard_matches,
+            must_pct, should_pct
+        )
+        rec = _llm_json_call(
+            _build_recruiter_assessment_prompt(
+                cv_text, job_description, job_title, company, kw_summary
+            ),
+            temperature=0.1
+        )
+        transferable = max(0, min(100, int(rec.get('transferable_score', 50))))
+        soft_skills  = max(0, min(100, int(rec.get('soft_skills_score', 50))))
 
-        # Cache result
+        # ── Composite score (deterministisk viktning + sqrt-mjukning)
+        composite = _compute_composite_score(
+            must_pct, should_pct, transferable, soft_skills,
+            len(must_matches), blockers_unsat,
+            must_matched=must_found, should_matched=should_found
+        )
+
+        # ── Backwards-compat fält (matched_skills / missing_skills / recommendations som strängar)
+        matched_skills_flat = [m['term'] for m in must_matches + should_matches if m['found']][:8]
+        missing_skills_flat = [m['term'] for m in must_matches + should_matches if not m['found']][:6]
+        recs_raw = rec.get('recommendations', []) or []
+        recommendations_flat = []
+        for r in recs_raw:
+            if isinstance(r, dict):
+                action = r.get('action', '').strip()
+                where  = r.get('where', '').strip()
+                txt    = r.get('suggested_text', '').strip()
+                bits   = [action]
+                if where:
+                    bits.append(f"[{where}]")
+                if txt:
+                    bits.append(f"→ \"{txt}\"")
+                recommendations_flat.append(' '.join(bits))
+            elif isinstance(r, str):
+                recommendations_flat.append(r)
+
+        result = {
+            'folder': folder,
+            'score':  composite,
+            'score_breakdown': {
+                'must_have':    {'matched': must_found,   'total': len(must_matches),   'pct': must_pct,   'weight': 0.40 if must_matches else 0.0},
+                'should_have':  {'matched': should_found, 'total': len(should_matches), 'pct': should_pct, 'weight': 0.25 if must_matches else 0.55},
+                'nice_to_have': {'matched': nice_found,   'total': len(nice_matches),   'pct': nice_pct,   'weight': 0.0},
+                'transferable': {'score': transferable, 'weight': 0.20 if must_matches else 0.28, 'reasoning': rec.get('transferable_reasoning', '')},
+                'soft_skills':  {'score': soft_skills,  'weight': 0.15 if must_matches else 0.17, 'reasoning': rec.get('soft_skills_reasoning', '')},
+                'hard_blockers_unsatisfied': blockers_unsat,
+                'penalty_applied': blockers_unsat * 10,
+            },
+            'keywords_must':   must_matches,
+            'keywords_should': should_matches,
+            'keywords_nice':   nice_matches,
+            'hard_blockers':   hard_matches,
+            'recommendations_structured': recs_raw,
+            # Backwards-compat:
+            'matched_skills':  matched_skills_flat,
+            'missing_skills':  missing_skills_flat,
+            'recommendations': recommendations_flat,
+            'summary':         rec.get('summary', ''),
+        }
+
         score_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-
         return jsonify({'ok': True, **result})
 
     except json.JSONDecodeError as e:

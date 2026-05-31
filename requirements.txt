@@ -1,4 +1,13 @@
 click
+flask>=3.0.0
+flask-login>=0.6.3
+flask-sqlalchemy>=3.1.1
+flask-migrate>=4.0.7
+flask-wtf>=1.2.1
+argon2-cffi>=23.1.0
+cryptography>=42.0.5
+gunicorn>=22.0.0
+
 # Internal resume builder library - replaced with local implementation
 httpx~=0.27.2
 inputimeout==1.0.4

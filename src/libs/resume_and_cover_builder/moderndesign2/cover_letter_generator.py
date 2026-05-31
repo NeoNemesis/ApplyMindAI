@@ -32,8 +32,6 @@ class ModernDesign2CoverLetterGenerator:
         """Hämtar profilbild"""
         try:
             possible_paths = [
-                "assets/victorvilches.png",
-                "assets/Vilchesab.png",
                 "data_folder/profil_no_bg.png",
                 "data_folder/profil.jpg",
                 "data_folder/profile.png"
@@ -82,19 +80,19 @@ class ModernDesign2CoverLetterGenerator:
         try:
             personal_info = self.resume_object.personal_information
             if not personal_info:
-                return "Victor Vilches C.", self._get_fallback_contact()
+                return "[Name]", self._get_fallback_contact()
             
-            name = getattr(personal_info, 'name', 'Victor')
-            surname = getattr(personal_info, 'surname', 'Vilches')
+            name = getattr(personal_info, 'name', '')
+            surname = getattr(personal_info, 'surname', '')
             full_name = f"{name} {surname} C."
             
-            email = getattr(personal_info, 'email', 'victorvilches@protonmail.com')
-            phone = getattr(personal_info, 'phone', '707978547')
-            address = getattr(personal_info, 'address', 'Kvarnängsgatan 24')
+            email = getattr(personal_info, 'email', '')
+            phone = getattr(personal_info, 'phone', '')
+            address = getattr(personal_info, 'address', '')
             city = getattr(personal_info, 'city', 'Uppsala')
             zip_code = getattr(personal_info, 'zip_code', '75420')
             country = getattr(personal_info, 'country', 'Sverige')
-            website = getattr(personal_info, 'website', 'vilchesab.se')
+            website = getattr(personal_info, 'website', '')
             
             # Kontaktinfo med gradient ikoner
             contact_parts = []
@@ -109,7 +107,7 @@ class ModernDesign2CoverLetterGenerator:
             
         except Exception as e:
             logger.error(f"❌ Fel vid personlig info: {e}")
-            return "Victor Vilches C.", self._get_fallback_contact()
+            return "[Name]", self._get_fallback_contact()
     
     def _get_fallback_contact(self) -> str:
         """Fallback kontakt"""

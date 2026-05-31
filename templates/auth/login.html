@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logga in — ApplyMind AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:       #4AE54A;
+      --green-glow:  rgba(74,229,74,0.18);
+      --bg:          #111111;
+      --surface:     #1a1a1a;
+      --surface2:    #222222;
+      --border:      #2a2a2a;
+      --border-focus:#404040;
+      --text:        #e8e8e8;
+      --muted:       #777777;
+      --error:       #EF4444;
+      --error-bg:    rgba(239,68,68,0.08);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(74,229,74,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74,229,74,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .login-card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    /* Green top accent line */
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 10%; right: 10%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      border-radius: 1px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--green-glow);
+      border: 1px solid rgba(74,229,74,0.3);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--green);
+    }
+
+    .logo-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .logo-version {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    /* Error banner */
+    .error-banner {
+      background: var(--error-bg);
+      border: 1px solid rgba(239,68,68,0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--error);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: shake 0.4s cubic-bezier(0.36,0.07,0.19,0.97);
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%       { transform: translateX(-6px); }
+      40%       { transform: translateX(6px); }
+      60%       { transform: translateX(-4px); }
+      80%       { transform: translateX(4px); }
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+
+    input[type="email"],
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    input:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px var(--green-glow);
+    }
+
+    input::placeholder { color: var(--muted); }
+
+    .remember-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 18px 0 24px;
+    }
+
+    .remember-row input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--green);
+      cursor: pointer;
+    }
+
+    .remember-row label {
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      margin: 0;
+      cursor: pointer;
+      font-weight: 400;
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--green);
+      color: #111;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 160ms ease, transform 100ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-login:hover   { background: #38c438; }
+    .btn-login:active  { transform: scale(0.98); }
+    .btn-login:disabled {
+      background: #2a3d2a;
+      color: #4a6b4a;
+      cursor: not-allowed;
+    }
+
+    .footer-text {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 24px;
+      line-height: 1.6;
+    }
+
+    .footer-text a {
+      color: var(--green);
+      text-decoration: none;
+      opacity: 0.8;
+    }
+
+    .footer-text a:hover { opacity: 1; }
+
+    /* Spinner for loading state */
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(0,0,0,0.3);
+      border-top-color: #111;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-login.loading .spinner { display: block; }
+    .btn-login.loading .btn-text { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .error-banner { animation: none; }
+      .spinner { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">ApplyMind AI</div>
+        <div class="logo-version">Jobbansökan automation</div>
+      </div>
+    </div>
+
+    <h1>Logga in</h1>
+    <p class="subtitle">Ange dina uppgifter för att fortsätta.</p>
+
+    {% if error %}
+    <div class="error-banner" role="alert">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('auth.login') }}{% if request.args.get('next') %}?next={{ request.args.get('next') }}{% endif %}"
+          id="login-form" novalidate>
+
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+      <div class="form-group">
+        <label for="email">E-post eller användarnamn</label>
+        <input
+          type="text"
+          id="email"
+          name="email"
+          autocomplete="username"
+          placeholder="din@epost.se"
+          required
+          {% if error %}autofocus{% endif %}
+          value="{{ request.form.get('email', '') }}"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="password">Lösenord</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          autocomplete="current-password"
+          placeholder="••••••••"
+          required
+          {% if not error %}autofocus{% endif %}
+        >
+      </div>
+
+      <div class="remember-row">
+        <input type="checkbox" id="remember" name="remember"
+               {% if request.form.get('remember') %}checked{% endif %}>
+        <label for="remember">Kom ihåg mig i 30 dagar</label>
+      </div>
+
+      <button type="submit" class="btn-login" id="login-btn"
+              {% if rate_wait %}disabled{% endif %}>
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="btn-text">
+          {% if rate_wait %}
+            Vänta {{ rate_wait }}s...
+          {% else %}
+            Logga in
+          {% endif %}
+        </span>
+      </button>
+    </form>
+
+    <p class="footer-text">
+      Inget konto? Kontakta administratören.<br>
+      <a href="/">← Tillbaka till startsidan</a>
+    </p>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function() {
+      const btn = document.getElementById('login-btn');
+      if (!btn.disabled) {
+        btn.classList.add('loading');
+        btn.disabled = true;
+      }
+    });
+
+    {% if rate_wait and rate_wait > 0 %}
+    // Countdown timer
+    let wait = {{ rate_wait }};
+    const btn = document.getElementById('login-btn');
+    const txtEl = btn.querySelector('.btn-text');
+    const timer = setInterval(() => {
+      wait--;
+      if (wait <= 0) {
+        clearInterval(timer);
+        btn.disabled = false;
+        txtEl.textContent = 'Logga in';
+      } else {
+        txtEl.textContent = 'Vänta ' + wait + 's...';
+      }
+    }, 1000);
+    {% endif %}
+  </script>
+</body>
+</html>

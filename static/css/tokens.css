@@ -1,0 +1,108 @@
+/* ============================================================
+   ApplyMind AI — Design Tokens v1.0
+   Single source of truth. Import this first in style.css.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────── */
+  --color-primary:          #4AE54A;
+  --color-primary-hover:    #38c438;
+  --color-primary-dim:      #2fa82f;
+  --color-primary-glow:     rgba(74, 229, 74, 0.15);
+  --color-primary-glow-lg:  rgba(74, 229, 74, 0.25);
+  --color-secondary:        #1de9b6;
+
+  /* ── Backgrounds ────────────────────────────────────────── */
+  --color-bg:               #111111;
+  --color-surface:          #1a1a1a;
+  --color-surface-raised:   #212121;
+  --color-surface-overlay:  #2C2C2C;
+  --color-input:            #333333;
+
+  /* ── Borders ────────────────────────────────────────────── */
+  --color-border:           #2a2a2a;
+  --color-border-hover:     #404040;
+  --color-border-focus:     var(--color-primary);
+
+  /* ── Text ───────────────────────────────────────────────── */
+  --color-text:             #e8e8e8;
+  --color-text-secondary:   #888888;
+  --color-text-disabled:    #555555;
+
+  /* ── Status ─────────────────────────────────────────────── */
+  --color-success:          #4AE54A;
+  --color-warning:          #F59E0B;
+  --color-error:            #EF4444;
+  --color-info:             #3B82F6;
+  --color-purple:           #8B5CF6;
+
+  /* ── Tracker status ─────────────────────────────────────── */
+  --color-status-new:       #3B82F6;
+  --color-status-applied:   #8B5CF6;
+  --color-status-response:  #F59E0B;
+  --color-status-interview: #4AE54A;
+  --color-status-offer:     #1de9b6;
+  --color-status-rejected:  #EF4444;
+
+  /* ── Typography ─────────────────────────────────────────── */
+  --font-family:    'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --text-xs:        11px;
+  --text-sm:        13px;
+  --text-base:      14px;
+  --text-md:        15px;
+  --text-lg:        17px;
+  --text-xl:        20px;
+  --text-2xl:       24px;
+  --text-3xl:       28px;
+  --font-normal:    400;
+  --font-medium:    500;
+  --font-semibold:  600;
+  --font-bold:      700;
+  --leading-tight:  1.25;
+  --leading-base:   1.5;
+
+  /* ── Spacing (8px grid) ─────────────────────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+
+  /* ── Radius ─────────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   10px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* ── Elevation ──────────────────────────────────────────── */
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md:   0 4px 12px rgba(0,0,0,0.5);
+  --shadow-lg:   0 8px 24px rgba(0,0,0,0.6);
+  --shadow-glow: 0 0 18px var(--color-primary-glow);
+
+  /* ── Motion ─────────────────────────────────────────────── */
+  --duration-fast:   100ms;
+  --duration-base:   160ms;
+  --duration-slow:   220ms;
+  --ease-out:  cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-inout: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  --sidebar-width:    240px;
+  --topbar-height:    52px;
+  --content-max:      1280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
