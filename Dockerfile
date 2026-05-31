@@ -7,10 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir gunicorn psycopg2-binary
+# Python dependencies (production subset — exkluderar selenium, torch, pytest)
+COPY requirements.production.txt .
+RUN pip install --no-cache-dir -r requirements.production.txt
 
 # App source
 COPY . .
