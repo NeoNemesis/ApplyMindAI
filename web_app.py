@@ -575,16 +575,32 @@ def require_login():
 
 
 # ============================================================
-# SETUP CHECK — redirect new users to wizard
+# SETUP CHECK — ny användare utan API-nyckel → setup, men kan skippa
 # ============================================================
 @app.before_request
 def check_setup():
-    # Skip auth routes
     if request.endpoint in _PUBLIC_ENDPOINTS:
         return None
-    allowed = ['/setup', '/static', '/api/found-jobs', '/auth/']
-    if not is_setup_complete() and not any(request.path.startswith(p) for p in allowed):
+    setup_done = is_setup_complete() or session.get('setup_skipped')
+    g.setup_needed = not setup_done
+    allowed = ['/setup', '/static', '/auth/']
+    if not setup_done and not any(request.path.startswith(p) for p in allowed):
         return redirect(url_for('setup'))
+
+
+@app.route('/setup/skip', methods=['POST'])
+@login_required
+def setup_skip():
+    session['setup_skipped'] = True
+    session.permanent = True
+    return redirect(url_for('index'))
+
+
+@app.route('/setup/skip', methods=['POST'])
+@login_required
+def setup_skip():
+    session['setup_skipped'] = True
+    return redirect(request.referrer or url_for('index'))
 
 
 # ============================================================
