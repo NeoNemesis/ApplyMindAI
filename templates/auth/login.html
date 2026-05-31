@@ -317,10 +317,13 @@
         >
       </div>
 
-      <div class="remember-row">
-        <input type="checkbox" id="remember" name="remember"
-               {% if request.form.get('remember') %}checked{% endif %}>
-        <label for="remember">Kom ihåg mig i 30 dagar</label>
+      <div class="remember-row" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" id="remember" name="remember"
+                 {% if request.form.get('remember') %}checked{% endif %}>
+          <label for="remember" style="margin:0;">Kom ihåg mig i 30 dagar</label>
+        </div>
+        <a href="/auth/forgot-password" style="font-size:12px;color:var(--muted);text-decoration:none;">Glömt lösenordet?</a>
       </div>
 
       <button type="submit" class="btn-login" id="login-btn"
