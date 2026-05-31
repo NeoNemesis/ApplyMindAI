@@ -1,0 +1,13 @@
+[Unit]
+Description=ApplyMind AI — Auto-deploy från GitHub master
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/applymind/scripts/auto-deploy.sh
+Environment=REPO=/opt/applymind
+Environment=LOG=/var/log/applymind-deploy.log
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=300
