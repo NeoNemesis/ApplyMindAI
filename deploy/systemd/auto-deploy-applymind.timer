@@ -1,0 +1,12 @@
+[Unit]
+Description=ApplyMind AI — Pollar GitHub var 2:a minut
+Requires=auto-deploy-applymind.service
+
+[Timer]
+OnBootSec=30sec
+OnUnitActiveSec=2min
+AccuracySec=10sec
+Unit=auto-deploy-applymind.service
+
+[Install]
+WantedBy=timers.target
