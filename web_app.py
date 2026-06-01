@@ -1095,6 +1095,7 @@ def search_run():
                         break
                     search_queue.put(('progress', f'{i}/{len(jobs)}'))
                     search_queue.put(('output', f'\n[{i}/{len(jobs)}] 📄 {job["title"]} @ {job["company"]}\n'))
+                    _enforce_job_quota()   # Radera äldst om kvot (50) uppnåtts
                     ok = jm.generate_documents_for_job(
                         job, i,
                         ats_filter=ats_filter_enabled,
@@ -1392,6 +1393,97 @@ def view_pdf_legacy(subpath):
     if len(parts) == 2:
         return redirect(f'/view-pdf?folder={parts[0]}&filename={parts[1]}')
     return 'Ogiltig URL', 400
+
+
+# ── Jobbkvot ────────────────────────────────────────────────────────────────
+JOB_QUOTA = 50  # Max antal jobbmappar per användare
+
+def _enforce_job_quota():
+    """Ta bort de äldsta jobbmapparna om kvoten (50) överskrids.
+    Kallas innan varje nytt jobb sparas."""
+    out_dir = _user_output_dir()
+    if not out_dir.exists():
+        return
+    folders = sorted(
+        [f for f in out_dir.iterdir() if f.is_dir()],
+        key=lambda f: f.name   # Job_001_ prefix → äldst har lägst nummer
+    )
+    while len(folders) >= JOB_QUOTA:
+        oldest = folders.pop(0)
+        shutil.rmtree(oldest, ignore_errors=True)
+
+
+def _job_quota_status() -> dict:
+    """Returnerar {'count': int, 'quota': int, 'pct': int}."""
+    out_dir = _user_output_dir()
+    count = sum(1 for f in out_dir.iterdir() if f.is_dir()) if out_dir.exists() else 0
+    return {'count': count, 'quota': JOB_QUOTA, 'pct': round(count / JOB_QUOTA * 100)}
+
+
+def _build_zip(folders_and_files: list, single_folder: bool = False) -> 'io.BytesIO':
+    """Bygg ZIP i minne från lista av (folder_path, arcname_prefix)."""
+    import zipfile, io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for folder_path, prefix in folders_and_files:
+            for f in folder_path.iterdir():
+                if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
+                    arcname = f.name if single_folder else f'{prefix}/{f.name}'
+                    zf.write(f, arcname)
+    buf.seek(0)
+    return buf
+
+
+@app.route('/api/jobs/download-zip')
+@login_required
+def download_job_zip():
+    """Ladda ner ett jobb som ZIP. ?delete=1 raderar mappen efter nedladdning."""
+    folder = request.args.get('folder', '').strip()
+    delete = request.args.get('delete', '0') == '1'
+    if not folder or '..' in folder or '/' in folder or '\\' in folder:
+        return 'Ogiltig mapp', 400
+    job_folder = _user_output_dir() / folder
+    if not job_folder.exists():
+        return 'Mappen finns inte', 404
+
+    buf = _build_zip([(job_folder, folder)], single_folder=True)
+    safe_name = "".join(c for c in folder if c.isalnum() or c in (' ', '-', '_')).strip()
+
+    if delete:
+        shutil.rmtree(job_folder, ignore_errors=True)
+
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'{safe_name}.zip')
+
+
+@app.route('/api/jobs/download-all-zip')
+@login_required
+def download_all_jobs_zip():
+    """Ladda ner alla jobb som ZIP. ?delete=1 raderar alla mappar efter nedladdning."""
+    delete = request.args.get('delete', '0') == '1'
+    out_dir = _user_output_dir()
+    if not out_dir.exists():
+        return 'Inga jobb att ladda ner', 404
+
+    job_folders = [(f, f.name) for f in sorted(out_dir.iterdir()) if f.is_dir()]
+    if not job_folders:
+        return 'Inga jobb att ladda ner', 404
+
+    buf = _build_zip(job_folders)
+
+    if delete:
+        for folder_path, _ in job_folders:
+            shutil.rmtree(folder_path, ignore_errors=True)
+
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name='applymind-alla-jobb.zip')
+
+
+@app.route('/api/jobs/quota')
+@login_required
+def api_job_quota():
+    """Returnerar kvot-status för inloggad användare."""
+    return jsonify(_job_quota_status())
 
 
 @app.route('/api/jobs')
@@ -2637,48 +2729,94 @@ def _extract_url_from_job_info(job_folder: Path) -> str:
 
 
 def _fetch_job_description_from_url(url: str) -> str:
-    """Försök hämta annonsen direkt från URL:en med browser-headers (en shot, kort timeout).
-    Returnerar ren text om vi får > 800 tecken meningsfull innehåll, annars tom sträng.
-    Detta körs server-side när scraper-fallback detekteras så användaren slipper klistra in."""
+    """Hämtar jobbannons från URL. Försöker requests först, sen Playwright (headless Chrome)
+    som fallback för JS-renderade sidor som Indeed, LinkedIn m.fl."""
     if not url:
         return ''
-    try:
-        import requests
-        from bs4 import BeautifulSoup
-    except ImportError:
-        return ''
 
-    headers = {
-        'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                       'AppleWebKit/537.36 (KHTML, like Gecko) '
-                       'Chrome/124.0.0.0 Safari/537.36'),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache',
-    }
-    try:
-        r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
-        if r.status_code != 200:
-            return ''
-        soup = BeautifulSoup(r.text, 'html.parser')
+    # Selektorer för jobbeskrivning-container på vanliga jobbsajter
+    _DESC_SELECTORS = [
+        '#jobDescriptionText',
+        '.jobsearch-jobDescriptionText',
+        '[data-testid="jobsearch-JobComponent-description"]',
+        '.show-more-less-html__markup',
+        '[data-test-id="job-description"]',
+        '.job-description',
+        'article',
+        'main',
+    ]
+
+    def _extract_from_html(html: str) -> str:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
         for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
             tag.decompose()
-        # Föredra konkreta annons-containers om de finns (Indeed/LinkedIn/Teamtailor)
-        for sel in ['#jobDescriptionText', '.jobsearch-jobDescriptionText',
-                    '.show-more-less-html', '[data-test-id="job-description"]',
-                    'article', 'main']:
+        for sel in _DESC_SELECTORS:
             el = soup.select_one(sel)
             if el:
                 text = ' '.join(el.get_text(' ', strip=True).split())
-                if len(text) > 800:
-                    return text[:10000]
-        # Fallback: hela body
+                if len(text) > 400:
+                    return text[:12000]
         text = ' '.join(soup.get_text(' ', strip=True).split())
-        if len(text) > 800:
-            return text[:10000]
+        return text[:12000] if len(text) > 400 else ''
+
+    # ── Försök 1: requests (snabb, funkar för statiska sidor) ──────────────
+    try:
+        import requests
+        headers = {
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/124.0.0.0 Safari/537.36'),
+            'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+            'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+        }
+        r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        if r.status_code == 200:
+            text = _extract_from_html(r.text)
+            if text and not _is_placeholder_description(text):
+                return text
     except Exception:
-        return ''
+        pass
+
+    # ── Försök 2: Playwright (headless Chrome — kör JS, hanterar cookies) ──
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
+            page = browser.new_page(
+                user_agent=('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                             'AppleWebKit/537.36 (KHTML, like Gecko) '
+                             'Chrome/124.0.0.0 Safari/537.36')
+            )
+            # Blockera bilder/fonts för snabbhet
+            page.route('**/*.{png,jpg,gif,svg,woff,woff2,ttf}', lambda r: r.abort())
+            page.goto(url, wait_until='domcontentloaded', timeout=20000)
+            # Stäng cookie-popups om de dyker upp
+            for btn_text in ['Avvisa alla', 'Reject all', 'Accept', 'Acceptera']:
+                try:
+                    page.get_by_text(btn_text, exact=True).first.click(timeout=2000)
+                except Exception:
+                    pass
+            page.wait_for_timeout(2000)
+            # Extrahera text från kända selektorer
+            for sel in _DESC_SELECTORS:
+                try:
+                    el = page.locator(sel).first
+                    if el.count() > 0:
+                        text = el.inner_text()
+                        if len(text) > 400:
+                            browser.close()
+                            return text[:12000]
+                except Exception:
+                    continue
+            # Fallback: hela body-texten
+            text = page.locator('body').inner_text()
+            browser.close()
+            if len(text) > 400:
+                return text[:12000]
+    except Exception:
+        pass
+
     return ''
 
 
