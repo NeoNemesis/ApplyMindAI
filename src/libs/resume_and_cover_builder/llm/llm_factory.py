@@ -13,10 +13,29 @@ Konfigurera via .env:
 """
 
 import os
+import threading
 from dotenv import load_dotenv
 from src.libs.resume_and_cover_builder.utils import LoggerChatModel
 
 load_dotenv()
+
+# Thread-local: per-user LLM-kontext sätts av web_app innan LLM-anrop
+# Alla get_llm()-anrop (inklusive från src/-moduler) läser härifrån
+_user_llm_context = threading.local()
+
+
+def set_user_llm_context(api_key: str, provider: str = '', model: str = ''):
+    """Sätts av web_app i request-kontexten eller söktrådarna."""
+    _user_llm_context.api_key  = api_key
+    _user_llm_context.provider = provider
+    _user_llm_context.model    = model
+
+
+def clear_user_llm_context():
+    """Nollställ efter anropet."""
+    _user_llm_context.api_key  = ''
+    _user_llm_context.provider = ''
+    _user_llm_context.model    = ''
 
 # ── Tillgängliga modeller per leverantör ─────────────────────────────────────
 AVAILABLE_MODELS = {
@@ -101,14 +120,19 @@ def get_llm(temperature: float = 0.4, timeout: int = 60,
     Skapar och returnerar rätt LLM.
 
     Prioritetsordning för konfiguration:
-      1. Explicit api_key/provider/model (per-user från databas)
-      2. Miljövariabler LLM_PROVIDER / LLM_MODEL / *_API_KEY (.env.production)
+      1. Explicit api_key/provider/model (skickas direkt)
+      2. Thread-local context (sätts av web_app för inloggad användare)
+      3. Miljövariabler (.env.production)
     """
-    _provider   = (provider or get_provider()).lower()
-    _model      = model or get_model_name()
+    ctx_key      = getattr(_user_llm_context, 'api_key',  '')
+    ctx_provider = getattr(_user_llm_context, 'provider', '')
+    ctx_model    = getattr(_user_llm_context, 'model',    '')
+
+    _provider = (provider or ctx_provider or get_provider()).lower()
+    _model    = model or ctx_model or get_model_name()
 
     def _key(env_var: str) -> str:
-        return api_key or os.environ.get(env_var, '')
+        return api_key or ctx_key or os.environ.get(env_var, '')
 
     try:
         if _provider == 'openai':

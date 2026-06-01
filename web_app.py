@@ -225,23 +225,49 @@ def decrypt_secret(value: str) -> str:
 
 def get_user_llm(temperature: float = 0.4, timeout: int = 60):
     """
-    Returnerar LLM konfigurerad med den inloggade användarens API-nyckel.
-    Faller tillbaka på global .env om användaren inte har satt en nyckel.
+    Returnerar LLM med användarens nyckel OCH sätter thread-local context
+    så att alla get_llm()-anrop i src/ (CV-generering, brev, jobbparser)
+    också använder rätt nyckel för denna tråd.
     """
-    from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
+    from src.libs.resume_and_cover_builder.llm.llm_factory import (
+        get_llm, set_user_llm_context
+    )
     try:
         from flask_login import current_user as _cu
         if _cu and _cu.is_authenticated and _cu.llm_api_key:
-            return get_llm(
-                temperature = temperature,
-                timeout     = timeout,
-                api_key     = decrypt_secret(_cu.llm_api_key),
-                provider    = _cu.llm_provider or '',
-                model       = _cu.llm_model or '',
-            )
+            key      = decrypt_secret(_cu.llm_api_key)
+            provider = _cu.llm_provider or ''
+            model    = _cu.llm_model or ''
+            set_user_llm_context(key, provider, model)
+            return get_llm(temperature=temperature, timeout=timeout,
+                           api_key=key, provider=provider, model=model)
     except Exception:
         pass
     return get_llm(temperature=temperature, timeout=timeout)
+
+
+def _set_search_thread_llm_context(user_id: int):
+    """
+    Sätts i söktrådarna (background threads) innan job_master körs.
+    Säkerställer att CV- och brevgenerering använder rätt nyckel.
+    """
+    from src.libs.resume_and_cover_builder.llm.llm_factory import (
+        set_user_llm_context, clear_user_llm_context
+    )
+    try:
+        with app.app_context():
+            from models import User
+            u = User.query.get(user_id)
+            if u and u.llm_api_key:
+                set_user_llm_context(
+                    decrypt_secret(u.llm_api_key),
+                    u.llm_provider or '',
+                    u.llm_model or '',
+                )
+                return
+    except Exception:
+        pass
+    clear_user_llm_context()
 
 def _validate_api_key(provider: str, api_key: str) -> str | None:
     """Validerar API-nyckelformat. Returnerar felbeskrivning eller None om OK."""
@@ -1112,8 +1138,15 @@ def search_run():
         except queue.Empty:
             break
 
+    # Fånga user_id innan tråden startar (current_user är inte tillgänglig i tråden)
+    _search_user_id = current_user.id if current_user.is_authenticated else None
+
     def run_search():
         global search_state, _stop_requested
+        # Sätt per-user LLM-kontext i söktråden så att CV/brev-generering
+        # använder rätt API-nyckel (inte den globala .env-nyckeln)
+        if _search_user_id:
+            _set_search_thread_llm_context(_search_user_id)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
@@ -2205,12 +2238,27 @@ def setup_save_cover_letter_route():
 # ============================================================
 
 @app.route('/settings')
+@login_required
 def settings():
     from src.libs.resume_and_cover_builder.llm.llm_factory import AVAILABLE_MODELS, PROVIDER_INFO
     env           = read_env()
-    model_cfg     = get_current_model_config()
     scheduler_cfg = load_scheduler_config()
     scheduler_cfg['next_run_label'] = _next_run_label(scheduler_cfg)
+
+    # Visa per-user konfiguration om den finns, annars global env
+    if current_user.llm_provider:
+        model_cfg = {
+            'provider': current_user.llm_provider,
+            'model':    current_user.llm_model or 'gpt-4o-mini',
+            'has_key':  bool(current_user.llm_api_key),
+        }
+    else:
+        model_cfg = get_current_model_config()
+        model_cfg['has_key'] = bool(
+            env.get('OPENAI_API_KEY') or env.get('ANTHROPIC_API_KEY') or
+            env.get('GOOGLE_API_KEY') or os.environ.get('OPENAI_API_KEY')
+        )
+
     return render_template('settings.html',
                            env=env,
                            model_cfg=model_cfg,
