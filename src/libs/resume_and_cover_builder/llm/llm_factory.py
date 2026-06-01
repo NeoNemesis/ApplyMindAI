@@ -95,62 +95,64 @@ def get_model_name() -> str:
     return os.environ.get('LLM_MODEL', defaults.get(provider, 'gpt-4o-mini'))
 
 
-def get_llm(temperature: float = 0.4, timeout: int = 60):
+def get_llm(temperature: float = 0.4, timeout: int = 60,
+            api_key: str = '', provider: str = '', model: str = ''):
     """
-    Skapar och returnerar rätt LLM baserat på LLM_PROVIDER och LLM_MODEL i .env.
-    Faller tillbaka på OpenAI om leverantören inte stöds.
+    Skapar och returnerar rätt LLM.
+
+    Prioritetsordning för konfiguration:
+      1. Explicit api_key/provider/model (per-user från databas)
+      2. Miljövariabler LLM_PROVIDER / LLM_MODEL / *_API_KEY (.env.production)
     """
-    provider   = get_provider()
-    model_name = get_model_name()
+    _provider   = (provider or get_provider()).lower()
+    _model      = model or get_model_name()
+
+    def _key(env_var: str) -> str:
+        return api_key or os.environ.get(env_var, '')
 
     try:
-        if provider == 'openai':
+        if _provider == 'openai':
             from langchain_openai import ChatOpenAI
-            api_key = os.environ.get('OPENAI_API_KEY', '')
             return LoggerChatModel(ChatOpenAI(
-                model_name    = model_name,
-                openai_api_key= api_key,
-                temperature   = temperature,
-                timeout       = timeout,
+                model_name     = _model,
+                openai_api_key = _key('OPENAI_API_KEY'),
+                temperature    = temperature,
+                timeout        = timeout,
             ))
 
-        elif provider == 'anthropic':
+        elif _provider == 'anthropic':
             from langchain_anthropic import ChatAnthropic
-            api_key = os.environ.get('ANTHROPIC_API_KEY', '')
             return LoggerChatModel(ChatAnthropic(
-                model       = model_name,
-                anthropic_api_key = api_key,
-                temperature = temperature,
-                timeout     = timeout,
-                max_tokens  = 4096,
+                model             = _model,
+                anthropic_api_key = _key('ANTHROPIC_API_KEY'),
+                temperature       = temperature,
+                timeout           = timeout,
+                max_tokens        = 4096,
             ))
 
-        elif provider == 'google':
+        elif _provider == 'google':
             from langchain_google_genai import ChatGoogleGenerativeAI
-            api_key = os.environ.get('GOOGLE_API_KEY', '')
             return LoggerChatModel(ChatGoogleGenerativeAI(
-                model       = model_name,
-                google_api_key = api_key,
-                temperature = temperature,
+                model          = _model,
+                google_api_key = _key('GOOGLE_API_KEY'),
+                temperature    = temperature,
             ))
 
-        elif provider == 'ollama':
+        elif _provider == 'ollama':
             from langchain_ollama import ChatOllama
             return LoggerChatModel(ChatOllama(
-                model       = model_name,
+                model       = _model,
                 temperature = temperature,
             ))
 
         else:
-            raise ValueError(f"Okänd leverantör: {provider}")
+            raise ValueError(f"Okänd leverantör: {_provider}")
 
-    except Exception as e:
-        # Fallback to OpenAI
+    except Exception:
         from langchain_openai import ChatOpenAI
-        api_key = os.environ.get('OPENAI_API_KEY', '')
         return LoggerChatModel(ChatOpenAI(
             model_name     = 'gpt-4o-mini',
-            openai_api_key = api_key,
+            openai_api_key = _key('OPENAI_API_KEY'),
             temperature    = temperature,
             timeout        = timeout,
         ))
