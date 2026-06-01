@@ -2634,48 +2634,94 @@ def _extract_url_from_job_info(job_folder: Path) -> str:
 
 
 def _fetch_job_description_from_url(url: str) -> str:
-    """Försök hämta annonsen direkt från URL:en med browser-headers (en shot, kort timeout).
-    Returnerar ren text om vi får > 800 tecken meningsfull innehåll, annars tom sträng.
-    Detta körs server-side när scraper-fallback detekteras så användaren slipper klistra in."""
+    """Hämtar jobbannons från URL. Försöker requests först, sen Playwright (headless Chrome)
+    som fallback för JS-renderade sidor som Indeed, LinkedIn m.fl."""
     if not url:
         return ''
-    try:
-        import requests
-        from bs4 import BeautifulSoup
-    except ImportError:
-        return ''
 
-    headers = {
-        'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                       'AppleWebKit/537.36 (KHTML, like Gecko) '
-                       'Chrome/124.0.0.0 Safari/537.36'),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache',
-    }
-    try:
-        r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
-        if r.status_code != 200:
-            return ''
-        soup = BeautifulSoup(r.text, 'html.parser')
+    # Selektorer för jobbeskrivning-container på vanliga jobbsajter
+    _DESC_SELECTORS = [
+        '#jobDescriptionText',
+        '.jobsearch-jobDescriptionText',
+        '[data-testid="jobsearch-JobComponent-description"]',
+        '.show-more-less-html__markup',
+        '[data-test-id="job-description"]',
+        '.job-description',
+        'article',
+        'main',
+    ]
+
+    def _extract_from_html(html: str) -> str:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html, 'html.parser')
         for tag in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
             tag.decompose()
-        # Föredra konkreta annons-containers om de finns (Indeed/LinkedIn/Teamtailor)
-        for sel in ['#jobDescriptionText', '.jobsearch-jobDescriptionText',
-                    '.show-more-less-html', '[data-test-id="job-description"]',
-                    'article', 'main']:
+        for sel in _DESC_SELECTORS:
             el = soup.select_one(sel)
             if el:
                 text = ' '.join(el.get_text(' ', strip=True).split())
-                if len(text) > 800:
-                    return text[:10000]
-        # Fallback: hela body
+                if len(text) > 400:
+                    return text[:12000]
         text = ' '.join(soup.get_text(' ', strip=True).split())
-        if len(text) > 800:
-            return text[:10000]
+        return text[:12000] if len(text) > 400 else ''
+
+    # ── Försök 1: requests (snabb, funkar för statiska sidor) ──────────────
+    try:
+        import requests
+        headers = {
+            'User-Agent': ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                           'AppleWebKit/537.36 (KHTML, like Gecko) '
+                           'Chrome/124.0.0.0 Safari/537.36'),
+            'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+            'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+        }
+        r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        if r.status_code == 200:
+            text = _extract_from_html(r.text)
+            if text and not _is_placeholder_description(text):
+                return text
     except Exception:
-        return ''
+        pass
+
+    # ── Försök 2: Playwright (headless Chrome — kör JS, hanterar cookies) ──
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
+            page = browser.new_page(
+                user_agent=('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                             'AppleWebKit/537.36 (KHTML, like Gecko) '
+                             'Chrome/124.0.0.0 Safari/537.36')
+            )
+            # Blockera bilder/fonts för snabbhet
+            page.route('**/*.{png,jpg,gif,svg,woff,woff2,ttf}', lambda r: r.abort())
+            page.goto(url, wait_until='domcontentloaded', timeout=20000)
+            # Stäng cookie-popups om de dyker upp
+            for btn_text in ['Avvisa alla', 'Reject all', 'Accept', 'Acceptera']:
+                try:
+                    page.get_by_text(btn_text, exact=True).first.click(timeout=2000)
+                except Exception:
+                    pass
+            page.wait_for_timeout(2000)
+            # Extrahera text från kända selektorer
+            for sel in _DESC_SELECTORS:
+                try:
+                    el = page.locator(sel).first
+                    if el.count() > 0:
+                        text = el.inner_text()
+                        if len(text) > 400:
+                            browser.close()
+                            return text[:12000]
+                except Exception:
+                    continue
+            # Fallback: hela body-texten
+            text = page.locator('body').inner_text()
+            browser.close()
+            if len(text) > 400:
+                return text[:12000]
+    except Exception:
+        pass
+
     return ''
 
 
