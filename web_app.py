@@ -431,11 +431,11 @@ def save_tracker(data: dict):
 
 
 def get_job_folders():
-    """Get all job output folders sorted newest first"""
-    if not OUTPUT_DIR.exists():
+    """Get all job output folders sorted newest first — per-user isolated"""
+    d = _user_output_dir()
+    if not d.exists():
         return []
-    folders = [f for f in OUTPUT_DIR.iterdir() if f.is_dir()]
-    return sorted(folders, key=lambda x: x.name, reverse=True)
+    return sorted([f for f in d.iterdir() if f.is_dir()], key=lambda x: x.name, reverse=True)
 
 
 def parse_job_folder(folder: Path) -> dict:
@@ -1303,7 +1303,7 @@ def batch_evaluate():
                     safe_title = "".join(
                         c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')
                     ).strip()
-                    folder_path = OUTPUT_DIR / f"Job_{i:03d}_{safe_company}_{safe_title}"
+                    folder_path = _user_output_dir() / f"Job_{i:03d}_{safe_company}_{safe_title}"
                     if folder_path.exists():
                         shutil.rmtree(folder_path)
                         search_queue.put(('output', f'   🗑️  Borttagen: {folder_path.name}\n'))
@@ -1313,7 +1313,7 @@ def batch_evaluate():
             search_queue.put(('output',
                 f'\n{sep}\n'
                 f'📊 RESULTAT: {passed} godkända, {failed} borttagna av {len(jobs)} jobb\n'
-                f'📂 Filer: {OUTPUT_DIR}\n'
+                f'📂 Filer: {_user_output_dir()}\n'
             ))
 
         except Exception as e:
@@ -1355,7 +1355,7 @@ def download_file():
         return 'Parametrar saknas', 400
     if '..' in folder or '..' in filename or '/' in filename or '\\' in filename:
         return 'Ogiltig förfrågan', 400
-    file_path = OUTPUT_DIR / folder / filename
+    file_path = _user_output_dir() / folder / filename
     if file_path.exists() and file_path.suffix.lower() == '.pdf':
         return send_file(str(file_path.resolve()), as_attachment=True,
                          download_name=filename)
@@ -1371,7 +1371,7 @@ def view_pdf():
         return 'Parametrar saknas', 400
     if '..' in folder or '..' in filename or '/' in filename or '\\' in filename:
         return 'Ogiltig förfrågan', 400
-    file_path = OUTPUT_DIR / folder / filename
+    file_path = _user_output_dir() / folder / filename
     if file_path.exists() and file_path.suffix.lower() == '.pdf':
         return send_file(str(file_path.resolve()), mimetype='application/pdf')
     return 'Filen hittades inte', 404
@@ -1411,7 +1411,7 @@ def api_delete_job():
     if not folder or '..' in folder or '/' in folder or '\\' in folder:
         return jsonify({'ok': False, 'error': 'Ogiltig mapp'}), 400
 
-    job_folder = OUTPUT_DIR / folder
+    job_folder = _user_output_dir() / folder
     if not job_folder.exists():
         return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
 
@@ -1466,7 +1466,7 @@ def api_regenerate_docs():
     if not folder or '..' in folder or '/' in folder or '\\' in folder:
         return jsonify({'ok': False, 'error': 'Ogiltig mapp'}), 400
 
-    job_folder = OUTPUT_DIR / folder
+    job_folder = _user_output_dir() / folder
     if not job_folder.exists():
         return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
 
@@ -1566,7 +1566,7 @@ def api_stats_detailed():
             sf = f / 'ats_score.json'
             if not sf.exists():
                 # Check inside the job subfolder pattern
-                sf = OUTPUT_DIR / f.name / 'ats_score.json'
+                sf = _user_output_dir() / f.name / 'ats_score.json'
             if sf.exists():
                 try:
                     sc = json.loads(sf.read_text(encoding='utf-8')).get('score', 0)
@@ -2710,7 +2710,7 @@ def api_ats_generate():
     if not folder:
         return jsonify({'ok': False, 'error': 'folder required'}), 400
 
-    job_folder = OUTPUT_DIR / folder
+    job_folder = _user_output_dir() / folder
     if not job_folder.exists():
         return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
 
@@ -2853,7 +2853,7 @@ def api_ats_generate():
 @app.route('/api/ats-score/<folder>')
 def api_ats_get(folder):
     """Return cached ATS score for a folder"""
-    score_file = OUTPUT_DIR / folder / 'ats_score.json'
+    score_file = _user_output_dir() / folder / 'ats_score.json'
     if score_file.exists():
         try:
             data = json.loads(score_file.read_text(encoding='utf-8'))
