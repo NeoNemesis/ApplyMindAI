@@ -58,15 +58,21 @@ if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
   exec bash "$SCRIPT_PATH"
 fi
 
-# ── Bygga och starta containers ─────────────────────────────────────────
-# Utan --no-cache: Docker återanvänder lager som inte ändrats.
-# Kod-ändringar (templates, py-filer) träffar bara sista lagret → snabb rebuild.
-# Byt till --no-cache manuellt vid dep-ändringar (requirements.txt).
-log "🔨 Bygger Docker-images"
-docker compose --env-file "$ENV_FILE" build
+# ── Bygg bara om beroenden eller Dockerfile ändrats ────────────────────
+DEPS_CHANGED=$(git diff HEAD~1..HEAD -- requirements.production.txt Dockerfile 2>/dev/null | grep -c '^+' || echo 0)
 
-log "▶ Startar containers"
-docker compose --env-file "$ENV_FILE" up -d --wait
+if [[ "$DEPS_CHANGED" -gt 0 ]]; then
+  log "📦 Beroenden ändrade — full rebuild (kort downtime möjlig)"
+  docker compose --env-file "$ENV_FILE" build
+  docker compose --env-file "$ENV_FILE" up -d --wait
+else
+  log "⚡ Kod-ändring — gunicorn graceful reload (noll downtime)"
+  # Källkoden är monterad som volym — kill -HUP laddar om workers
+  # utan att stänga av containern eller tappa en enda request
+  docker compose --env-file "$ENV_FILE" up -d --no-recreate 2>/dev/null || true
+  docker exec applymind-web kill -HUP 1
+  sleep 5
+fi
 
 # ── Kör DB-migrationer om de finns ─────────────────────────────────────
 if docker compose exec -T applymind-web python -c "import flask_migrate" 2>/dev/null; then
