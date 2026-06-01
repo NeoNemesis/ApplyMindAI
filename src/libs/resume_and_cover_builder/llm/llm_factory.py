@@ -172,11 +172,19 @@ def get_llm(temperature: float = 0.4, timeout: int = 60,
         else:
             raise ValueError(f"Okänd leverantör: {_provider}")
 
+    except ValueError:
+        raise  # Okänd leverantör eller valideringsfel — propagera, inte swälj
     except Exception:
+        # Fallback till OpenAI vid oväntade fel (fel modellnamn, nätverksfel etc.)
         from langchain_openai import ChatOpenAI
+        fallback_key = api_key or ctx_key or os.environ.get('OPENAI_API_KEY', '')
+        if not fallback_key:
+            raise ValueError(
+                "API-nyckel saknas. Gå till Inställningar och konfigurera din LLM-leverantör."
+            )
         return LoggerChatModel(ChatOpenAI(
             model_name     = 'gpt-4o-mini',
-            openai_api_key = _key('OPENAI_API_KEY'),
+            openai_api_key = fallback_key,
             temperature    = temperature,
             timeout        = timeout,
         ))

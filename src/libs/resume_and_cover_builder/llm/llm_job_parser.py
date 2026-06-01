@@ -36,8 +36,14 @@ logger.add(log_path / "gpt_resume.log", rotation="1 day", compression="zip", ret
 class LLMParser:
     def __init__(self, openai_api_key):
         self.llm = get_llm(temperature=0.4, timeout=60)
-        self.llm_embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)  # Initialize embeddings
-        self.vectorstore = None  # Will be initialized after document loading
+        self.vectorstore = None
+        # Embeddings: endast om OpenAI-nyckel finns — annars hoppar vi över FAISS-vektorsökning
+        self.llm_embeddings = None
+        if openai_api_key:
+            try:
+                self.llm_embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+            except Exception:
+                pass
 
     @staticmethod
     def _preprocess_template_string(template: str) -> str:
@@ -77,13 +83,16 @@ class LLMParser:
         all_splits = text_splitter.split_documents(document)
         logger.debug(f"Text split into {len(all_splits)} fragments.")
         
-        # Create the vectorstore using FAISS
-        try:
-            self.vectorstore = FAISS.from_documents(documents=all_splits, embedding=self.llm_embeddings)
-            logger.debug("Vectorstore successfully initialized.")
-        except Exception as e:
-            logger.error(f"Error during vectorstore creation: {e}")
-            raise
+        # Skapa vectorstore om embeddings finns — annars hoppa över (fungerar för de flesta providers)
+        if self.llm_embeddings:
+            try:
+                self.vectorstore = FAISS.from_documents(documents=all_splits, embedding=self.llm_embeddings)
+                logger.debug("Vectorstore successfully initialized.")
+            except Exception as e:
+                logger.warning(f"Vectorstore initialization failed, continuing without: {e}")
+                self.vectorstore = None
+        else:
+            logger.debug("Embeddings ej tillgängliga (icke-OpenAI provider) — hoppar över vectorstore.")
 
     def _retrieve_context(self, query: str, top_k: int = 3) -> str:
         """
