@@ -2696,18 +2696,30 @@ _PLACEHOLDER_PATTERNS = [
     'tjänsten kräver teknisk kompetens och erfarenhet av webbutveckling',
 ]
 
+# Mönster som tyder på att vi fångade navigationstext istället för annonstext
+_NAV_PATTERNS = [
+    'logga in', 'skapa konto', 'cookie', 'gdpr', 'villkor', 'sekretesspolicy',
+    'sök jobb', 'jobba hos', 'karriär', 'indeed.com', 'linkedin.com',
+    'jobbannons', 'company reviews', 'find jobs',
+]
 
 def _is_placeholder_description(text: str) -> bool:
-    """Returnera True om beskrivningen är en känd bot-fallback eller för kort/innehållslös
-    för att meningsfullt analyseras."""
+    """Returnera True om beskrivningen är en känd bot-fallback, navigationstext
+    eller för kort för att meningsfullt analyseras."""
     if not text:
         return True
     t = text.strip().lower()
-    # Kortare än 400 tecken indikerar att riktig annonstext inte hämtades
-    # (riktiga annonser är typiskt 1500-5000 tecken).
     if len(t) < 400:
         return True
     if any(p in t for p in _PLACEHOLDER_PATTERNS):
+        return True
+    # Navigationstext: många nav-nyckelord + saknar jobbspecifika termer
+    nav_hits = sum(1 for p in _NAV_PATTERNS if p in t)
+    job_terms = ['erfarenhet', 'krav', 'ansvar', 'kompetens', 'tjänst',
+                 'söker', 'ansökan', 'arbetsuppgifter', 'vi erbjuder',
+                 'experience', 'requirements', 'responsibilities']
+    job_hits = sum(1 for p in job_terms if p in t)
+    if nav_hits >= 3 and job_hits < 2:
         return True
     return False
 

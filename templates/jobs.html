@@ -352,17 +352,6 @@ function generateAts(force) {
     if (data.ok) {
       renderAtsResult(data);
       renderAtsBadge(_atsFolder, data.score);
-    } else if (data.no_description || data.placeholder_detected) {
-      body.innerHTML = `
-        <div class="alert alert-warning m-3 small">
-          <strong><i class="bi bi-exclamation-triangle me-1"></i>Annonstexten kunde inte hämtas</strong><br>
-          ${data.error || 'Källsidan blockerade automatisk hämtning.'}
-          <div class="mt-3 text-center">
-            <button class="btn btn-sm btn-outline-success" onclick="generateAts(true)">
-              <i class="bi bi-arrow-clockwise me-1"></i>Försök igen
-            </button>
-          </div>
-        </div>`;
     } else {
       body.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle me-2"></i>${data.error || 'Okänt fel'}</div>`;
     }
