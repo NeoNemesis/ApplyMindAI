@@ -1092,6 +1092,7 @@ def search_run():
                         break
                     search_queue.put(('progress', f'{i}/{len(jobs)}'))
                     search_queue.put(('output', f'\n[{i}/{len(jobs)}] 📄 {job["title"]} @ {job["company"]}\n'))
+                    _enforce_job_quota()   # Radera äldst om kvot (50) uppnåtts
                     ok = jm.generate_documents_for_job(
                         job, i,
                         ats_filter=ats_filter_enabled,
@@ -1391,25 +1392,63 @@ def view_pdf_legacy(subpath):
     return 'Ogiltig URL', 400
 
 
+# ── Jobbkvot ────────────────────────────────────────────────────────────────
+JOB_QUOTA = 50  # Max antal jobbmappar per användare
+
+def _enforce_job_quota():
+    """Ta bort de äldsta jobbmapparna om kvoten (50) överskrids.
+    Kallas innan varje nytt jobb sparas."""
+    out_dir = _user_output_dir()
+    if not out_dir.exists():
+        return
+    folders = sorted(
+        [f for f in out_dir.iterdir() if f.is_dir()],
+        key=lambda f: f.name   # Job_001_ prefix → äldst har lägst nummer
+    )
+    while len(folders) >= JOB_QUOTA:
+        oldest = folders.pop(0)
+        shutil.rmtree(oldest, ignore_errors=True)
+
+
+def _job_quota_status() -> dict:
+    """Returnerar {'count': int, 'quota': int, 'pct': int}."""
+    out_dir = _user_output_dir()
+    count = sum(1 for f in out_dir.iterdir() if f.is_dir()) if out_dir.exists() else 0
+    return {'count': count, 'quota': JOB_QUOTA, 'pct': round(count / JOB_QUOTA * 100)}
+
+
+def _build_zip(folders_and_files: list, single_folder: bool = False) -> 'io.BytesIO':
+    """Bygg ZIP i minne från lista av (folder_path, arcname_prefix)."""
+    import zipfile, io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for folder_path, prefix in folders_and_files:
+            for f in folder_path.iterdir():
+                if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
+                    arcname = f.name if single_folder else f'{prefix}/{f.name}'
+                    zf.write(f, arcname)
+    buf.seek(0)
+    return buf
+
+
 @app.route('/api/jobs/download-zip')
 @login_required
 def download_job_zip():
-    """Ladda ner ett jobb som ZIP (CV + personligt brev + jobinfo)."""
-    import zipfile, io
+    """Ladda ner ett jobb som ZIP. ?delete=1 raderar mappen efter nedladdning."""
     folder = request.args.get('folder', '').strip()
+    delete = request.args.get('delete', '0') == '1'
     if not folder or '..' in folder or '/' in folder or '\\' in folder:
         return 'Ogiltig mapp', 400
     job_folder = _user_output_dir() / folder
     if not job_folder.exists():
         return 'Mappen finns inte', 404
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for f in job_folder.iterdir():
-            if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
-                zf.write(f, f.name)
-    buf.seek(0)
+    buf = _build_zip([(job_folder, folder)], single_folder=True)
     safe_name = "".join(c for c in folder if c.isalnum() or c in (' ', '-', '_')).strip()
+
+    if delete:
+        shutil.rmtree(job_folder, ignore_errors=True)
+
     return send_file(buf, mimetype='application/zip', as_attachment=True,
                      download_name=f'{safe_name}.zip')
 
@@ -1417,23 +1456,31 @@ def download_job_zip():
 @app.route('/api/jobs/download-all-zip')
 @login_required
 def download_all_jobs_zip():
-    """Ladda ner alla jobb som ett ZIP-arkiv."""
-    import zipfile, io
+    """Ladda ner alla jobb som ZIP. ?delete=1 raderar alla mappar efter nedladdning."""
+    delete = request.args.get('delete', '0') == '1'
     out_dir = _user_output_dir()
     if not out_dir.exists():
         return 'Inga jobb att ladda ner', 404
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for job_folder in sorted(out_dir.iterdir()):
-            if not job_folder.is_dir():
-                continue
-            for f in job_folder.iterdir():
-                if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
-                    zf.write(f, f'{job_folder.name}/{f.name}')
-    buf.seek(0)
+    job_folders = [(f, f.name) for f in sorted(out_dir.iterdir()) if f.is_dir()]
+    if not job_folders:
+        return 'Inga jobb att ladda ner', 404
+
+    buf = _build_zip(job_folders)
+
+    if delete:
+        for folder_path, _ in job_folders:
+            shutil.rmtree(folder_path, ignore_errors=True)
+
     return send_file(buf, mimetype='application/zip', as_attachment=True,
                      download_name='applymind-alla-jobb.zip')
+
+
+@app.route('/api/jobs/quota')
+@login_required
+def api_job_quota():
+    """Returnerar kvot-status för inloggad användare."""
+    return jsonify(_job_quota_status())
 
 
 @app.route('/api/jobs')

@@ -24,10 +24,24 @@
     <a href="/search" class="btn btn-green btn-sm">
       <i class="bi bi-plus-lg me-1"></i>Sök fler
     </a>
-    <a href="/api/jobs/download-all-zip" class="btn btn-sm" title="Ladda ner alla jobb som ZIP"
-       style="background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);">
-      <i class="bi bi-file-earmark-zip me-1"></i>Ladda ner alla
-    </a>
+    <div class="dropdown">
+      <button class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown"
+              style="background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);">
+        <i class="bi bi-file-earmark-zip me-1"></i>Ladda ner alla
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" style="background:#1a1a1a;border:1px solid #333;">
+        <li><a class="dropdown-item text-light" href="/api/jobs/download-all-zip">
+          <i class="bi bi-download me-2"></i>Ladda ner ZIP
+        </a></li>
+        <li><a class="dropdown-item text-warning" href="/api/jobs/download-all-zip?delete=1"
+               onclick="return confirm('Ladda ner alla och radera från servern?');">
+          <i class="bi bi-trash me-2"></i>Ladda ner och rensa servern
+        </a></li>
+      </ul>
+    </div>
+    <span id="quota-badge" class="badge" style="font-size:0.75rem;background:rgba(255,255,255,0.08);color:#888;">
+      <i class="bi bi-hdd me-1"></i><span id="quota-text">...</span>
+    </span>
   </div>
 </div>
 
@@ -108,10 +122,20 @@
                   </a>
                 {% endif %}
 
-                <a href="/api/jobs/download-zip?folder={{ job.folder }}"
-                   class="btn btn-sm btn-outline-secondary" title="Ladda ner jobb som ZIP (CV + brev)">
-                  <i class="bi bi-file-earmark-zip"></i>
-                </a>
+                <div class="dropdown d-inline-block">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle px-2" data-bs-toggle="dropdown" title="Ladda ner">
+                    <i class="bi bi-file-earmark-zip"></i>
+                  </button>
+                  <ul class="dropdown-menu" style="background:#1a1a1a;border:1px solid #333;">
+                    <li><a class="dropdown-item text-light" href="/api/jobs/download-zip?folder={{ job.folder }}">
+                      <i class="bi bi-download me-2"></i>Ladda ner ZIP
+                    </a></li>
+                    <li><a class="dropdown-item text-warning" href="/api/jobs/download-zip?folder={{ job.folder }}&delete=1"
+                           onclick="return confirm('Ladda ner och radera från servern?');">
+                      <i class="bi bi-trash me-2"></i>Ladda ner och rensa
+                    </a></li>
+                  </ul>
+                </div>
 
                 {% if job.url %}
                   <a href="{{ job.url }}" target="_blank" rel="noopener"
@@ -761,5 +785,16 @@ function regenerateDocs(folder) {
     alert('Nätverksfel, försök igen.');
   });
 }
+
+  // Kvot-status i headern
+  fetch('/api/jobs/quota').then(r=>r.json()).then(function(d){
+    var pct = d.pct || 0;
+    var el = document.getElementById('quota-badge');
+    var txt = document.getElementById('quota-text');
+    if (!el || !txt) return;
+    txt.textContent = d.count + ' / ' + d.quota + ' jobb';
+    el.style.color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#888';
+    if (pct >= 70) el.style.background = 'rgba(239,68,68,0.1)';
+  }).catch(function(){});
 </script>
 {% endblock %}
