@@ -2735,21 +2735,18 @@ def api_ats_generate():
             'no_description': True
         }), 422
 
+    partial_description = False
     if _is_placeholder_description(job_description):
-        # Auto-fetch: försök hämta annonsen direkt från sparad URL.
-        # Användaren ska inte behöva fylla i något — en knapptryckning räcker.
+        # Försök hämta fullständig annonstext från sparad URL
         url = _extract_url_from_job_info(job_folder)
         fetched = _fetch_job_description_from_url(url) if url else ''
         if fetched and not _is_placeholder_description(fetched):
             job_description = fetched
             desc_file.write_text(fetched, encoding='utf-8')
         else:
-            return jsonify({
-                'ok': False,
-                'error': ('Annonstexten är inte fullständigt sparad och kunde inte hämtas automatiskt '
-                          '(källsidan blockerade förfrågan). Försök igen senare.'),
-                'placeholder_detected': True,
-            }), 422
+            # Kör ATS ändå med ofullständig text — visa varning i resultatet
+            # istället för att vägra helt. Användaren kan fortfarande se en indikation.
+            partial_description = True
 
     cv_text = _get_cv_full_text(job_folder)
     if not cv_text:
@@ -2839,6 +2836,9 @@ def api_ats_generate():
             'missing_skills':  missing_skills_flat,
             'recommendations': recommendations_flat,
             'summary':         rec.get('summary', ''),
+            'partial_description': partial_description,
+            'partial_warning': ('Annonstexten var ofullständig — analysen baseras på begränsad information och kan vara missvisande.'
+                                if partial_description else ''),
         }
 
         score_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
