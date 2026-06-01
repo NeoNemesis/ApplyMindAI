@@ -66,11 +66,14 @@ if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
 fi
 
 # ── Bygga och starta containers ─────────────────────────────────────────
+# Utan --no-cache: Docker återanvänder lager som inte ändrats.
+# Kod-ändringar (templates, py-filer) träffar bara sista lagret → snabb rebuild.
+# Byt till --no-cache manuellt vid dep-ändringar (requirements.txt).
 log "🔨 Bygger Docker-images"
-docker compose --env-file "$ENV_FILE" build --no-cache
+docker compose --env-file "$ENV_FILE" build
 
-log "▶ Startar containers (zero-downtime)"
-docker compose --env-file "$ENV_FILE" up -d
+log "▶ Startar containers"
+docker compose --env-file "$ENV_FILE" up -d --wait
 
 # ── Kör DB-migrationer om de finns ─────────────────────────────────────
 if docker compose exec -T applymind-web python -c "import flask_migrate" 2>/dev/null; then
