@@ -594,12 +594,6 @@ def setup_skip():
     session['setup_skipped'] = True
     session.permanent = True
     return redirect(url_for('index'))
-
-
-@app.route('/setup/skip', methods=['POST'])
-@login_required
-def setup_skip():
-    session['setup_skipped'] = True
     return redirect(request.referrer or url_for('index'))
 
 
