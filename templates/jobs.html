@@ -24,6 +24,10 @@
     <a href="/search" class="btn btn-green btn-sm">
       <i class="bi bi-plus-lg me-1"></i>Sök fler
     </a>
+    <a href="/api/jobs/download-all-zip" class="btn btn-sm" title="Ladda ner alla jobb som ZIP"
+       style="background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);">
+      <i class="bi bi-file-earmark-zip me-1"></i>Ladda ner alla
+    </a>
   </div>
 </div>
 
@@ -103,6 +107,11 @@
                     <i class="bi bi-download"></i>
                   </a>
                 {% endif %}
+
+                <a href="/api/jobs/download-zip?folder={{ job.folder }}"
+                   class="btn btn-sm btn-outline-secondary" title="Ladda ner jobb som ZIP (CV + brev)">
+                  <i class="bi bi-file-earmark-zip"></i>
+                </a>
 
                 {% if job.url %}
                   <a href="{{ job.url }}" target="_blank" rel="noopener"

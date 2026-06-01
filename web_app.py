@@ -1391,6 +1391,51 @@ def view_pdf_legacy(subpath):
     return 'Ogiltig URL', 400
 
 
+@app.route('/api/jobs/download-zip')
+@login_required
+def download_job_zip():
+    """Ladda ner ett jobb som ZIP (CV + personligt brev + jobinfo)."""
+    import zipfile, io
+    folder = request.args.get('folder', '').strip()
+    if not folder or '..' in folder or '/' in folder or '\\' in folder:
+        return 'Ogiltig mapp', 400
+    job_folder = _user_output_dir() / folder
+    if not job_folder.exists():
+        return 'Mappen finns inte', 404
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in job_folder.iterdir():
+            if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
+                zf.write(f, f.name)
+    buf.seek(0)
+    safe_name = "".join(c for c in folder if c.isalnum() or c in (' ', '-', '_')).strip()
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name=f'{safe_name}.zip')
+
+
+@app.route('/api/jobs/download-all-zip')
+@login_required
+def download_all_jobs_zip():
+    """Ladda ner alla jobb som ett ZIP-arkiv."""
+    import zipfile, io
+    out_dir = _user_output_dir()
+    if not out_dir.exists():
+        return 'Inga jobb att ladda ner', 404
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for job_folder in sorted(out_dir.iterdir()):
+            if not job_folder.is_dir():
+                continue
+            for f in job_folder.iterdir():
+                if f.is_file() and f.suffix.lower() in ('.pdf', '.txt', '.json'):
+                    zf.write(f, f'{job_folder.name}/{f.name}')
+    buf.seek(0)
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name='applymind-alla-jobb.zip')
+
+
 @app.route('/api/jobs')
 def api_jobs():
     """JSON API for jobs list"""
