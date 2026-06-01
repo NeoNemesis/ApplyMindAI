@@ -1,13 +1,12 @@
 import os
 import time
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager  # Import webdriver_manager
 import urllib
 from src.logger_config import logger
 
+
 def chrome_browser_options():
+    """Build Chrome options. Selenium imported here, not at module level."""
+    from selenium.webdriver.chrome.options import Options
     logger.debug("Setting Chrome browser options")
     options = Options()
     # Kör UTAN headless — Indeed/LinkedIn detekterar headless och blockerar
@@ -41,7 +40,11 @@ def chrome_browser_options():
     logger.debug("Chrome options set (visible window, stealth mode)")
     return options
 
-def init_browser() -> webdriver.Chrome:
+def init_browser():
+    """Initialize Chrome WebDriver. Selenium imported here, not at module level."""
+    from selenium import webdriver
+    from selenium.webdriver.chrome.service import Service as ChromeService
+    from webdriver_manager.chrome import ChromeDriverManager
     try:
         options = chrome_browser_options()
         service = ChromeService(ChromeDriverManager().install())
