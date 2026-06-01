@@ -382,6 +382,15 @@ function renderAtsResult(data) {
   const label = scoreLabel(score);
   const bd    = data.score_breakdown || null;
 
+  // ── Varning om ofullständig annonstext ───────────────────
+  const partialWarningHtml = data.partial_description ? `
+    <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);
+                border-radius:8px;padding:10px 14px;margin-bottom:14px;
+                font-size:0.8rem;color:#f59e0b;display:flex;gap:8px;align-items:flex-start;">
+      <span>⚠️</span>
+      <span>${escapeHtml(data.partial_warning)}</span>
+    </div>` : '';
+
   // ── Score ring + summary ──────────────────────────────────
   const ringHtml = `
     <div class="text-center mb-3">
@@ -509,7 +518,7 @@ function renderAtsResult(data) {
   }
 
   document.getElementById('ats-modal-body').innerHTML =
-    ringHtml + blockersHtml + breakdownHtml + keywordsHtml + recsHtml;
+    partialWarningHtml + ringHtml + blockersHtml + breakdownHtml + keywordsHtml + recsHtml;
 
   document.getElementById('ats-regenerate-btn').style.display = 'inline-flex';
 }
