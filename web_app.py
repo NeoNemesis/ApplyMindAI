@@ -368,7 +368,11 @@ def is_setup_complete() -> bool:
     """Return True if at least one API key is configured"""
     env = read_env()
     providers = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY']
-    llm_provider = env.get('LLM_PROVIDER', 'openai')
+    # Kolla även os.environ — API-nyckel kan komma från .env.production via docker
+    for k in providers:
+        if not env.get(k):
+            env[k] = os.environ.get(k, '')
+    llm_provider = env.get('LLM_PROVIDER') or os.environ.get('LLM_PROVIDER', 'openai')
     if llm_provider == 'ollama':
         return True
     return any(env.get(k, '').startswith('sk-') or
@@ -594,7 +598,6 @@ def setup_skip():
     session['setup_skipped'] = True
     session.permanent = True
     return redirect(url_for('index'))
-    return redirect(request.referrer or url_for('index'))
 
 
 # ============================================================
