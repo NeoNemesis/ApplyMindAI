@@ -247,14 +247,21 @@ def _validate_api_key(provider: str, api_key: str) -> str | None:
     """Validerar API-nyckelformat. Returnerar felbeskrivning eller None om OK."""
     if not api_key:
         return None  # Tom = ingen ändring
-    if provider == 'openai' and not api_key.startswith('sk-'):
-        return 'OpenAI API-nycklar börjar alltid med "sk-". Kontrollera nyckeln.'
+    # Sanera: ta bort whitespace inkl. newlines
+    api_key = api_key.strip()
+    if '\n' in api_key or '\r' in api_key or '\t' in api_key:
+        return 'API-nyckeln innehåller ogiltiga tecken. Kopiera bara själva nyckeln.'
+    if len(api_key) > 500:
+        return 'API-nyckeln är för lång. Kontrollera att du klistrade in rätt.'
+    if provider == 'openai':
+        if not api_key.startswith('sk-'):
+            return 'OpenAI API-nycklar börjar alltid med "sk-". Kontrollera nyckeln.'
+        if api_key.startswith('sk-ant-'):
+            return 'Det ser ut som en Anthropic-nyckel. Välj "Anthropic" som leverantör.'
     if provider == 'anthropic' and not api_key.startswith('sk-ant-'):
         return 'Anthropic API-nycklar börjar med "sk-ant-". Kontrollera nyckeln.'
     if provider == 'google' and len(api_key) < 20:
         return 'Google API-nyckeln ser för kort ut. Kontrollera nyckeln.'
-    if len(api_key) > 500:
-        return 'API-nyckeln är för lång. Kontrollera att du klistrade in rätt.'
     return None
 
 # ============================================================
