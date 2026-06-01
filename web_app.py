@@ -54,7 +54,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('FLASK_SECRET', 'applymind-ai-dev-secret-change-in-prod-2026')
+
+_secret = os.environ.get('FLASK_SECRET', '')
+_dev_placeholder = 'applymind-ai-dev-secret-change-in-prod-2026'
+if os.environ.get('FLASK_ENV') == 'production' and (not _secret or _secret == _dev_placeholder):
+    raise RuntimeError(
+        "FLASK_SECRET måste sättas till ett slumpmässigt 32+ teckens värde i produktion. "
+        "Generera: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+app.secret_key = _secret or _dev_placeholder
 
 # ── Database + Auth ───────────────────────────────────────────
 from models import db, User, AuditLog
@@ -66,9 +74,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
     f"sqlite:///{BASE_DIR / 'instance' / 'applymind.db'}"
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['REMEMBER_COOKIE_SECURE']   = os.environ.get('FLASK_ENV') == 'production'
+_is_prod = os.environ.get('FLASK_ENV') == 'production'
+app.config['REMEMBER_COOKIE_SECURE']   = _is_prod
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE']    = _is_prod
 app.config['SESSION_COOKIE_SAMESITE']  = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY']  = True
 

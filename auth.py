@@ -65,8 +65,10 @@ def login():
                 user.last_login = datetime.utcnow()
                 db.session.commit()
                 next_page = request.args.get("next") or url_for("index")
-                # Safety: only redirect to relative URLs
-                if next_page.startswith("http"):
+                # Block absolute URLs and protocol-relative URLs (//evil.com)
+                from urllib.parse import urlparse
+                parsed = urlparse(next_page)
+                if parsed.netloc or parsed.scheme:
                     next_page = url_for("index")
                 return redirect(next_page)
             else:
@@ -87,12 +89,12 @@ def logout():
 
 def _send_email(to: str, subject: str, html_body: str) -> bool:
     """Send email via SMTP. Returns True on success."""
-    host     = os.environ.get("SMTP_HOST",      "smtp.hostinger.com")
-    port     = int(os.environ.get("SMTP_PORT",  "587"))
-    user     = os.environ.get("SMTP_USER",      "support@vilchesab.se")
-    password = os.environ.get("SMTP_PASS",      "PugA#V24!Wr#")
-    from_name= os.environ.get("SMTP_FROM_NAME", "ApplyMind AI")
-    from_email = os.environ.get("SMTP_FROM_EMAIL", "support@vilchesab.se")
+    host       = os.environ.get("SMTP_HOST", "smtp.hostinger.com")
+    port       = int(os.environ.get("SMTP_PORT", "587"))
+    user       = os.environ.get("SMTP_USER", "")
+    password   = os.environ.get("SMTP_PASS", "")
+    from_name  = os.environ.get("SMTP_FROM_NAME", "ApplyMind AI")
+    from_email = os.environ.get("SMTP_FROM_EMAIL", user)
 
     if not host or not user or not password:
         return False
