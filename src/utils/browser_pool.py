@@ -15,27 +15,23 @@ Usage:
         # Browser automatically closed on exit
 """
 import atexit
-from typing import Optional
-from selenium.webdriver import Chrome
+from typing import Optional, TYPE_CHECKING
 from loguru import logger
+
+if TYPE_CHECKING:
+    from selenium.webdriver import Chrome  # Only for type checkers, not at runtime
 
 
 class BrowserPool:
     """
     Singleton Browser Pool to manage Chrome WebDriver instances.
-    
-    This eliminates the performance bottleneck of spawning a new browser
-    for every document generation operation.
-    
-    Features:
-    - Singleton pattern ensures only one browser instance
-    - Context manager for automatic cleanup
-    - Thread-safe (using class-level lock)
-    - Automatic cleanup on program exit
+
+    Selenium is imported lazily (inside get_driver) so this module
+    can be safely imported in environments where Selenium is not installed.
     """
-    
+
     _instance: Optional['BrowserPool'] = None
-    _driver: Optional[Chrome] = None
+    _driver: Optional['Chrome'] = None
     _lock = None  # Will be threading.Lock() if needed
     
     def __new__(cls):
@@ -57,7 +53,7 @@ class BrowserPool:
             cls._instance = BrowserPool()
         return cls._instance
     
-    def get_driver(self) -> Chrome:
+    def get_driver(self) -> 'Chrome':
         """
         Get the Chrome WebDriver instance.
         Creates a new one if it doesn't exist or was closed.
@@ -155,7 +151,7 @@ class BrowserSession:
 
 
 # Convenience functions
-def get_browser() -> Chrome:
+def get_browser() -> 'Chrome':
     """
     Get a browser instance from the pool.
     
