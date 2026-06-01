@@ -13,10 +13,29 @@ Konfigurera via .env:
 """
 
 import os
+import threading
 from dotenv import load_dotenv
 from src.libs.resume_and_cover_builder.utils import LoggerChatModel
 
 load_dotenv()
+
+# Thread-local: per-user LLM-kontext sätts av web_app innan LLM-anrop
+# Alla get_llm()-anrop (inklusive från src/-moduler) läser härifrån
+_user_llm_context = threading.local()
+
+
+def set_user_llm_context(api_key: str, provider: str = '', model: str = ''):
+    """Sätts av web_app i request-kontexten eller söktrådarna."""
+    _user_llm_context.api_key  = api_key
+    _user_llm_context.provider = provider
+    _user_llm_context.model    = model
+
+
+def clear_user_llm_context():
+    """Nollställ efter anropet."""
+    _user_llm_context.api_key  = ''
+    _user_llm_context.provider = ''
+    _user_llm_context.model    = ''
 
 # ── Tillgängliga modeller per leverantör ─────────────────────────────────────
 AVAILABLE_MODELS = {
@@ -95,62 +114,69 @@ def get_model_name() -> str:
     return os.environ.get('LLM_MODEL', defaults.get(provider, 'gpt-4o-mini'))
 
 
-def get_llm(temperature: float = 0.4, timeout: int = 60):
+def get_llm(temperature: float = 0.4, timeout: int = 60,
+            api_key: str = '', provider: str = '', model: str = ''):
     """
-    Skapar och returnerar rätt LLM baserat på LLM_PROVIDER och LLM_MODEL i .env.
-    Faller tillbaka på OpenAI om leverantören inte stöds.
+    Skapar och returnerar rätt LLM.
+
+    Prioritetsordning för konfiguration:
+      1. Explicit api_key/provider/model (skickas direkt)
+      2. Thread-local context (sätts av web_app för inloggad användare)
+      3. Miljövariabler (.env.production)
     """
-    provider   = get_provider()
-    model_name = get_model_name()
+    ctx_key      = getattr(_user_llm_context, 'api_key',  '')
+    ctx_provider = getattr(_user_llm_context, 'provider', '')
+    ctx_model    = getattr(_user_llm_context, 'model',    '')
+
+    _provider = (provider or ctx_provider or get_provider()).lower()
+    _model    = model or ctx_model or get_model_name()
+
+    def _key(env_var: str) -> str:
+        return api_key or ctx_key or os.environ.get(env_var, '')
 
     try:
-        if provider == 'openai':
+        if _provider == 'openai':
             from langchain_openai import ChatOpenAI
-            api_key = os.environ.get('OPENAI_API_KEY', '')
             return LoggerChatModel(ChatOpenAI(
-                model_name    = model_name,
-                openai_api_key= api_key,
-                temperature   = temperature,
-                timeout       = timeout,
+                model_name     = _model,
+                openai_api_key = _key('OPENAI_API_KEY'),
+                temperature    = temperature,
+                timeout        = timeout,
             ))
 
-        elif provider == 'anthropic':
+        elif _provider == 'anthropic':
             from langchain_anthropic import ChatAnthropic
-            api_key = os.environ.get('ANTHROPIC_API_KEY', '')
             return LoggerChatModel(ChatAnthropic(
-                model       = model_name,
-                anthropic_api_key = api_key,
-                temperature = temperature,
-                timeout     = timeout,
-                max_tokens  = 4096,
+                model             = _model,
+                anthropic_api_key = _key('ANTHROPIC_API_KEY'),
+                temperature       = temperature,
+                timeout           = timeout,
+                max_tokens        = 4096,
             ))
 
-        elif provider == 'google':
+        elif _provider == 'google':
             from langchain_google_genai import ChatGoogleGenerativeAI
-            api_key = os.environ.get('GOOGLE_API_KEY', '')
             return LoggerChatModel(ChatGoogleGenerativeAI(
-                model       = model_name,
-                google_api_key = api_key,
-                temperature = temperature,
+                model          = _model,
+                google_api_key = _key('GOOGLE_API_KEY'),
+                temperature    = temperature,
             ))
 
-        elif provider == 'ollama':
+        elif _provider == 'ollama':
             from langchain_ollama import ChatOllama
             return LoggerChatModel(ChatOllama(
-                model       = model_name,
+                model       = _model,
                 temperature = temperature,
             ))
 
         else:
-            raise ValueError(f"Okänd leverantör: {provider}")
+            raise ValueError(f"Okänd leverantör: {_provider}")
 
-    except Exception as e:
-        # Fallback to OpenAI
+    except Exception:
         from langchain_openai import ChatOpenAI
-        api_key = os.environ.get('OPENAI_API_KEY', '')
         return LoggerChatModel(ChatOpenAI(
             model_name     = 'gpt-4o-mini',
-            openai_api_key = api_key,
+            openai_api_key = _key('OPENAI_API_KEY'),
             temperature    = temperature,
             timeout        = timeout,
         ))

@@ -207,6 +207,100 @@ _stop_requested = False  # Global stop flag — set by /search/stop
 
 
 # ============================================================
+# KRYPTERING — per-user API-nycklar
+# ============================================================
+
+def _get_cipher():
+    """Returnerar Fernet-cipher härledd från ENCRYPTION_KEY (eller FLASK_SECRET)."""
+    from cryptography.fernet import Fernet
+    import base64, hashlib
+    raw = os.environ.get('ENCRYPTION_KEY') or os.environ.get('FLASK_SECRET', 'dev')
+    derived = base64.urlsafe_b64encode(hashlib.sha256(raw.encode()).digest())
+    return Fernet(derived)
+
+def encrypt_secret(value: str) -> str:
+    """Krypterar en sträng. Returnerar tom sträng om value är tom."""
+    if not value:
+        return ''
+    return _get_cipher().encrypt(value.encode()).decode()
+
+def decrypt_secret(value: str) -> str:
+    """Dekrypterar en krypterad sträng. Returnerar tom sträng vid fel."""
+    if not value:
+        return ''
+    try:
+        return _get_cipher().decrypt(value.encode()).decode()
+    except Exception:
+        return ''
+
+def get_user_llm(temperature: float = 0.4, timeout: int = 60):
+    """
+    Returnerar LLM med användarens nyckel OCH sätter thread-local context
+    så att alla get_llm()-anrop i src/ (CV-generering, brev, jobbparser)
+    också använder rätt nyckel för denna tråd.
+    """
+    from src.libs.resume_and_cover_builder.llm.llm_factory import (
+        get_llm, set_user_llm_context
+    )
+    try:
+        from flask_login import current_user as _cu
+        if _cu and _cu.is_authenticated and _cu.llm_api_key:
+            key      = decrypt_secret(_cu.llm_api_key)
+            provider = _cu.llm_provider or ''
+            model    = _cu.llm_model or ''
+            set_user_llm_context(key, provider, model)
+            return get_llm(temperature=temperature, timeout=timeout,
+                           api_key=key, provider=provider, model=model)
+    except Exception:
+        pass
+    return get_llm(temperature=temperature, timeout=timeout)
+
+
+def _set_search_thread_llm_context(user_id: int):
+    """
+    Sätts i söktrådarna (background threads) innan job_master körs.
+    Säkerställer att CV- och brevgenerering använder rätt nyckel.
+    """
+    from src.libs.resume_and_cover_builder.llm.llm_factory import (
+        set_user_llm_context, clear_user_llm_context
+    )
+    try:
+        with app.app_context():
+            from models import User
+            u = User.query.get(user_id)
+            if u and u.llm_api_key:
+                set_user_llm_context(
+                    decrypt_secret(u.llm_api_key),
+                    u.llm_provider or '',
+                    u.llm_model or '',
+                )
+                return
+    except Exception:
+        pass
+    clear_user_llm_context()
+
+def _validate_api_key(provider: str, api_key: str) -> str | None:
+    """Validerar API-nyckelformat. Returnerar felbeskrivning eller None om OK."""
+    if not api_key:
+        return None  # Tom = ingen ändring
+    # Sanera: ta bort whitespace inkl. newlines
+    api_key = api_key.strip()
+    if '\n' in api_key or '\r' in api_key or '\t' in api_key:
+        return 'API-nyckeln innehåller ogiltiga tecken. Kopiera bara själva nyckeln.'
+    if len(api_key) > 500:
+        return 'API-nyckeln är för lång. Kontrollera att du klistrade in rätt.'
+    if provider == 'openai':
+        if not api_key.startswith('sk-'):
+            return 'OpenAI API-nycklar börjar alltid med "sk-". Kontrollera nyckeln.'
+        if api_key.startswith('sk-ant-'):
+            return 'Det ser ut som en Anthropic-nyckel. Välj "Anthropic" som leverantör.'
+    if provider == 'anthropic' and not api_key.startswith('sk-ant-'):
+        return 'Anthropic API-nycklar börjar med "sk-ant-". Kontrollera nyckeln.'
+    if provider == 'google' and len(api_key) < 20:
+        return 'Google API-nyckeln ser för kort ut. Kontrollera nyckeln.'
+    return None
+
+# ============================================================
 # APP CONFIG HELPERS
 # ============================================================
 
@@ -375,7 +469,21 @@ def _scheduler_loop():
 
 
 def is_setup_complete() -> bool:
-    """Return True if at least one API key is configured"""
+    """Returnerar True om inloggad användare har en API-nyckel,
+    eller om global env har en nyckel (fallback för admin/server-nyckel)."""
+    # 1. Kolla per-user nyckel i databasen
+    try:
+        from flask_login import current_user as _cu
+        if _cu and _cu.is_authenticated:
+            if _cu.llm_provider == 'ollama':
+                return True
+            if _cu.llm_api_key:
+                decrypted = decrypt_secret(_cu.llm_api_key)
+                if decrypted and len(decrypted) > 10:
+                    return True
+    except Exception:
+        pass
+    # 2. Fallback: global env (server-nyckel, bakåtkompatibilitet)
     env = read_env()
     providers = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY']
     for k in providers:
@@ -1040,8 +1148,15 @@ def search_run():
         except queue.Empty:
             break
 
+    # Fånga user_id innan tråden startar (current_user är inte tillgänglig i tråden)
+    _search_user_id = current_user.id if current_user.is_authenticated else None
+
     def run_search():
         global search_state, _stop_requested
+        # Sätt per-user LLM-kontext i söktråden så att CV/brev-generering
+        # använder rätt API-nyckel (inte den globala .env-nyckeln)
+        if _search_user_id:
+            _set_search_thread_llm_context(_search_user_id)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
@@ -2174,11 +2289,10 @@ def _cv_text_to_yaml(cv_text: str):
         return
 
     try:
-        from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_core.output_parsers import StrOutputParser
 
-        llm    = get_llm(temperature=0.2)
+        llm    = get_user_llm(temperature=0.2)
         prompt = ChatPromptTemplate.from_messages([
             ("system",
              "You are a CV parser. Extract information from the CV text and return ONLY a YAML block "
@@ -2226,12 +2340,27 @@ def setup_save_cover_letter_route():
 # ============================================================
 
 @app.route('/settings')
+@login_required
 def settings():
     from src.libs.resume_and_cover_builder.llm.llm_factory import AVAILABLE_MODELS, PROVIDER_INFO
     env           = read_env()
-    model_cfg     = get_current_model_config()
     scheduler_cfg = load_scheduler_config()
     scheduler_cfg['next_run_label'] = _next_run_label(scheduler_cfg)
+
+    # Visa per-user konfiguration om den finns, annars global env
+    if current_user.llm_provider:
+        model_cfg = {
+            'provider': current_user.llm_provider,
+            'model':    current_user.llm_model or 'gpt-4o-mini',
+            'has_key':  bool(current_user.llm_api_key),
+        }
+    else:
+        model_cfg = get_current_model_config()
+        model_cfg['has_key'] = bool(
+            env.get('OPENAI_API_KEY') or env.get('ANTHROPIC_API_KEY') or
+            env.get('GOOGLE_API_KEY') or os.environ.get('OPENAI_API_KEY')
+        )
+
     return render_template('settings.html',
                            env=env,
                            model_cfg=model_cfg,
@@ -2241,24 +2370,42 @@ def settings():
 
 
 @app.route('/settings/save', methods=['POST'])
+@login_required
 def settings_save():
     provider = request.form.get('provider', 'openai')
     model    = request.form.get('model', 'gpt-4o-mini')
     api_key  = request.form.get('api_key', '').strip()
 
-    updates  = {'LLM_PROVIDER': provider, 'LLM_MODEL': model}
-    key_map  = {'openai': 'OPENAI_API_KEY', 'anthropic': 'ANTHROPIC_API_KEY', 'google': 'GOOGLE_API_KEY'}
-    if provider in key_map and api_key:
-        updates[key_map[provider]] = api_key
+    # Validera API-nyckelformat innan vi sparar
+    key_error = _validate_api_key(provider, api_key)
+    if key_error:
+        flash(key_error, 'danger')
+        return redirect(url_for('settings'))
 
+    # Spara provider/modell + krypterad nyckel per användare i databasen
+    from models import db
+    current_user.llm_provider = provider
+    current_user.llm_model    = model
+    if api_key:
+        current_user.llm_api_key = encrypt_secret(api_key)
+    elif provider == 'ollama':
+        current_user.llm_api_key = None  # Ollama behöver ingen nyckel
+
+    # LinkedIn (fortfarande global i .env — ingen annan användare har dessa)
+    env_updates = {}
     linkedin_email    = request.form.get('linkedin_email', '').strip()
     linkedin_password = request.form.get('linkedin_password', '').strip()
     if linkedin_email:
-        updates['LINKEDIN_EMAIL'] = linkedin_email
+        env_updates['LINKEDIN_EMAIL'] = linkedin_email
+        current_user.linkedin_email = linkedin_email
     if linkedin_password:
-        updates['LINKEDIN_PASSWORD'] = linkedin_password
+        env_updates['LINKEDIN_PASSWORD'] = linkedin_password
+        current_user.linkedin_password = encrypt_secret(linkedin_password)
 
-    write_env(updates)
+    db.session.commit()
+    if env_updates:
+        write_env(env_updates)
+
     flash('Inställningar sparade!', 'success')
     return redirect(url_for('settings'))
 
@@ -2832,11 +2979,10 @@ def _fetch_job_description_from_url(url: str) -> str:
 
 def _llm_json_call(prompt_text: str, temperature: float) -> dict:
     """Anropa LLM och parsa JSON-svar. Strippar markdown-fences."""
-    from src.libs.resume_and_cover_builder.llm.llm_factory import get_llm
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
 
-    llm    = get_llm(temperature=temperature)
+    llm    = get_user_llm(temperature=temperature)
     prompt = ChatPromptTemplate.from_messages([("human", "{prompt}")])
     chain  = prompt | llm | StrOutputParser()
     raw    = chain.invoke({'prompt': prompt_text})
