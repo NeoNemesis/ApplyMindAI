@@ -4,7 +4,13 @@
    SIDEBAR TOGGLE
    ============================================================ */
 function toggleSidebar() {
-  document.body.classList.toggle('sidebar-collapsed');
+  document.body.classList.toggle('sidebar-open');
+  document.getElementById('sidebar-overlay').classList.toggle('active');
+}
+
+function closeSidebar() {
+  document.body.classList.remove('sidebar-open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
 }
 
 /* ============================================================
