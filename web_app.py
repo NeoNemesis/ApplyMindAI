@@ -387,6 +387,22 @@ def _next_run_label(cfg: dict) -> str:
             return f'{day_names_sv[candidate.weekday()]} {sched_time}'
     return sched_time
 
+def _set_search_thread_llm_context(uid: int) -> None:
+    """Inject per-user LLM credentials into thread-local for background threads."""
+    from src.libs.resume_and_cover_builder.llm.llm_factory import set_user_llm_context
+    try:
+        from models import User
+        user = User.query.get(uid)
+        if user and user.llm_api_key:
+            set_user_llm_context(
+                api_key  = user.llm_api_key,
+                provider = user.llm_provider or '',
+                model    = user.llm_model    or '',
+            )
+    except Exception:
+        pass  # Fall back to env defaults
+
+
 def _scheduler_loop():
     """Background thread: fires search at the scheduled time each day."""
     while True:
@@ -433,7 +449,11 @@ def _scheduler_loop():
                         'progress': 0, 'started_at': now.isoformat(), 'finished_at': None,
                     })
 
-                def _sched_search(plats=platforms, mj=max_jobs, locs=locations, pos=positions):
+                # Hämta scheduler-ägaren från config (user_id sparas när schema ställs in)
+                sched_user_id = cfg.get('user_id')
+
+                def _sched_search(plats=platforms, mj=max_jobs, locs=locations,
+                                   pos=positions, uid=sched_user_id):
                     global search_state
                     old_out = sys.stdout
                     class _SC:
@@ -447,12 +467,17 @@ def _scheduler_loop():
                     from job_master import JobMaster
                     try:
                         sys.stdout = _SC()
-                        jm = JobMaster()
-                        jm.initialize()
-                        jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
-                        for i, job in enumerate(jobs or [], 1):
-                            jm.generate_documents_for_job(job, i)
-                        jm.cleanup()
+                        # Scheduler kör utanför request-context — behöver app_context
+                        # för DB-access och rätt per-user sökvägar
+                        with app.app_context():
+                            if uid:
+                                _set_search_thread_llm_context(uid)
+                            jm = JobMaster()
+                            jm.initialize()
+                            jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
+                            for i, job in enumerate(jobs or [], 1):
+                                jm.generate_documents_for_job(job, i)
+                            jm.cleanup()
                     except Exception as e:
                         search_queue.put(('error', str(e)))
                     finally:
@@ -1856,7 +1881,9 @@ def api_scheduler_save():
     import re as _re
     if not _re.match(r'^\d{2}:\d{2}$', t):
         t = '08:00'
-    save_scheduler_config({'enabled': enabled, 'time': t, 'days': days})
+    # Spara user_id så schedulern vet vilken användares prefs/nyckel att använda
+    uid = current_user.id if current_user.is_authenticated else None
+    save_scheduler_config({'enabled': enabled, 'time': t, 'days': days, 'user_id': uid})
     cfg = load_scheduler_config()
     cfg['next_run_label'] = _next_run_label(cfg)
     return jsonify({'ok': True, 'next_run_label': cfg['next_run_label']})

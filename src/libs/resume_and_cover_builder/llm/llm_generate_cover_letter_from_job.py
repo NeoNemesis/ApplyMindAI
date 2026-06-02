@@ -28,8 +28,16 @@ logger.add(log_path / "gpt_cover_letter_job_descr.log", rotation="1 day", compre
 class LLMCoverLetterJobDescription:
     def __init__(self, openai_api_key, strings):
         self.llm_cheap = get_llm(temperature=0.4, timeout=60)
-        self.llm_embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
         self.strings = strings
+        # Embeddings: använd OpenAI om nyckel finns, annars hoppa över
+        # (embeddings behövs bara för vektorsökning — fungerar ändå utan för de flesta brevmalar)
+        self._openai_api_key = openai_api_key
+        self.llm_embeddings = None
+        if openai_api_key:
+            try:
+                self.llm_embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key)
+            except Exception:
+                pass
 
     @staticmethod
     def _preprocess_template_string(template: str) -> str:
