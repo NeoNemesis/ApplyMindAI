@@ -65,10 +65,11 @@ def login():
                 user.last_login = datetime.utcnow()
                 db.session.commit()
                 next_page = request.args.get("next") or url_for("index")
-                # Block absolute URLs and protocol-relative URLs (//evil.com)
+                # Block absolute URLs, protocol-relative URLs, and auth routes
                 from urllib.parse import urlparse
                 parsed = urlparse(next_page)
-                if parsed.netloc or parsed.scheme:
+                _bad = parsed.netloc or parsed.scheme or next_page.startswith("/auth") or next_page == "/login"
+                if _bad:
                     next_page = url_for("index")
                 return redirect(next_page)
             else:
