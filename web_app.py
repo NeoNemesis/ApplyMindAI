@@ -750,6 +750,17 @@ def landing():
 # ============================================================
 # ROUTES — DASHBOARD
 # ============================================================
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
+
+@app.route('/login')
+def login_redirect():
+    from flask import redirect, url_for
+    return redirect(url_for('auth.login'))
+
+
 @app.route('/')
 def index():
     stats         = get_stats()

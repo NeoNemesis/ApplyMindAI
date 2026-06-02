@@ -35,10 +35,14 @@ import re
 from pathlib import Path
 from typing import List, Dict, Optional, Set, Tuple
 from datetime import datetime
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+try:
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import TimeoutException, NoSuchElementException
+except ImportError:
+    By = WebDriverWait = EC = None
+    TimeoutException = NoSuchElementException = Exception
 from dotenv import load_dotenv
 
 # Fix Windows console encoding — cp1252 kan inte hantera emojis i loggar
