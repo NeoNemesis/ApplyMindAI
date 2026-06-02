@@ -133,8 +133,14 @@ class JobMaster:
         'örebro', 'norrland', 'norrbotten', 'latinamerika', 'nordamerika'
     ]
 
-    def __init__(self):
-        """Initialisera Job Master"""
+    def __init__(self, output_dir: Path = None, data_dir: Path = None):
+        """Initialisera Job Master.
+
+        output_dir: override för job-utdatakatalogg (annars legacy data_folder/).
+                    web_app.py skickar per-user _user_output_dir() hit.
+        data_dir:   override för data-katalogg (CV, cover letter, cookies).
+                    web_app.py skickar per-user _user_data_dir() hit.
+        """
         self.driver = None
         self.resume_object = None
         self.modern_facade = None
@@ -145,9 +151,16 @@ class JobMaster:
         # Base directory - resolve to script's directory
         self.script_dir = Path(__file__).parent.absolute()
 
-        # Output directories
-        self.base_output_dir = self.script_dir / 'data_folder' / 'output' / 'job_master'
+        # Output directories — per-user path if provided, else legacy fallback
+        self.base_output_dir = Path(output_dir) if output_dir else (
+            self.script_dir / 'data_folder' / 'output' / 'job_master'
+        )
         self.base_output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Data directory — per-user path if provided, else legacy fallback
+        self.base_data_dir = Path(data_dir) if data_dir else (
+            self.script_dir / 'data_folder'
+        )
 
         # Tracking files
         self.processed_jobs_file = self.base_output_dir / 'processed_jobs.json'
@@ -239,7 +252,7 @@ class JobMaster:
         print("="*80)
 
         # Ladda resume
-        resume_yaml_path = self.script_dir / 'data_folder' / 'plain_text_resume.yaml'
+        resume_yaml_path = self.base_data_dir / 'plain_text_resume.yaml'
         print(f"Laddar CV fran: {resume_yaml_path}")
 
         with open(resume_yaml_path, 'r', encoding='utf-8') as f:
@@ -411,7 +424,7 @@ class JobMaster:
 
     def _save_linkedin_cookies(self):
         """Spara LinkedIn-session cookies till fil för framtida inloggningar."""
-        cookie_path = self.script_dir / 'data_folder' / 'linkedin_cookies.json'
+        cookie_path = self.base_data_dir / 'linkedin_cookies.json'
         try:
             cookies = self.driver.get_cookies()
             with open(cookie_path, 'w', encoding='utf-8') as f:
@@ -423,7 +436,7 @@ class JobMaster:
     def _load_linkedin_cookies(self) -> bool:
         """Försök återställa LinkedIn-session från sparade cookies.
         Returnerar True om sidan laddas som inloggad, annars False."""
-        cookie_path = self.script_dir / 'data_folder' / 'linkedin_cookies.json'
+        cookie_path = self.base_data_dir / 'linkedin_cookies.json'
         if not cookie_path.exists():
             return False
         try:
@@ -1508,7 +1521,7 @@ class JobMaster:
         try:
             cover_text = cover_path.read_text(encoding='utf-8', errors='ignore') if cover_path.suffix == '.txt' else ''
             if not cover_text:
-                ref = self.script_dir / 'data_folder' / 'reference_cover_letter.txt'
+                ref = self.base_data_dir / 'reference_cover_letter.txt'
                 cover_text = ref.read_text(encoding='utf-8', errors='ignore') if ref.exists() else ''
             if cover_text:
                 textareas = self.driver.find_elements(By.CSS_SELECTOR, 'textarea')
