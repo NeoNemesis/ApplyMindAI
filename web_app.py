@@ -1413,23 +1413,17 @@ def batch_evaluate():
 
             from job_master import JobMaster
             jm = JobMaster(output_dir=_out_dir, data_dir=_dat_dir)
-            # Lazy browser init — only starts if a job needs it
-            jm.initialize(platforms=['jobtech'])
+            # No browser needed — ATS uses cached job_description.txt
+            jm.initialize(platforms=[])
 
-            def _sync_stop():
-                import time as _t
-                while search_state.get('running') and not _stop_requested:
-                    _t.sleep(0.3)
-                jm.stop_requested = True
-
-            threading.Thread(target=_sync_stop, daemon=True).start()
-
+            passed_jobs = []
             passed = 0
             failed = 0
 
             for i, job in enumerate(jobs, 1):
                 if _stop_requested:
                     search_queue.put(('output', '\n⛔ Avbruten av användaren.\n'))
+                    passed_jobs.extend(jobs[i - 1:])
                     break
 
                 search_queue.put(('progress', f'{i}/{len(jobs)}'))
@@ -1437,36 +1431,63 @@ def batch_evaluate():
                     f'\n[{i}/{len(jobs)}] {job["title"]} @ {job["company"]}\n'
                 ))
 
-                ok = jm.generate_documents_for_job(
-                    job, i,
-                    ats_filter=True,
-                    ats_threshold=60,
-                )
+                # Locate job folder: try exact Job_{i:03d} name first, then scan
+                safe_company = "".join(
+                    c for c in job['company'] if c.isalnum() or c in (' ', '-', '_')
+                ).strip()
+                safe_title = "".join(
+                    c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')
+                ).strip()
+                folder_path = _out_dir / f"Job_{i:03d}_{safe_company}_{safe_title}"
+                if not folder_path.exists():
+                    sig = f"{safe_company}_{safe_title[:15]}".lower()
+                    candidates = [
+                        f for f in _out_dir.iterdir()
+                        if f.is_dir() and sig in f.name.lower()
+                    ]
+                    folder_path = candidates[0] if candidates else None
 
-                if ok:
+                # Read cached job description — never re-fetch URLs
+                desc = ''
+                if folder_path and folder_path.exists():
+                    desc_file = folder_path / 'job_description.txt'
+                    if desc_file.exists():
+                        desc = desc_file.read_text(encoding='utf-8')
+
+                if not desc:
+                    search_queue.put(('output',
+                        '   ⚠️  Ingen cachad jobbeskrivning — jobbet behålls\n'
+                    ))
+                    passed_jobs.append(job)
                     passed += 1
-                    search_queue.put(('output', '   ✅ Dokument genererade! (ATS ≥ 60%)\n'))
+                    continue
+
+                score, reasoning = jm.quick_ats_score(desc, 60)
+                search_queue.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
+
+                if score >= 60:
+                    passed_jobs.append(job)
+                    passed += 1
+                    search_queue.put(('output', '   ✅ Godkänd (ATS ≥ 60%) — behålls\n'))
                 else:
                     failed += 1
-                    search_queue.put(('output', '   ❌ Under tröskeln (ATS < 60%) — tar bort mapp...\n'))
-                    # Delete the job folder so it doesn't clutter the jobs list
-                    safe_company = "".join(
-                        c for c in job['company'] if c.isalnum() or c in (' ', '-', '_')
-                    ).strip()
-                    safe_title = "".join(
-                        c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')
-                    ).strip()
-                    folder_path = _out_dir / f"Job_{i:03d}_{safe_company}_{safe_title}"
-                    if folder_path.exists():
+                    short_reason = reasoning[:80] + ('...' if len(reasoning) > 80 else '')
+                    search_queue.put(('output', f'   ❌ Under tröskeln — {short_reason}\n'))
+                    if folder_path and folder_path.exists():
                         shutil.rmtree(folder_path)
-                        search_queue.put(('output', f'   🗑️  Borttagen: {folder_path.name}\n'))
+                        search_queue.put(('output', f'   🗑️  Mapp borttagen: {folder_path.name}\n'))
 
             jm.cleanup()
 
+            # Sync found_jobs.json — remove deleted jobs so search page updates too
+            _found_jobs_path.write_text(
+                json.dumps(passed_jobs, ensure_ascii=False, indent=2),
+                encoding='utf-8',
+            )
+
             search_queue.put(('output',
                 f'\n{sep}\n'
-                f'📊 RESULTAT: {passed} godkända, {failed} borttagna av {len(jobs)} jobb\n'
-                f'📂 Filer: {_out_dir}\n'
+                f'📊 RESULTAT: {passed} behållna, {failed} borttagna av {len(jobs)} jobb\n'
             ))
 
         except Exception as e:
