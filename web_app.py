@@ -435,6 +435,9 @@ def _scheduler_loop():
 
                 save_scheduler_config({'last_run_date': today_str})
 
+                # Hämta scheduler-ägaren (sparas av api_scheduler_save)
+                uid = cfg.get('user_id')
+
                 # Load saved preferences and fire search
                 prefs = load_yaml(PREFS_YAML()) or {}
                 platforms  = prefs.get('platforms', ['indeed', 'jobtech'])
@@ -472,7 +475,10 @@ def _scheduler_loop():
                         with app.app_context():
                             if uid:
                                 _set_search_thread_llm_context(uid)
-                            jm = JobMaster()
+                            jm = JobMaster(
+                                output_dir = _user_output_dir(uid),
+                                data_dir   = _user_data_dir(uid),
+                            )
                             jm.initialize()
                             jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
                             for i, job in enumerate(jobs or [], 1):
@@ -1214,7 +1220,7 @@ def search_run():
             sys.stderr = OutputCapture()
 
             _stop_requested = False
-            jm = JobMaster()
+            jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
             jm.stop_requested = False
             jm.initialize(platforms=platforms)  # Skip browser if only API platforms selected
 
@@ -1410,7 +1416,7 @@ def batch_evaluate():
             ))
 
             from job_master import JobMaster
-            jm = JobMaster()
+            jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
             # Lazy browser init — only starts if a job needs it
             jm.initialize(platforms=['jobtech'])
 
@@ -1720,7 +1726,7 @@ def api_regenerate_docs():
 
     try:
         from job_master import JobMaster
-        jm = JobMaster()
+        jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
         jm.initialize(platforms=[])
 
         # Bygg ett minimalt jobb-objekt med sparad beskrivning
