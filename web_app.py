@@ -387,6 +387,22 @@ def _next_run_label(cfg: dict) -> str:
             return f'{day_names_sv[candidate.weekday()]} {sched_time}'
     return sched_time
 
+def _set_search_thread_llm_context(uid: int) -> None:
+    """Inject per-user LLM credentials into thread-local for background threads."""
+    from src.libs.resume_and_cover_builder.llm.llm_factory import set_user_llm_context
+    try:
+        from models import User
+        user = User.query.get(uid)
+        if user and user.llm_api_key:
+            set_user_llm_context(
+                api_key  = user.llm_api_key,
+                provider = user.llm_provider or '',
+                model    = user.llm_model    or '',
+            )
+    except Exception:
+        pass  # Fall back to env defaults
+
+
 def _scheduler_loop():
     """Background thread: fires search at the scheduled time each day."""
     while True:
@@ -456,10 +472,6 @@ def _scheduler_loop():
                         with app.app_context():
                             if uid:
                                 _set_search_thread_llm_context(uid)
-                                # Läs rätt användares prefs explicit
-                                user_out = INSTANCE_UPLOADS / f'user_{uid}' / 'output' / 'job_master'
-                                user_data = INSTANCE_UPLOADS / f'user_{uid}' / 'data'
-                                user_out.mkdir(parents=True, exist_ok=True)
                             jm = JobMaster()
                             jm.initialize()
                             jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
