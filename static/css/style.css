@@ -928,18 +928,41 @@ body.sidebar-collapsed .main-content {
   color: var(--green);
 }
 
+/* ── Mobile sidebar overlay ──────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(calc(-1 * var(--sidebar-w)));
+    z-index: 200;
   }
   .main-content {
     margin-left: 0;
   }
   body.sidebar-open .sidebar {
     transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .sidebar-overlay {
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
   }
   .hero-title {
     font-size: 1.3rem;
