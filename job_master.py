@@ -1367,6 +1367,15 @@ class JobMaster:
                         print(f"   ⏭️  Hoppar över: {title} (för avancerad nivå)")
                         continue
 
+                    # Ansökningsdeadline — Jobtech ger alltid detta fält
+                    raw_deadline = hit.get('application_deadline', '') or ''
+                    deadline_date = raw_deadline[:10] if raw_deadline else ''
+
+                    # Hoppa över utgångna annonser
+                    if deadline_date and deadline_date < datetime.now().strftime('%Y-%m-%d'):
+                        print(f"   ⏭️  Utgången ({deadline_date}): {title}")
+                        continue
+
                     job = {
                         'title': title,
                         'company': company,
@@ -1375,13 +1384,15 @@ class JobMaster:
                         'source': 'Jobtech/AF',
                         'search_query': f"{position} i {location}",
                         'found_date': datetime.now().isoformat(),
+                        'deadline': deadline_date,
                     }
                     if self._job_is_duplicate(job, seen_urls, seen_sigs):
                         continue
 
                     self._mark_job_seen(job, seen_urls, seen_sigs)
                     all_jobs.append(job)
-                    print(f"   ✅ {title} @ {company} - {job_location}")
+                    dl_str = f" | frist {deadline_date}" if deadline_date else ''
+                    print(f"   ✅ {title} @ {company} - {job_location}{dl_str}")
 
             except Exception as e:
                 print(f"   ⚠️  Jobtech-fel för '{position} i {location}': {e}")
@@ -1723,7 +1734,10 @@ class JobMaster:
                 f.write(f"Företag: {job['company']}\n")
                 f.write(f"Plats: {job['location']}\n")
                 f.write(f"Källa: {job['source']}\n")
-                f.write(f"Hittad: {job['found_date']}\n\n")
+                f.write(f"Hittad: {job['found_date']}\n")
+                if job.get('deadline'):
+                    f.write(f"Sista ansökningsdag: {job['deadline']}\n")
+                f.write("\n")
 
                 f.write("="*80 + "\n")
                 f.write("HUR MAN SÖKER\n")

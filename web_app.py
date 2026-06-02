@@ -619,6 +619,8 @@ def parse_job_folder(folder: Path) -> dict:
                 info['source'] = line.split('Källa:', 1)[1].strip()
             elif 'Hittad:' in line:
                 info['date'] = line.split('Hittad:', 1)[1].strip()
+            elif 'Sista ansökningsdag:' in line:
+                info['deadline'] = line.split('Sista ansökningsdag:', 1)[1].strip()
 
     if not info.get('title'):
         parts = folder.name.split('_', 3)
@@ -642,6 +644,7 @@ def parse_job_folder(folder: Path) -> dict:
         'source':          info.get('source', ''),
         'url':             info.get('url', ''),
         'date':            info.get('date', '')[:10] if info.get('date') else '',
+        'deadline':        info.get('deadline', '')[:10] if info.get('deadline') else '',
         'cv_file':         cv_file.name     if cv_file     else None,
         'letter_file':     letter_file.name if letter_file else None,
         'has_letter':      letter_file is not None,
@@ -1498,9 +1501,12 @@ def batch_evaluate():
 
 @app.route('/jobs')
 def jobs():
-    folders  = get_job_folders()
-    job_list = [parse_job_folder(f) for f in folders]
-    return render_template('jobs.html', jobs=job_list)
+    from datetime import timedelta
+    folders      = get_job_folders()
+    job_list     = [parse_job_folder(f) for f in folders]
+    today        = datetime.now().strftime('%Y-%m-%d')
+    warning_date = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
+    return render_template('jobs.html', jobs=job_list, today=today, warning_date=warning_date)
 
 
 @app.route('/download-pdf')

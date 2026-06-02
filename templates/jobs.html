@@ -57,7 +57,8 @@
             <th>Titel</th>
             <th>Företag</th>
             <th>Plats</th>
-            <th>Datum</th>
+            <th>Hittad</th>
+            <th>Sista dag</th>
             <th>Dokument</th>
             <th class="text-center">ATS</th>
             <th class="text-center">Åtgärder</th>
@@ -74,6 +75,19 @@
             <td>{{ job.company }}</td>
             <td><small class="text-muted">{{ job.location }}</small></td>
             <td><small class="text-muted">{{ job.date }}</small></td>
+            <td>
+              {% if job.deadline %}
+                {% if job.deadline < today %}
+                  <small class="text-danger"><i class="bi bi-x-circle me-1"></i>{{ job.deadline }}</small>
+                {% elif job.deadline <= warning_date %}
+                  <small class="text-warning fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>{{ job.deadline }}</small>
+                {% else %}
+                  <small class="text-success"><i class="bi bi-calendar-check me-1"></i>{{ job.deadline }}</small>
+                {% endif %}
+              {% else %}
+                <small class="text-muted">—</small>
+              {% endif %}
+            </td>
             <td>
               {% if job.has_letter %}
                 <span class="badge-letter"><i class="bi bi-check2 me-1"></i>CV + Brev</span>
