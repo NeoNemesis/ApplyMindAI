@@ -387,22 +387,6 @@ def _next_run_label(cfg: dict) -> str:
             return f'{day_names_sv[candidate.weekday()]} {sched_time}'
     return sched_time
 
-def _set_search_thread_llm_context(uid: int) -> None:
-    """Inject per-user LLM credentials into thread-local for background threads."""
-    from src.libs.resume_and_cover_builder.llm.llm_factory import set_user_llm_context
-    try:
-        from models import User
-        user = User.query.get(uid)
-        if user and user.llm_api_key:
-            set_user_llm_context(
-                api_key  = user.llm_api_key,
-                provider = user.llm_provider or '',
-                model    = user.llm_model    or '',
-            )
-    except Exception:
-        pass  # Fall back to env defaults
-
-
 def _scheduler_loop():
     """Background thread: fires search at the scheduled time each day."""
     while True:
@@ -1223,7 +1207,7 @@ def search_run():
             sys.stderr = OutputCapture()
 
             _stop_requested = False
-            jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
+            jm = JobMaster(output_dir=_user_output_dir(_search_user_id), data_dir=_user_data_dir(_search_user_id))
             jm.stop_requested = False
             jm.initialize(platforms=platforms)  # Skip browser if only API platforms selected
 
@@ -1370,6 +1354,9 @@ def batch_evaluate():
             'finished_at':  None,
         })
 
+    # Fånga user_id innan tråden startar (current_user är inte tillgänglig i tråden)
+    _eval_user_id = current_user.id if current_user.is_authenticated else None
+
     # Flush queue
     while not search_queue.empty():
         try:
@@ -1379,6 +1366,8 @@ def batch_evaluate():
 
     def run_evaluation():
         global _stop_requested
+        if _eval_user_id:
+            _set_search_thread_llm_context(_eval_user_id)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
@@ -1402,11 +1391,15 @@ def batch_evaluate():
         sys.stderr = OutputCapture()
 
         try:
-            if not FOUND_JOBS().exists():
+            _out_dir = _user_output_dir(_eval_user_id)
+            _dat_dir = _user_data_dir(_eval_user_id)
+            _found_jobs_path = _out_dir / 'found_jobs.json'
+
+            if not _found_jobs_path.exists():
                 search_queue.put(('error', '❌ Inga sparade jobb hittades. Gör en sökning först.\n'))
                 return
 
-            jobs = json.loads(FOUND_JOBS().read_text(encoding='utf-8'))
+            jobs = json.loads(_found_jobs_path.read_text(encoding='utf-8'))
             if not jobs:
                 search_queue.put(('output', '❌ Jobbfilen är tom. Gör en ny sökning.\n'))
                 search_queue.put(('done', None))
@@ -1419,7 +1412,7 @@ def batch_evaluate():
             ))
 
             from job_master import JobMaster
-            jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
+            jm = JobMaster(output_dir=_out_dir, data_dir=_dat_dir)
             # Lazy browser init — only starts if a job needs it
             jm.initialize(platforms=['jobtech'])
 
@@ -1463,7 +1456,7 @@ def batch_evaluate():
                     safe_title = "".join(
                         c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')
                     ).strip()
-                    folder_path = _user_output_dir() / f"Job_{i:03d}_{safe_company}_{safe_title}"
+                    folder_path = _out_dir / f"Job_{i:03d}_{safe_company}_{safe_title}"
                     if folder_path.exists():
                         shutil.rmtree(folder_path)
                         search_queue.put(('output', f'   🗑️  Borttagen: {folder_path.name}\n'))
@@ -1473,7 +1466,7 @@ def batch_evaluate():
             search_queue.put(('output',
                 f'\n{sep}\n'
                 f'📊 RESULTAT: {passed} godkända, {failed} borttagna av {len(jobs)} jobb\n'
-                f'📂 Filer: {_user_output_dir()}\n'
+                f'📂 Filer: {_out_dir}\n'
             ))
 
         except Exception as e:
