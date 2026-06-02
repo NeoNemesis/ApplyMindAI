@@ -435,6 +435,9 @@ def _scheduler_loop():
 
                 save_scheduler_config({'last_run_date': today_str})
 
+                # Hämta scheduler-ägaren (sparas av api_scheduler_save)
+                uid = cfg.get('user_id')
+
                 # Load saved preferences and fire search
                 prefs = load_yaml(PREFS_YAML()) or {}
                 platforms  = prefs.get('platforms', ['indeed', 'jobtech'])
