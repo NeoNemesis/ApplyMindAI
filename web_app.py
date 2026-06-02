@@ -750,6 +750,11 @@ def landing():
 # ============================================================
 # ROUTES — DASHBOARD
 # ============================================================
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
+
 @app.route('/')
 def index():
     stats         = get_stats()
