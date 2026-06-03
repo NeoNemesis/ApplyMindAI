@@ -564,11 +564,16 @@ def save_tracker(data: dict):
 
 
 def get_job_folders():
-    """Get all job output folders sorted newest first — per-user isolated"""
+    """Get all job output folders with at least one PDF — per-user isolated.
+    Folders without PDFs are failed/incomplete jobs and should not be shown."""
     d = _user_output_dir()
     if not d.exists():
         return []
-    return sorted([f for f in d.iterdir() if f.is_dir()], key=lambda x: x.name, reverse=True)
+    folders = []
+    for f in d.iterdir():
+        if f.is_dir() and any(f.glob('*.pdf')):
+            folders.append(f)
+    return sorted(folders, key=lambda x: x.name, reverse=True)
 
 
 def parse_job_folder(folder: Path) -> dict:
@@ -1479,15 +1484,36 @@ def batch_evaluate():
 
                 search_queue.put(('output', f'\n[{i}/{len(job_folders)}] {display_name}\n'))
 
-                desc_file = folder / 'job_description.txt'
-                if not desc_file.exists():
-                    search_queue.put(('output', '   ⚠️  Ingen jobbeskrivning — hoppar över\n'))
+                # Hoppa över mappar utan PDFs — misslyckade jobb
+                if not any(folder.glob('*.pdf')):
+                    search_queue.put(('output', '   ⚠️  Inga dokument — hoppar över\n'))
                     skipped += 1
                     continue
 
-                desc = desc_file.read_text(encoding='utf-8')
-                score, reasoning = jm.quick_ats_score(desc, 60)
-                search_queue.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
+                # Använd cachad ATS-poäng (ats_score.json) om den finns
+                # quick_ats_score ger ofta annorlunda resultat än den detaljerade analysen
+                score = None
+                reasoning = ''
+                score_file = folder / 'ats_score.json'
+                if score_file.exists():
+                    try:
+                        cached = json.loads(score_file.read_text(encoding='utf-8'))
+                        score = cached.get('score')
+                        reasoning = cached.get('summary', cached.get('reasoning', 'Cachad poäng'))
+                        search_queue.put(('output', f'   🎯 ATS-poäng (cachad): {score}/100\n'))
+                    except Exception:
+                        score = None
+
+                # Fallback: beräkna med quick_ats_score om ingen cache
+                if score is None:
+                    desc_file = folder / 'job_description.txt'
+                    if not desc_file.exists():
+                        search_queue.put(('output', '   ⚠️  Ingen beskrivning eller cache — hoppar över\n'))
+                        skipped += 1
+                        continue
+                    desc = desc_file.read_text(encoding='utf-8')
+                    score, reasoning = jm.quick_ats_score(desc, 60)
+                    search_queue.put(('output', f'   🎯 ATS-poäng (beräknad): {score}/100\n'))
 
                 if score >= 60:
                     passed += 1
