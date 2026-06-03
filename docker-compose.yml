@@ -11,6 +11,7 @@ services:
       - applymind-instance:/app/instance
       - ./data_folder:/app/data_folder
       - ./web_app.py:/app/web_app.py:ro
+      - ./job_master.py:/app/job_master.py:ro
       - ./auth.py:/app/auth.py:ro
       - ./models.py:/app/models.py:ro
       - ./admin.py:/app/admin.py:ro
@@ -21,6 +22,7 @@ services:
     networks:
       - applymind-net
       - taskit-net
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--timeout", "300", "web_app:app"]
     expose:
       - "5000"
     healthcheck:

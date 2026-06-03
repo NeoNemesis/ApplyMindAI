@@ -67,11 +67,15 @@ fi
 
 # ── Bygg bara om beroenden eller Dockerfile ändrats ────────────────────
 DEPS_CHANGED=$(git diff HEAD~1..HEAD -- requirements.production.txt Dockerfile 2>/dev/null | grep -c '^+' || echo 0)
+COMPOSE_CHANGED=$(git diff HEAD~1..HEAD -- docker-compose.yml 2>/dev/null | grep -c '^+' || echo 0)
 
 if [[ "$DEPS_CHANGED" -gt 0 ]]; then
   log "📦 Beroenden ändrade — full rebuild (kort downtime möjlig)"
   docker compose --env-file "$ENV_FILE" build
   docker compose --env-file "$ENV_FILE" up -d --wait
+elif [[ "$COMPOSE_CHANGED" -gt 0 ]]; then
+  log "🔄 docker-compose.yml ändrad — återskapar container (applicerar nya volumes/env)"
+  docker compose --env-file "$ENV_FILE" up -d --force-recreate
 else
   log "⚡ Kod-ändring — gunicorn graceful reload (noll downtime)"
   # Källkoden är monterad som volym — kill -HUP laddar om workers
