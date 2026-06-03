@@ -70,12 +70,33 @@ def init_browser():
 
 
 
+def _html_to_pdf_playwright(html_content: str) -> str:
+    """Konvertera HTML till PDF med Playwright Chromium (fallback när Selenium ej finns)."""
+    import base64 as _b64
+    from playwright.sync_api import sync_playwright
+    encoded = urllib.parse.quote(html_content)
+    data_url = f"data:text/html;charset=utf-8,{encoded}"
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True, args=['--no-sandbox', '--disable-dev-shm-usage'])
+        page = browser.new_page()
+        page.emulate_media(media='print')
+        page.goto(data_url, wait_until='networkidle', timeout=30000)
+        pdf_bytes = page.pdf(
+            format='A4',
+            print_background=True,
+            margin={'top': '0.5cm', 'bottom': '0.5cm', 'left': '0.5cm', 'right': '0.5cm'},
+        )
+        browser.close()
+    return _b64.b64encode(pdf_bytes).decode('utf-8')
+
+
 def HTML_to_PDF(html_content, driver):
     """
     Converte una stringa HTML in un PDF e restituisce il PDF come stringa base64.
+    Om driver är None används Playwright Chromium som fallback (production-läge).
 
     :param html_content: Stringa contenente il codice HTML da convertire.
-    :param driver: Istanza del WebDriver di Selenium.
+    :param driver: Istanza del WebDriver di Selenium, eller None för Playwright-fallback.
     :return: Stringa base64 del PDF generato.
     :raises ValueError: Se l'input HTML non è una stringa valida.
     :raises RuntimeError: Se si verifica un'eccezione nel WebDriver.
@@ -83,6 +104,15 @@ def HTML_to_PDF(html_content, driver):
     # Validazione del contenuto HTML
     if not isinstance(html_content, str) or not html_content.strip():
         raise ValueError("Il contenuto HTML deve essere una stringa non vuota.")
+
+    # Playwright-fallback om Selenium-driver saknas
+    if driver is None:
+        logger.info("🎭 Playwright-fallback aktiverad för PDF-generering (ingen Selenium-driver)")
+        try:
+            return _html_to_pdf_playwright(html_content)
+        except Exception as e:
+            logger.error(f"❌ Playwright PDF-generering misslyckades: {e}")
+            raise RuntimeError(f"PDF-generering misslyckades (varken Selenium eller Playwright fungerar): {e}")
 
     # Codifica l'HTML in un URL di tipo data
     encoded_html = urllib.parse.quote(html_content)

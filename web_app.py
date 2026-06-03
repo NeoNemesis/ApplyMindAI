@@ -1342,6 +1342,27 @@ def search_status():
     return jsonify(search_state)
 
 
+@app.route('/search/force-reset', methods=['POST'])
+def search_force_reset():
+    """Force-reset search state if a previous search got stuck."""
+    global _stop_requested
+    with _search_lock:
+        _stop_requested = True
+        search_state.update({
+            'running':     False,
+            'output':      [],
+            'error':       None,
+            'progress':    0,
+            'finished_at': datetime.now().isoformat(),
+        })
+    while not search_queue.empty():
+        try:
+            search_queue.get_nowait()
+        except queue.Empty:
+            break
+    return jsonify({'status': 'reset'})
+
+
 # ============================================================
 # ROUTES — BATCH RE-EVALUATE
 # ============================================================
@@ -1406,99 +1427,99 @@ def batch_evaluate():
             _dat_dir = _user_data_dir(_eval_user_id)
             _found_jobs_path = _out_dir / 'found_jobs.json'
 
-            if not _found_jobs_path.exists():
-                search_queue.put(('error', '❌ Inga sparade jobb hittades. Gör en sökning först.\n'))
-                return
+            # Scan actual job folders on disk — not found_jobs.json (which may be out of sync)
+            job_folders = sorted(
+                [f for f in _out_dir.iterdir() if f.is_dir() and f.name.startswith('Job_')],
+                key=lambda x: x.name,
+            )
 
-            jobs = json.loads(_found_jobs_path.read_text(encoding='utf-8'))
-            if not jobs:
-                search_queue.put(('output', '❌ Jobbfilen är tom. Gör en ny sökning.\n'))
+            if not job_folders:
+                search_queue.put(('output', '❌ Inga jobbmappar hittades. Gör en sökning först.\n'))
                 search_queue.put(('done', None))
                 return
 
             sep = '=' * 60
             search_queue.put(('output',
-                f'\n🔍 Utvärderar {len(jobs)} sparade jobb med ATS-filter (tröskel: 60%)...\n'
+                f'\n🔍 Utvärderar {len(job_folders)} jobbmappar med ATS-filter (tröskel: 60%)...\n'
                 f'{sep}\n'
             ))
 
             from job_master import JobMaster
             jm = JobMaster(output_dir=_out_dir, data_dir=_dat_dir)
-            # No browser needed — ATS uses cached job_description.txt
             jm.initialize(platforms=[])
 
-            passed_jobs = []
             passed = 0
             failed = 0
+            skipped = 0
 
-            for i, job in enumerate(jobs, 1):
+            for i, folder in enumerate(job_folders, 1):
                 if _stop_requested:
                     search_queue.put(('output', '\n⛔ Avbruten av användaren.\n'))
-                    passed_jobs.extend(jobs[i - 1:])
                     break
 
-                search_queue.put(('progress', f'{i}/{len(jobs)}'))
-                search_queue.put(('output',
-                    f'\n[{i}/{len(jobs)}] {job["title"]} @ {job["company"]}\n'
-                ))
+                search_queue.put(('progress', f'{i}/{len(job_folders)}'))
 
-                # Locate job folder: try exact Job_{i:03d} name first, then scan
-                safe_company = "".join(
-                    c for c in job['company'] if c.isalnum() or c in (' ', '-', '_')
-                ).strip()
-                safe_title = "".join(
-                    c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')
-                ).strip()
-                folder_path = _out_dir / f"Job_{i:03d}_{safe_company}_{safe_title}"
-                if not folder_path.exists():
-                    sig = f"{safe_company}_{safe_title[:15]}".lower()
-                    candidates = [
-                        f for f in _out_dir.iterdir()
-                        if f.is_dir() and sig in f.name.lower()
-                    ]
-                    folder_path = candidates[0] if candidates else None
+                # Read job title for display
+                display_name = folder.name
+                info_file = folder / 'job_info.txt'
+                if info_file.exists():
+                    for line in info_file.read_text(encoding='utf-8').split('\n'):
+                        if 'Titel:' in line:
+                            display_name = line.split('Titel:', 1)[1].strip()
+                            break
 
-                # Read cached job description — never re-fetch URLs
-                desc = ''
-                if folder_path and folder_path.exists():
-                    desc_file = folder_path / 'job_description.txt'
-                    if desc_file.exists():
-                        desc = desc_file.read_text(encoding='utf-8')
+                search_queue.put(('output', f'\n[{i}/{len(job_folders)}] {display_name}\n'))
 
-                if not desc:
-                    search_queue.put(('output',
-                        '   ⚠️  Ingen cachad jobbeskrivning — jobbet behålls\n'
-                    ))
-                    passed_jobs.append(job)
-                    passed += 1
+                desc_file = folder / 'job_description.txt'
+                if not desc_file.exists():
+                    search_queue.put(('output', '   ⚠️  Ingen jobbeskrivning — hoppar över\n'))
+                    skipped += 1
                     continue
 
+                desc = desc_file.read_text(encoding='utf-8')
                 score, reasoning = jm.quick_ats_score(desc, 60)
                 search_queue.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
 
                 if score >= 60:
-                    passed_jobs.append(job)
                     passed += 1
                     search_queue.put(('output', '   ✅ Godkänd (ATS ≥ 60%) — behålls\n'))
                 else:
                     failed += 1
                     short_reason = reasoning[:80] + ('...' if len(reasoning) > 80 else '')
                     search_queue.put(('output', f'   ❌ Under tröskeln — {short_reason}\n'))
-                    if folder_path and folder_path.exists():
-                        shutil.rmtree(folder_path)
-                        search_queue.put(('output', f'   🗑️  Mapp borttagen: {folder_path.name}\n'))
+                    shutil.rmtree(folder)
+                    search_queue.put(('output', f'   🗑️  Mapp borttagen: {folder.name}\n'))
 
             jm.cleanup()
 
-            # Sync found_jobs.json — remove deleted jobs so search page updates too
-            _found_jobs_path.write_text(
-                json.dumps(passed_jobs, ensure_ascii=False, indent=2),
-                encoding='utf-8',
-            )
+            # Update found_jobs.json: remove entries whose folder no longer exists
+            if _found_jobs_path.exists():
+                try:
+                    found_jobs = json.loads(_found_jobs_path.read_text(encoding='utf-8'))
+                    remaining = {f.name.lower() for f in _out_dir.iterdir() if f.is_dir()}
+
+                    def _folder_still_exists(job):
+                        safe_c = ''.join(
+                            c for c in job.get('company', '') if c.isalnum() or c in (' ', '-', '_')
+                        ).strip()
+                        safe_t = ''.join(
+                            c for c in job.get('title', '')[:30] if c.isalnum() or c in (' ', '-', '_')
+                        ).strip()
+                        sig = f'{safe_c}_{safe_t[:15]}'.lower()
+                        return any(sig in fname for fname in remaining)
+
+                    kept = [j for j in found_jobs if _folder_still_exists(j)]
+                    _found_jobs_path.write_text(
+                        json.dumps(kept, ensure_ascii=False, indent=2), encoding='utf-8'
+                    )
+                except Exception:
+                    pass  # Non-critical
 
             search_queue.put(('output',
                 f'\n{sep}\n'
-                f'📊 RESULTAT: {passed} behållna, {failed} borttagna av {len(jobs)} jobb\n'
+                f'📊 RESULTAT: {passed} behållna, {failed} borttagna'
+                + (f', {skipped} utan beskrivning' if skipped else '')
+                + f' av {len(job_folders)} mappar\n'
             ))
 
         except Exception as e:

@@ -9,9 +9,16 @@
     <i class="bi bi-search me-2"></i>Jobbsökning
   </h5>
   {% if search_state.running %}
-    <span class="badge bg-warning text-dark fs-6 pulse">
-      <i class="bi bi-hourglass-split me-1"></i>Sökning pågår...
-    </span>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-warning text-dark fs-6 pulse">
+        <i class="bi bi-hourglass-split me-1"></i>Sökning pågår...
+      </span>
+      <button type="button" class="btn btn-sm btn-outline-danger"
+              onclick="forceResetSearch()"
+              title="Fastnar sökningen? Klicka för att tvinga återställning.">
+        <i class="bi bi-x-circle me-1"></i>Fastnad? Återställ
+      </button>
+    </div>
   {% endif %}
 </div>
 
@@ -19,7 +26,7 @@
 
   <!-- Left: Search form -->
   <div class="col-lg-5">
-    <form id="search-form">
+    <form id="search-form" onsubmit="return false;">
 
       <!-- CV Design Picker — TOP of left column -->
       <div class="form-section">
@@ -650,5 +657,12 @@ fetch('/api/found-jobs').then(r => r.json()).then(j => {
   const c = document.getElementById('found-count');
   if (c) c.textContent = j.length;
 });
+
+function forceResetSearch() {
+  fetch('/search/force-reset', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => window.location.reload())
+    .catch(() => window.location.reload());
+}
 </script>
 {% endblock %}

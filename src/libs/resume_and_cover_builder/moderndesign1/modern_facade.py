@@ -56,6 +56,22 @@ class ModernDesign1Facade:
         self.driver = driver
         logger.debug("🌐 WebDriver satt för ModernDesign1Facade")
     
+    def _fetch_html_via_requests(self, job_url: str) -> str:
+        """Hämta sida via requests när browser saknas. Returnerar body-HTML eller tom sträng."""
+        try:
+            import requests as _req
+            from bs4 import BeautifulSoup as _BS
+            resp = _req.get(job_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
+                'Accept-Language': 'sv-SE,sv;q=0.9,en;q=0.8',
+            }, timeout=15, allow_redirects=True)
+            soup = _BS(resp.text, 'html.parser')
+            body = soup.find('body')
+            return str(body) if body else resp.text
+        except Exception as e:
+            logger.warning(f"⚠️ requests-fallback misslyckades för {job_url}: {e}")
+            return ''
+
     def link_to_job(self, job_url: str, job_title: str = "", job_company: str = ""):
         """Länka till jobb - FÖRBÄTTRAD VERSION MED TIMEOUT-HANTERING"""
         self._job_title_hint = job_title
@@ -63,13 +79,16 @@ class ModernDesign1Facade:
         try:
             logger.info(f"🔗 Modern Design 1: Länkar till jobb: {job_url}")
 
-            # Lägg till timeout för WebDriver-anrop
-            self.driver.set_page_load_timeout(30)  # 30 sekunder timeout
-            self.driver.get(job_url)
-            self.driver.implicitly_wait(10)
-
-            body_element = self.driver.find_element("tag name", "body")
-            body_element = body_element.get_attribute("outerHTML")
+            # Hämta HTML — browser om tillgänglig, annars requests-fallback
+            if self.driver is not None:
+                self.driver.set_page_load_timeout(30)
+                self.driver.get(job_url)
+                self.driver.implicitly_wait(10)
+                body_element_obj = self.driver.find_element("tag name", "body")
+                body_element = body_element_obj.get_attribute("outerHTML")
+            else:
+                logger.info("🔄 Browser ej tillgänglig — använder requests-fallback")
+                body_element = self._fetch_html_via_requests(job_url)
 
             # Extrahera ren text från HTML för språkdetektering
             # Detta ger oss HELA jobbeskrivningen, inte bara sammanfattningen
