@@ -308,7 +308,9 @@ class JobMaster:
         print("="*80)
 
     def _ensure_browser(self):
-        """Starta browser om den inte redan är igång (lazy init för dokumentgenerering)."""
+        """Starta browser om den inte redan är igång (lazy init för dokumentgenerering).
+        Loggar varning om browser inte kan startas — kastar INTE längre RuntimeError
+        så dokumentgenerering kan fortsätta via requests-fallback i link_to_job."""
         if self.driver is not None:
             return  # Already running
 
@@ -322,7 +324,7 @@ class JobMaster:
             self._browser_initialized = True
             print("Browser startad.")
         except Exception as e:
-            raise RuntimeError(f"Kunde inte starta browser for dokumentgenerering: {e}")
+            print(f"⚠️  Browser ej tillgänglig ({e}) — forsätter med requests-fallback")
 
     def show_main_menu(self) -> Dict:
         """Visa huvudmeny och få användarens val"""
@@ -1380,6 +1382,27 @@ class JobMaster:
                         print(f"   ⏭️  Utgången ({deadline_date}): {title}")
                         continue
 
+                    # Spara jobbeskrivning direkt från API:et — ingen browser behövs
+                    _desc_obj = hit.get('description') or {}
+                    _desc_text = ''
+                    if isinstance(_desc_obj, dict):
+                        _desc_text = _desc_obj.get('text', '') or _desc_obj.get('text_formatted', '') or ''
+                        # Rensa HTML-taggar om text_formatted
+                        if _desc_text and '<' in _desc_text:
+                            import re as _re
+                            _desc_text = _re.sub(r'<[^>]+>', ' ', _desc_text)
+                            _desc_text = _re.sub(r'\s+', ' ', _desc_text).strip()
+                        # Komplettera med must-have och nice-to-have
+                        _must = _desc_obj.get('must_have', {}) or {}
+                        _nice = _desc_obj.get('nice_to_have', {}) or {}
+                        _extras = []
+                        for _k in ('education', 'experience', 'languages', 'work_experiences', 'competencies'):
+                            for _d in [_must, _nice]:
+                                _items = _d.get(_k, []) or []
+                                _extras.extend(str(x) for x in _items if x)
+                        if _extras:
+                            _desc_text = (_desc_text + '\n' + ' '.join(_extras)).strip()
+
                     job = {
                         'title': title,
                         'company': company,
@@ -1389,6 +1412,7 @@ class JobMaster:
                         'search_query': f"{position} i {location}",
                         'found_date': datetime.now().isoformat(),
                         'deadline': deadline_date,
+                        'description': _desc_text,  # Sparas direkt från Jobtech API
                     }
                     if self._job_is_duplicate(job, seen_urls, seen_sigs):
                         continue
@@ -1681,6 +1705,10 @@ class JobMaster:
             safe_title = "".join(c for c in job['title'][:30] if c.isalnum() or c in (' ', '-', '_')).strip()
             job_folder = self.base_output_dir / f"Job_{job_number:03d}_{safe_company}_{safe_title}"
             job_folder.mkdir(exist_ok=True)
+
+            # Spara jobbeskrivning tidigt (från API-svar) — ATS kan poängsätta även om browser misslyckas
+            if job.get('description'):
+                (job_folder / 'job_description.txt').write_text(job['description'], encoding='utf-8')
 
             # Hämta jobbinformation
             print(f"\n🔗 Hämtar jobbinformation från: {job['url']}")

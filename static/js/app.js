@@ -166,6 +166,7 @@ function startSearch(formId) {
     };
 
     evtSource.onerror = () => {
+      appendTerminal('❌ Anslutningen till servern bröts. Försök igen.\n', 'err');
       evtSource.close();
       resetBtn(btn);
       hideStopBtn();
