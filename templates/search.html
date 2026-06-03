@@ -287,7 +287,14 @@
         </button>
       </div>
 
-      <small class="text-muted d-block mt-2 text-center">
+      <div class="d-flex justify-content-center mt-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="clearSearchHistory()"
+                title="Rensa jobbhistorik så att redan sökta jobb kan hittas igen">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Rensa jobbhistorik
+        </button>
+      </div>
+      <small class="text-muted d-block mt-1 text-center">
         AI:n hittar jobb, genererar anpassade CV och personliga brev automatiskt.
       </small>
 
@@ -663,6 +670,13 @@ function forceResetSearch() {
     .then(r => r.json())
     .then(() => window.location.reload())
     .catch(() => window.location.reload());
+}
+
+function clearSearchHistory() {
+  if (!confirm('Rensa jobbhistorik? Alla tidigare sökta jobb kan hittas igen.')) return;
+  fetch('/search/clear-history', { method: 'POST' })
+    .then(r => r.json())
+    .then(() => { appendTerminal('✅ Historik rensad — sökning kan hitta alla jobb igen.\n', 'ok'); });
 }
 </script>
 {% endblock %}

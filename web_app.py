@@ -1363,6 +1363,15 @@ def search_force_reset():
     return jsonify({'status': 'reset'})
 
 
+@app.route('/search/clear-history', methods=['POST'])
+def search_clear_history():
+    """Rensa processed_jobs.json så att redan sedda jobb kan hittas igen."""
+    p = PROCESSED_JOBS()
+    if p.exists():
+        p.write_text('[]', encoding='utf-8')
+    return jsonify({'status': 'cleared'})
+
+
 # ============================================================
 # ROUTES — BATCH RE-EVALUATE
 # ============================================================
