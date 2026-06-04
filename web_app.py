@@ -1266,6 +1266,34 @@ def search_run():
                         search_queue.put(('output', '   ✅ Klar!\n'))
                     else:
                         search_queue.put(('output', '   ⏭️  Hoppades över\n'))
+
+                # Registrera ALLA hittade jobb i processed_jobs.json så nästa
+                # sökning inte återkommer med samma annonser — oavsett om
+                # genereringen lyckades. (Använd "rensa historik" för att söka om.)
+                try:
+                    pj_path  = _user_output_dir(_search_user_id) / 'processed_jobs.json'
+                    existing = json.loads(pj_path.read_text(encoding='utf-8')) if pj_path.exists() else []
+                    known    = {j.get('url') for j in existing if j.get('url')}
+                    added    = 0
+                    for _job in jobs:
+                        _url = (_job.get('url') or '').strip()
+                        if _url and _url not in known:
+                            existing.append({
+                                'url':            _url,
+                                'title':          _job.get('title', ''),
+                                'company':        _job.get('company', ''),
+                                'source':         _job.get('source', ''),
+                                'status':         'processed',
+                                'processed_date': datetime.now().isoformat(),
+                            })
+                            known.add(_url)
+                            added += 1
+                    pj_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
+                    if added:
+                        search_queue.put(('output', f'🔒 {added} jobb registrerade i historiken (hittas ej igen).\n'))
+                except Exception as _e:
+                    search_queue.put(('output', f'⚠️  Kunde inte uppdatera dubblett-historiken: {_e}\n'))
+
                 search_queue.put(('output', f'\n✅ KLART! {successful}/{len(jobs)} jobb processade.\n'))
                 search_queue.put(('output', f'📂 Filer sparade i: {jm.base_output_dir}\n'))
             else:
