@@ -78,7 +78,13 @@
               data-folder="{{ job.folder }}">
             <td class="text-muted small">{{ loop.index }}</td>
             <td>
-              <span class="fw-medium">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}</span>
+              {% if job.url %}
+                <a href="{{ job.url }}" target="_blank" rel="noopener"
+                   class="fw-medium job-title-link"
+                   title="Öppna annonsen på {{ job.source or 'jobsajten' }}">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}<i class="bi bi-box-arrow-up-right ms-1" style="font-size:.7rem;opacity:.6;"></i></a>
+              {% else %}
+                <span class="fw-medium">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}</span>
+              {% endif %}
             </td>
             <td>{{ job.company }}</td>
             <td><small class="text-muted">{{ job.location }}</small></td>
@@ -632,6 +638,8 @@ document.getElementById('delete-confirm-btn').addEventListener('click', function
 </script>
 
 <style>
+.job-title-link { color: var(--text, #e8e8e8); text-decoration: none; }
+.job-title-link:hover { color: var(--green, #4AE54A); text-decoration: underline; }
 .ats-badge { cursor: pointer; }
 .ats-badge-inner.ats-unknown {
   background: rgba(255,255,255,0.05);
