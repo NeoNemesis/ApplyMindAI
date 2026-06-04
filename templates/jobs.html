@@ -32,6 +32,13 @@
     <a href="/search" class="btn btn-green btn-sm">
       <i class="bi bi-plus-lg me-1"></i>Sök fler
     </a>
+    <button class="btn btn-sm" onclick="document.getElementById('import-history-input').click()"
+            style="background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);"
+            title="Importera redan-sökta jobb (JSON) till dedup-historiken så de inte hittas igen">
+      <i class="bi bi-upload me-1"></i>Importera historik
+    </button>
+    <input type="file" id="import-history-input" accept=".json,application/json"
+           style="display:none" onchange="importHistory(this)">
     <div class="dropdown">
       <button class="btn btn-sm dropdown-toggle" data-bs-toggle="dropdown"
               style="background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);">
@@ -78,7 +85,13 @@
               data-folder="{{ job.folder }}">
             <td class="text-muted small">{{ loop.index }}</td>
             <td>
-              <span class="fw-medium">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}</span>
+              {% if job.url %}
+                <a href="{{ job.url }}" target="_blank" rel="noopener"
+                   class="fw-medium job-title-link"
+                   title="Öppna annonsen på {{ job.source or 'jobsajten' }}">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}<i class="bi bi-box-arrow-up-right ms-1" style="font-size:.7rem;opacity:.6;"></i></a>
+              {% else %}
+                <span class="fw-medium">{{ job.title[:50] }}{% if job.title|length > 50 %}…{% endif %}</span>
+              {% endif %}
             </td>
             <td>{{ job.company }}</td>
             <td><small class="text-muted">{{ job.location }}</small></td>
@@ -632,6 +645,8 @@ document.getElementById('delete-confirm-btn').addEventListener('click', function
 </script>
 
 <style>
+.job-title-link { color: var(--text, #e8e8e8); text-decoration: none; }
+.job-title-link:hover { color: var(--green, #4AE54A); text-decoration: underline; }
 .ats-badge { cursor: pointer; }
 .ats-badge-inner.ats-unknown {
   background: rgba(255,255,255,0.05);
@@ -744,6 +759,25 @@ function deleteExpired() {
       alert('Nätverksfel — försök igen');
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-calendar-x me-1"></i>Ta bort utgångna'; }
     });
+}
+
+function importHistory(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch('/api/jobs/import-history', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        alert('Importerat: ' + d.added + ' nya jobb tillagda i dedup-historiken ('
+              + d.total + ' totalt). De hittas inte igen vid sökning.');
+      } else {
+        alert('Fel: ' + (d.error || 'Okänt fel'));
+      }
+    })
+    .catch(() => alert('Nätverksfel — försök igen'))
+    .finally(() => { input.value = ''; });
 }
 
 function runBatchEval() {

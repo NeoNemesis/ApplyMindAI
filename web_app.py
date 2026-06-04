@@ -1840,6 +1840,51 @@ def api_delete_expired():
     return jsonify({'ok': True, 'deleted': len(deleted), 'jobs': deleted})
 
 
+@app.route('/api/jobs/import-history', methods=['POST'])
+def api_import_history():
+    """Importera redan-sökta jobb till dedup-historiken (processed_jobs.json).
+    Tar emot en uppladdad JSON-fil — en lista av jobb med minst 'url'. Slår ihop
+    med befintliga poster (dedup på url) så att framtida sökningar hoppar över dem.
+    Per användare. Rörer aldrig några dokumentmappar."""
+    f = request.files.get('file')
+    if not f:
+        return jsonify({'ok': False, 'error': 'Ingen fil bifogad'}), 400
+    try:
+        data = json.loads(f.read().decode('utf-8'))
+    except Exception as e:
+        return jsonify({'ok': False, 'error': f'Ogiltig JSON: {e}'}), 400
+    if not isinstance(data, list):
+        return jsonify({'ok': False, 'error': 'Filen måste vara en JSON-lista av jobb'}), 400
+
+    pj = PROCESSED_JOBS()
+    try:
+        existing = json.loads(pj.read_text(encoding='utf-8')) if pj.exists() else []
+    except Exception:
+        existing = []
+
+    known = {(j.get('url') or '').strip() for j in existing if j.get('url')}
+    added = 0
+    for j in data:
+        if not isinstance(j, dict):
+            continue
+        url = (j.get('url') or '').strip()
+        if not url or url in known:
+            continue
+        existing.append({
+            'url':            url,
+            'title':          j.get('title', ''),
+            'company':        j.get('company', ''),
+            'source':         j.get('source', ''),
+            'status':         j.get('status', 'processed'),
+            'processed_date': j.get('processed_date') or datetime.now().isoformat(),
+        })
+        known.add(url)
+        added += 1
+
+    pj.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
+    return jsonify({'ok': True, 'added': added, 'skipped': len(data) - added, 'total': len(existing)})
+
+
 @app.route('/api/jobs/regenerate-docs', methods=['POST'])
 def api_regenerate_docs():
     """Bygg om CV och personligt brev för ett jobb med den aktuella grundfilen."""
