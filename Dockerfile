@@ -14,8 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.production.txt .
 RUN pip install --no-cache-dir -r requirements.production.txt
 
-# Installera Playwright Chromium (headless, ingen X11 behövs)
-RUN playwright install chromium --with-deps 2>/dev/null || playwright install chromium
+# Installera Playwright Chromium i en DELAD, läsbar path — inte root-hemkatalogen.
+# Annars hamnar binären i /root/.cache (läge 700) och appuser (runtime) hittar
+# den inte → alla PDF-genereringar failar. PLAYWRIGHT_BROWSERS_PATH som ENV gör
+# att både build (root) och runtime (appuser) löser ut samma katalog.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps chromium \
+    && chmod -R a+rX /ms-playwright
 
 # App source
 COPY . .
