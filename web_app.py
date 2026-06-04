@@ -1383,9 +1383,17 @@ def search_clear_history():
 
 @app.route('/generate/batch-evaluate', methods=['POST'])
 def batch_evaluate():
-    """Re-evaluate all jobs in found_jobs.json with ATS filter (threshold 60%).
-    Generates CV+cover letter for jobs scoring ≥60%, deletes folders for the rest."""
+    """Utvärdera ALLA jobbmappar med EXAKT samma detaljerade ATS-pipeline som
+    /jobs-sidans badge (_evaluate_job_ats) och radera mappar under tröskeln.
+    Tröskel + force styrs från UI (samma standard som söksidan: 65)."""
     global _stop_requested
+
+    _body = request.get_json(silent=True) or {}
+    try:
+        _eval_threshold = max(0, min(100, int(_body.get('threshold', 65))))
+    except (TypeError, ValueError):
+        _eval_threshold = 65
+    _eval_force = bool(_body.get('force', True))
 
     with _search_lock:
         if search_state.get('running'):
@@ -1438,7 +1446,6 @@ def batch_evaluate():
 
         try:
             _out_dir = _user_output_dir(_eval_user_id)
-            _dat_dir = _user_data_dir(_eval_user_id)
             _found_jobs_path = _out_dir / 'found_jobs.json'
 
             # Scan actual job folders on disk — not found_jobs.json (which may be out of sync)
@@ -1454,13 +1461,10 @@ def batch_evaluate():
 
             sep = '=' * 60
             search_queue.put(('output',
-                f'\n🔍 Utvärderar {len(job_folders)} jobbmappar med ATS-filter (tröskel: 60%)...\n'
+                f'\n🔍 Utvärderar {len(job_folders)} jobbmappar med detaljerad ATS '
+                f'(tröskel: {_eval_threshold}%)...\n'
                 f'{sep}\n'
             ))
-
-            from job_master import JobMaster
-            jm = JobMaster(output_dir=_out_dir, data_dir=_dat_dir)
-            jm.initialize(platforms=[])
 
             passed = 0
             failed = 0
@@ -1473,7 +1477,7 @@ def batch_evaluate():
 
                 search_queue.put(('progress', f'{i}/{len(job_folders)}'))
 
-                # Read job title for display
+                # Läs titel för visning
                 display_name = folder.name
                 info_file = folder / 'job_info.txt'
                 if info_file.exists():
@@ -1490,42 +1494,30 @@ def batch_evaluate():
                     skipped += 1
                     continue
 
-                # Använd cachad ATS-poäng (ats_score.json) om den finns
-                # quick_ats_score ger ofta annorlunda resultat än den detaljerade analysen
-                score = None
-                reasoning = ''
-                score_file = folder / 'ats_score.json'
-                if score_file.exists():
-                    try:
-                        cached = json.loads(score_file.read_text(encoding='utf-8'))
-                        score = cached.get('score')
-                        reasoning = cached.get('summary', cached.get('reasoning', 'Cachad poäng'))
-                        search_queue.put(('output', f'   🎯 ATS-poäng (cachad): {score}/100\n'))
-                    except Exception:
-                        score = None
+                # SAMMA detaljerade pipeline som /jobs-badgen → identisk poäng överallt.
+                # force=_eval_force: True = räkna om alla, False = återanvänd cache.
+                res = _evaluate_job_ats(folder, force=_eval_force)
+                if not res.get('ok'):
+                    # Gick ej att poängsätta (saknar beskrivning/CV eller LLM-fel) → BEHÅLL
+                    err = (res.get('error') or 'okänt fel')[:60]
+                    search_queue.put(('output', f'   ⚠️  Kunde inte utvärdera — behålls ({err})\n'))
+                    skipped += 1
+                    continue
 
-                # Fallback: beräkna med quick_ats_score om ingen cache
-                if score is None:
-                    desc_file = folder / 'job_description.txt'
-                    if not desc_file.exists():
-                        search_queue.put(('output', '   ⚠️  Ingen beskrivning eller cache — hoppar över\n'))
-                        skipped += 1
-                        continue
-                    desc = desc_file.read_text(encoding='utf-8')
-                    score, reasoning = jm.quick_ats_score(desc, 60)
-                    search_queue.put(('output', f'   🎯 ATS-poäng (beräknad): {score}/100\n'))
+                score = res.get('score', 0)
+                search_queue.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
 
-                if score >= 60:
+                if score >= _eval_threshold:
                     passed += 1
-                    search_queue.put(('output', '   ✅ Godkänd (ATS ≥ 60%) — behålls\n'))
+                    search_queue.put(('output', f'   ✅ Godkänd (≥ {_eval_threshold}%) — behålls\n'))
                 else:
                     failed += 1
-                    short_reason = reasoning[:80] + ('...' if len(reasoning) > 80 else '')
-                    search_queue.put(('output', f'   ❌ Under tröskeln — {short_reason}\n'))
-                    shutil.rmtree(folder)
+                    summary = (res.get('summary') or '')[:80]
+                    search_queue.put(('output', f'   ❌ Under tröskeln — {summary}\n'))
+                    _meta = parse_job_folder(folder)
+                    _block_job_url(_meta.get('url', ''), _meta)
+                    shutil.rmtree(folder, ignore_errors=True)
                     search_queue.put(('output', f'   🗑️  Mapp borttagen: {folder.name}\n'))
-
-            jm.cleanup()
 
             # Update found_jobs.json: remove entries whose folder no longer exists
             if _found_jobs_path.exists():
@@ -1552,8 +1544,8 @@ def batch_evaluate():
 
             search_queue.put(('output',
                 f'\n{sep}\n'
-                f'📊 RESULTAT: {passed} behållna, {failed} borttagna'
-                + (f', {skipped} utan beskrivning' if skipped else '')
+                f'📊 RESULTAT: {passed} behållna (≥{_eval_threshold}%), {failed} borttagna'
+                + (f', {skipped} ej utvärderade' if skipped else '')
                 + f' av {len(job_folders)} mappar\n'
             ))
 
@@ -1583,11 +1575,13 @@ def batch_evaluate():
 @app.route('/jobs')
 def jobs():
     from datetime import timedelta
-    folders      = get_job_folders()
-    job_list     = [parse_job_folder(f) for f in folders]
-    today        = datetime.now().strftime('%Y-%m-%d')
-    warning_date = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
-    return render_template('jobs.html', jobs=job_list, today=today, warning_date=warning_date)
+    folders       = get_job_folders()
+    job_list      = [parse_job_folder(f) for f in folders]
+    today         = datetime.now().strftime('%Y-%m-%d')
+    warning_date  = (datetime.now() + timedelta(days=3)).strftime('%Y-%m-%d')
+    expired_count = sum(1 for j in job_list if j.get('deadline') and j['deadline'] < today)
+    return render_template('jobs.html', jobs=job_list, today=today,
+                           warning_date=warning_date, expired_count=expired_count)
 
 
 @app.route('/download-pdf')
@@ -1737,6 +1731,42 @@ def api_jobs():
     return jsonify(job_list)
 
 
+def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected') -> None:
+    """Lägg/markera en jobb-URL i processed_jobs.json så den inte hittas igen.
+    Delad av per-jobb-radering, batch-utvärdering och radering av utgångna jobb."""
+    job_url = (job_url or '').strip()
+    if not job_url:
+        return
+    try:
+        existing = json.loads(PROCESSED_JOBS().read_text(encoding='utf-8')) if PROCESSED_JOBS().exists() else []
+    except Exception:
+        existing = []
+
+    known_urls = {j.get('url') for j in existing}
+    if job_url not in known_urls:
+        existing.append({
+            'url':            job_url,
+            'title':          (job_meta or {}).get('title', ''),
+            'company':        (job_meta or {}).get('company', ''),
+            'source':         (job_meta or {}).get('source', ''),
+            'status':         status,
+            'processed_date': datetime.now().isoformat(),
+        })
+        PROCESSED_JOBS().write_text(
+            json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
+        )
+    else:
+        changed = False
+        for j in existing:
+            if j.get('url') == job_url and j.get('status') != status:
+                j['status'] = status
+                changed = True
+        if changed:
+            PROCESSED_JOBS().write_text(
+                json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
+            )
+
+
 @app.route('/api/jobs/delete', methods=['POST'])
 def api_delete_job():
     """Radera ett jobb: ta bort mappen och blockera URL:en från framtida sökningar."""
@@ -1750,46 +1780,36 @@ def api_delete_job():
     if not job_folder.exists():
         return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
 
-    # Hämta URL från job_info.txt så vi kan blockera den
-    job      = parse_job_folder(job_folder)
-    job_url  = job.get('url', '').strip()
-
-    # Säkerställ att URL:en finns i processed_jobs.json (blockerar framtida sökningar)
-    if job_url:
-        try:
-            existing = json.loads(PROCESSED_JOBS().read_text(encoding='utf-8')) if PROCESSED_JOBS().exists() else []
-        except Exception:
-            existing = []
-
-        known_urls = {j.get('url') for j in existing}
-        if job_url not in known_urls:
-            existing.append({
-                'url':            job_url,
-                'title':          job.get('title', ''),
-                'company':        job.get('company', ''),
-                'source':         job.get('source', ''),
-                'status':         'rejected',
-                'processed_date': datetime.now().isoformat(),
-            })
-            PROCESSED_JOBS().write_text(
-                json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
-            )
-        else:
-            # Markera som rejected om den redan finns
-            changed = False
-            for j in existing:
-                if j.get('url') == job_url and j.get('status') != 'rejected':
-                    j['status'] = 'rejected'
-                    changed = True
-            if changed:
-                PROCESSED_JOBS().write_text(
-                    json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
-                )
+    # Blockera URL:en innan vi raderar mappen
+    job = parse_job_folder(job_folder)
+    _block_job_url(job.get('url', ''), job)
 
     # Radera mappen med alla filer
     shutil.rmtree(str(job_folder), ignore_errors=True)
 
     return jsonify({'ok': True})
+
+
+@app.route('/api/jobs/delete-expired', methods=['POST'])
+def api_delete_expired():
+    """Radera alla jobb vars sista ansökningsdag har passerat (deadline < idag).
+    Blockerar deras URL:er. Jobb utan sparad deadline (t.ex. Indeed/LinkedIn)
+    rörs inte — de saknar datum att jämföra mot."""
+    today    = datetime.now().strftime('%Y-%m-%d')
+    deleted  = []
+    for folder in get_job_folders():
+        job      = parse_job_folder(folder)
+        deadline = (job.get('deadline') or '').strip()
+        if deadline and deadline < today:
+            _block_job_url(job.get('url', ''), job)
+            shutil.rmtree(str(folder), ignore_errors=True)
+            deleted.append({
+                'folder':   folder.name,
+                'title':    job.get('title', ''),
+                'company':  job.get('company', ''),
+                'deadline': deadline,
+            })
+    return jsonify({'ok': True, 'deleted': len(deleted), 'jobs': deleted})
 
 
 @app.route('/api/jobs/regenerate-docs', methods=['POST'])
@@ -3111,27 +3131,21 @@ def _llm_json_call(prompt_text: str, temperature: float) -> dict:
     return json.loads(raw.strip())
 
 
-@app.route('/api/ats-score/generate', methods=['POST'])
-def api_ats_generate():
-    """Generate ATS score via 3-pass pipeline:
+def _evaluate_job_ats(job_folder: Path, force: bool = False) -> dict:
+    """Detaljerad 3-pass ATS-pipeline för EN jobbmapp:
        1) LLM extraherar keywords + hårda krav från annons
        2) Deterministisk keyword-matchning i full CV-text
        3) LLM bedömer transferable + soft skills, ger konkreta rekommendationer
-       Slutpoäng är viktad formel — inte LLM-satt."""
-    data   = request.get_json(silent=True) or {}
-    folder = data.get('folder', '').strip()
+       Slutpoäng är viktad formel — inte LLM-satt.
 
-    if not folder:
-        return jsonify({'ok': False, 'error': 'folder required'}), 400
-
-    job_folder = _user_output_dir() / folder
-    if not job_folder.exists():
-        return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
-
+    Returnerar alltid en dict med 'ok'. Vid fel finns 'error' + '_status'
+    (HTTP-hint). Skriver ats_score.json vid lyckad körning, återanvänder cachen
+    om force=False. Anropas av BÅDE /api/ats-score/generate (per jobb) OCH
+    batch-utvärderingen — så att poängen är identisk överallt."""
     score_file = job_folder / 'ats_score.json'
-    if score_file.exists() and not data.get('force'):
+    if score_file.exists() and not force:
         try:
-            return jsonify({'ok': True, **json.loads(score_file.read_text(encoding='utf-8'))})
+            return {'ok': True, **json.loads(score_file.read_text(encoding='utf-8'))}
         except Exception:
             pass
 
@@ -3141,13 +3155,15 @@ def api_ats_generate():
     job = parse_job_folder(job_folder)
     job_title = job.get('title', '')
     company   = job.get('company', '')
+    folder    = job_folder.name
 
     if not job_description:
-        return jsonify({
+        return {
             'ok': False,
             'error': 'Ingen jobbeskrivning sparad för detta jobb. Kommande jobb sparas automatiskt.',
-            'no_description': True
-        }), 422
+            'no_description': True,
+            '_status': 422,
+        }
 
     partial_description = False
     if _is_placeholder_description(job_description):
@@ -3164,7 +3180,7 @@ def api_ats_generate():
 
     cv_text = _get_cv_full_text(job_folder)
     if not cv_text:
-        return jsonify({'ok': False, 'error': 'CV saknas — fyll i ditt CV först'}), 422
+        return {'ok': False, 'error': 'CV saknas — fyll i ditt CV först', '_status': 422}
 
     try:
         # ── Pass 1: Keyword-extraktion (temp=0 för deterministisk extraktion)
@@ -3256,12 +3272,29 @@ def api_ats_generate():
         }
 
         score_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-        return jsonify({'ok': True, **result})
+        return {'ok': True, **result}
 
     except json.JSONDecodeError as e:
-        return jsonify({'ok': False, 'error': f'AI svarade i fel format: {e}'}), 500
+        return {'ok': False, 'error': f'AI svarade i fel format: {e}', '_status': 500}
     except Exception as e:
-        return jsonify({'ok': False, 'error': str(e)}), 500
+        return {'ok': False, 'error': str(e), '_status': 500}
+
+
+@app.route('/api/ats-score/generate', methods=['POST'])
+def api_ats_generate():
+    """Tunn HTTP-wrapper kring _evaluate_job_ats (per jobb från /jobs-sidan)."""
+    data   = request.get_json(silent=True) or {}
+    folder = data.get('folder', '').strip()
+    if not folder:
+        return jsonify({'ok': False, 'error': 'folder required'}), 400
+    if '..' in folder or '/' in folder or '\\' in folder:
+        return jsonify({'ok': False, 'error': 'Ogiltig mapp'}), 400
+    job_folder = _user_output_dir() / folder
+    if not job_folder.exists():
+        return jsonify({'ok': False, 'error': 'Mappen finns inte'}), 404
+    result = _evaluate_job_ats(job_folder, force=bool(data.get('force')))
+    status = result.pop('_status', 200 if result.get('ok') else 500)
+    return jsonify(result), status
 
 
 @app.route('/api/ats-score/<folder>')
