@@ -66,8 +66,10 @@ if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
 fi
 
 # ── Bygg bara om beroenden eller Dockerfile ändrats ────────────────────
-DEPS_CHANGED=$(git diff HEAD~1..HEAD -- requirements.production.txt Dockerfile 2>/dev/null | grep -c '^+' || echo 0)
-COMPOSE_CHANGED=$(git diff HEAD~1..HEAD -- docker-compose.yml 2>/dev/null | grep -c '^+' || echo 0)
+DEPS_CHANGED=0
+COMPOSE_CHANGED=0
+git diff HEAD~1..HEAD -- requirements.production.txt Dockerfile 2>/dev/null | grep -q '^+' && DEPS_CHANGED=1 || true
+git diff HEAD~1..HEAD -- docker-compose.yml 2>/dev/null | grep -q '^+' && COMPOSE_CHANGED=1 || true
 
 if [[ "$DEPS_CHANGED" -gt 0 ]]; then
   log "📦 Beroenden ändrade — full rebuild (kort downtime möjlig)"
