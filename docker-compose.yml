@@ -7,6 +7,13 @@ services:
     environment:
       - FLASK_ENV=production
       - PYTHONIOENCODING=utf-8
+    # VIKTIGT: de enskilda fil-mountsen nedan (./web_app.py m.fl.) binder till
+    # filens inode. När servern kör `git reset --hard` får filerna NYA inodes,
+    # men en körande container är låst vid de gamla → `kill -HUP` (gunicorn
+    # reload) läser då fortfarande GAMMAL kod. Endast en container-RECREATE
+    # binder om mountsen. Därför måste auto-deploy köra `--force-recreate` vid
+    # kod-ändring (inte bara HUP) — se auto-deploy.sh. Denna kommentar triggar
+    # också COMPOSE_CHANGED så att en deploy återskapar containern.
     volumes:
       - applymind-instance:/app/instance
       - ./data_folder:/app/data_folder
