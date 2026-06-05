@@ -62,7 +62,9 @@ git reset --hard "origin/$BRANCH"
 SCRIPT_SHA_AFTER=$(sha256sum "$SCRIPT_PATH" | cut -d' ' -f1)
 if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
   log "🔄 Deploy-skriptet uppdaterades — startar om med ny version"
-  exec bash "$SCRIPT_PATH"
+  # FORCE=1 så att den omstartade körningen inte tidig-avbryter på
+  # LOCAL==REMOTE (koden är redan reset:ad) utan faktiskt kör deploy-stegen.
+  exec env FORCE=1 bash "$SCRIPT_PATH"
 fi
 
 # ── Bygg bara om beroenden eller Dockerfile ändrats ────────────────────
@@ -79,12 +81,13 @@ elif [[ "$COMPOSE_CHANGED" -gt 0 ]]; then
   log "🔄 docker-compose.yml ändrad — återskapar container (applicerar nya volumes/env)"
   docker compose --env-file "$ENV_FILE" up -d --force-recreate
 else
-  log "⚡ Kod-ändring — gunicorn graceful reload (noll downtime)"
-  # Källkoden är monterad som volym — kill -HUP laddar om workers
-  # utan att stänga av containern eller tappa en enda request
-  docker compose --env-file "$ENV_FILE" up -d --no-recreate 2>/dev/null || true
-  docker exec applymind-web kill -HUP 1
-  sleep 5
+  log "⚡ Kod-ändring — återskapar container (kort downtime, binder om fil-mounts)"
+  # VIKTIGT: källkoden bind-mountas som ENSKILDA filer (./web_app.py m.fl.) som
+  # binder till filens inode. `git reset --hard` ger filerna NYA inodes, så
+  # `kill -HUP` (gunicorn reload) läser fortfarande GAMMAL kod — nya routes blir
+  # 404. --force-recreate skapar ny container som binder om mountsen till de nya
+  # inoderna. (Verifierat: PR #43:s /api/jobs/import-history gav 404 efter HUP.)
+  docker compose --env-file "$ENV_FILE" up -d --force-recreate
 fi
 
 # ── Kör DB-migrationer om de finns ─────────────────────────────────────
