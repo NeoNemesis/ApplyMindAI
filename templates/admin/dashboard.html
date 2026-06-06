@@ -217,6 +217,12 @@
           <td>
             <div class="actions">
               {% if user.id != current_user.id %}
+              <form method="POST" action="{{ url_for('admin.toggle_role', user_id=user.id) }}" style="display:inline;"
+                    onsubmit="return confirm('Ändra roll för {{ user.username }} till {{ &quot;user&quot; if user.role == &quot;admin&quot; else &quot;admin&quot; }}?');">
+                <button type="submit" class="btn btn-outline btn-sm">
+                  {{ 'Ta bort admin' if user.role == 'admin' else 'Gör admin' }}
+                </button>
+              </form>
               <form method="POST" action="{{ url_for('admin.toggle_user', user_id=user.id) }}" style="display:inline;">
                 <button type="submit" class="btn btn-outline btn-sm">
                   {{ 'Inaktivera' if user.is_active else 'Aktivera' }}
