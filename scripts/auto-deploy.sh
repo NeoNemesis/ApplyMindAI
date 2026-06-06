@@ -75,7 +75,7 @@ rollback() {
   git reset --hard "$PREV_SHA"
   docker compose --env-file "$ENV_FILE" up -d --force-recreate
   sleep 6
-  if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
+  if docker compose exec -T applymind-web curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
     log "✅ Rollback lyckades — appen är uppe med föregående version (${PREV_SHA:0:7})"
     log "⚠️  Ny kod (${REMOTE:0:7}) var trasig — undersök och fixa innan nästa deploy"
   else
@@ -90,7 +90,7 @@ wait_healthy() {
   local label="$1"
   log "▶ Väntar på hälsokontroll ($label)..."
   for i in $(seq 1 20); do
-    if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
+    if docker compose exec -T applymind-web curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
       return 0
     fi
     sleep 3
