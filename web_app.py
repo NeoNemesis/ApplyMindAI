@@ -68,8 +68,12 @@ app.secret_key = _secret or _dev_placeholder
 from models import db, User, AuditLog
 from flask_login import LoginManager, current_user, login_required
 from flask_migrate import Migrate
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _limiter_available = True
+except ImportError:
+    _limiter_available = False
 from auth import auth_bp
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
@@ -88,12 +92,18 @@ app.config['SESSION_COOKIE_HTTPONLY']  = True
 db.init_app(app)
 migrate = Migrate(app, db)
 
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=[],
-    storage_uri="memory://",
-)
+if _limiter_available:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=[],
+        storage_uri="memory://",
+    )
+else:
+    class _NoopLimiter:
+        def limit(self, *a, **kw):
+            return lambda f: f
+    limiter = _NoopLimiter()
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
