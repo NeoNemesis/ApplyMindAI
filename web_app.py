@@ -784,7 +784,6 @@ def index():
 # ROUTES — CV EDITOR
 # ============================================================
 
-PROFILE_PHOTO_PATH = DATA_DIR / 'profile.png'
 ALLOWED_PHOTO_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
@@ -792,7 +791,7 @@ MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 @app.route('/cv')
 def cv_editor():
     resume = load_yaml(RESUME_YAML())
-    has_photo = PROFILE_PHOTO_PATH.exists()
+    has_photo = _u('profile.png').exists()
     return render_template('cv.html', resume=resume,
                            has_profile_photo=has_photo,
                            now=int(time.time()))
@@ -801,14 +800,15 @@ def cv_editor():
 @app.route('/cv/photo')
 def cv_photo():
     """Serve the profile photo"""
-    if not PROFILE_PHOTO_PATH.exists():
+    photo_path = _u('profile.png')
+    if not photo_path.exists():
         return 'Ingen bild', 404
-    return send_file(str(PROFILE_PHOTO_PATH), mimetype='image/png')
+    return send_file(str(photo_path), mimetype='image/png')
 
 
 @app.route('/cv/upload-photo', methods=['POST'])
 def cv_upload_photo():
-    """Upload and save profile photo as data_folder/profile.png"""
+    """Upload and save profile photo per user"""
     if 'photo' not in request.files:
         flash('Ingen fil vald.', 'danger')
         return redirect(url_for('cv_editor'))
@@ -828,15 +828,14 @@ def cv_upload_photo():
         flash('Bilden är för stor (max 5 MB).', 'danger')
         return redirect(url_for('cv_editor'))
 
-    # Convert JPG to PNG for consistency (overwrite profile.png)
+    photo_path = _u('profile.png')
     try:
         from PIL import Image
         import io
         img = Image.open(io.BytesIO(data)).convert('RGB')
-        img.save(str(PROFILE_PHOTO_PATH), 'PNG', optimize=True)
+        img.save(str(photo_path), 'PNG', optimize=True)
     except ImportError:
-        # PIL not installed — save raw file (works for PNG, near-works for JPG)
-        PROFILE_PHOTO_PATH.write_bytes(data)
+        photo_path.write_bytes(data)
     except Exception as e:
         flash(f'Kunde inte spara bilden: {e}', 'danger')
         return redirect(url_for('cv_editor'))
@@ -848,8 +847,9 @@ def cv_upload_photo():
 @app.route('/cv/delete-photo')
 def cv_delete_photo():
     """Delete profile photo"""
-    if PROFILE_PHOTO_PATH.exists():
-        PROFILE_PHOTO_PATH.unlink()
+    photo_path = _u('profile.png')
+    if photo_path.exists():
+        photo_path.unlink()
         flash('Profilbild borttagen.', 'success')
     return redirect(url_for('cv_editor'))
 
