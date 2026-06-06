@@ -854,6 +854,47 @@ def cv_delete_photo():
     return redirect(url_for('cv_editor'))
 
 
+@app.route('/cv/import', methods=['POST'])
+@login_required
+def cv_import():
+    """Import CV from PDF or pasted text and fill the CV form via AI."""
+    mode = request.form.get('mode', 'text')
+    if mode == 'pdf':
+        f = request.files.get('cv_pdf')
+        if not f or not f.filename.lower().endswith('.pdf'):
+            flash('Välj en PDF-fil.', 'danger')
+            return redirect(url_for('cv_editor'))
+        tmp = _u('_import_cv.pdf')
+        f.save(str(tmp))
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(str(tmp))
+            cv_text = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        except ImportError:
+            try:
+                import pdfplumber
+                with pdfplumber.open(str(tmp)) as pdf:
+                    cv_text = '\n'.join(p.extract_text() or '' for p in pdf.pages)
+            except Exception as e:
+                flash(f'Kunde inte läsa PDF: {e}', 'danger')
+                return redirect(url_for('cv_editor'))
+        finally:
+            tmp.unlink(missing_ok=True)
+        if not cv_text.strip():
+            flash('PDF:en verkade vara tom eller oläsbar.', 'danger')
+            return redirect(url_for('cv_editor'))
+        _cv_text_to_yaml(cv_text)
+        flash('CV importerat från PDF! Granska och spara nedan.', 'success')
+    else:
+        cv_text = request.form.get('cv_text', '').strip()
+        if not cv_text:
+            flash('Klistra in CV-text.', 'danger')
+            return redirect(url_for('cv_editor'))
+        _cv_text_to_yaml(cv_text)
+        flash('CV importerat! Granska och spara nedan.', 'success')
+    return redirect(url_for('cv_editor'))
+
+
 @app.route('/cv/save', methods=['POST'])
 def cv_save():
     resume = load_yaml(RESUME_YAML())
@@ -2454,8 +2495,7 @@ def setup_upload_cv():
             flash('Välj en PDF-fil.', 'danger')
             return redirect(url_for('setup', step='2'))
 
-        # Save uploaded PDF temporarily
-        tmp = BASE_DIR / 'data_folder' / '_upload_cv.pdf'
+        tmp = _u('_upload_cv.pdf')
         f.save(str(tmp))
 
         # Extract text with pypdf
