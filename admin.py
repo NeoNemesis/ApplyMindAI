@@ -70,6 +70,20 @@ def create_user():
     return redirect(url_for("admin.dashboard"))
 
 
+@admin_bp.route("/users/<int:user_id>/toggle-role", methods=["POST"])
+@admin_required
+def toggle_role(user_id: int):
+    user = User.query.get_or_404(user_id)
+    if user.id == current_user.id:
+        flash("Du kan inte ändra din egen roll.", "error")
+        return redirect(url_for("admin.dashboard"))
+    user.role = "user" if user.role == "admin" else "admin"
+    db.session.commit()
+    _log("toggle_role", target_id=user.id, detail=f"username={user.username} new_role={user.role}")
+    flash(f"{user.username} är nu {user.role}.", "success")
+    return redirect(url_for("admin.dashboard"))
+
+
 @admin_bp.route("/users/<int:user_id>/toggle", methods=["POST"])
 @admin_required
 def toggle_user(user_id: int):
