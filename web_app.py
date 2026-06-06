@@ -67,6 +67,9 @@ app.secret_key = _secret or _dev_placeholder
 # ── Database + Auth ───────────────────────────────────────────
 from models import db, User, AuditLog
 from flask_login import LoginManager, current_user, login_required
+from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from auth import auth_bp
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
@@ -83,6 +86,14 @@ app.config['SESSION_COOKIE_SAMESITE']  = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY']  = True
 
 db.init_app(app)
+migrate = Migrate(app, db)
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
@@ -1113,6 +1124,7 @@ def api_design_save():
 
 
 @app.route('/search/run', methods=['POST'])
+@limiter.limit("20 per hour")
 def search_run():
     global search_state
 
@@ -1410,6 +1422,7 @@ def search_clear_history():
 # ============================================================
 
 @app.route('/generate/batch-evaluate', methods=['POST'])
+@limiter.limit("30 per hour")
 def batch_evaluate():
     """Utvärdera ALLA jobbmappar med EXAKT samma detaljerade ATS-pipeline som
     /jobs-sidans badge (_evaluate_job_ats) och radera mappar under tröskeln.
