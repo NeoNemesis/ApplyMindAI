@@ -738,7 +738,8 @@ def check_setup():
         return None
     setup_done = is_setup_complete() or session.get('setup_skipped')
     g.setup_needed = not setup_done
-    allowed = ['/setup', '/static', '/auth/']
+    # CV- och brevsidor kräver ingen API-nyckel — alltid tillgängliga
+    allowed = ['/setup', '/static', '/auth/', '/cv', '/cover-letter', '/admin']
     if not setup_done and not any(request.path.startswith(p) for p in allowed):
         return redirect(url_for('setup'))
 
@@ -959,8 +960,11 @@ def cv_save():
     if languages:
         resume['languages'] = languages
 
-    save_yaml(RESUME_YAML(), resume)
-    flash('CV sparat!', 'success')
+    try:
+        save_yaml(RESUME_YAML(), resume)
+        flash('CV sparat!', 'success')
+    except Exception as e:
+        flash(f'Kunde inte spara CV: {e}', 'danger')
     return redirect(url_for('cv_editor'))
 
 
@@ -1070,16 +1074,17 @@ def _build_letter_preview_content() -> dict:
 
 @app.route('/cover-letter/save', methods=['POST'])
 def cover_letter_save():
-    content = request.form.get('content', '')
-    COVER_LETTER().write_text(content, encoding='utf-8')
-
-    profile = request.form.get('profile', '')
-    if profile:
-        resume = load_yaml(RESUME_YAML())
-        resume['cover_letter_profile'] = profile
-        save_yaml(RESUME_YAML(), resume)
-
-    flash('Personligt brev sparat!', 'success')
+    try:
+        content = request.form.get('content', '')
+        COVER_LETTER().write_text(content, encoding='utf-8')
+        profile = request.form.get('profile', '')
+        if profile:
+            resume = load_yaml(RESUME_YAML())
+            resume['cover_letter_profile'] = profile
+            save_yaml(RESUME_YAML(), resume)
+        flash('Personligt brev sparat!', 'success')
+    except Exception as e:
+        flash(f'Kunde inte spara brevet: {e}', 'danger')
     return redirect(url_for('cover_letter'))
 
 
