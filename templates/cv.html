@@ -60,6 +60,46 @@
     </div>
   </div>
 
+  <!-- ── IMPORTERA CV ── -->
+  <div class="form-section mb-3">
+    <div class="form-section-title">
+      <i class="bi bi-cloud-upload-fill"></i> Importera befintligt CV (AI fyller i formuläret)
+    </div>
+    <ul class="nav nav-tabs mb-3" id="importTabs" role="tablist" style="border-bottom:1px solid #333;">
+      <li class="nav-item">
+        <button class="nav-link active" id="tab-pdf-btn" data-tab="tab-pdf" onclick="switchImportTab(this,'tab-pdf')">
+          <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+        </button>
+      </li>
+      <li class="nav-item">
+        <button class="nav-link" id="tab-text-btn" data-tab="tab-text" onclick="switchImportTab(this,'tab-text')">
+          <i class="bi bi-text-left me-1"></i>Klistra in text
+        </button>
+      </li>
+    </ul>
+    <div id="tab-pdf">
+      <form action="/cv/import" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="mode" value="pdf">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <input type="file" name="cv_pdf" accept=".pdf" class="form-control form-control-sm" style="max-width:320px;" required>
+          <button type="submit" class="btn btn-green btn-sm">
+            <i class="bi bi-magic me-1"></i>Importera med AI
+          </button>
+        </div>
+        <small class="text-muted d-block mt-1">AI läser PDF:en och fyller i fälten nedan automatiskt. Granska och spara efteråt.</small>
+      </form>
+    </div>
+    <div id="tab-text" style="display:none;">
+      <form action="/cv/import" method="POST">
+        <input type="hidden" name="mode" value="text">
+        <textarea name="cv_text" class="form-control mb-2" rows="6" placeholder="Klistra in din CV-text här..."></textarea>
+        <button type="submit" class="btn btn-green btn-sm">
+          <i class="bi bi-magic me-1"></i>Importera med AI
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- ── PERSONLIG INFO ── -->
   <div class="form-section">
     <div class="form-section-title">
@@ -354,6 +394,14 @@
 </form>
 
 <script>
+function switchImportTab(btn, tabId) {
+  document.querySelectorAll('#importTabs .nav-link').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  ['tab-pdf', 'tab-text'].forEach(id => {
+    document.getElementById(id).style.display = id === tabId ? '' : 'none';
+  });
+}
+
 function previewPhoto(input) {
   if (!input.files || !input.files[0]) return;
   const reader = new FileReader();
