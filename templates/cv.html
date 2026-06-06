@@ -9,6 +9,47 @@
 {% set ts = resume.get('technical_skills', {}) %}
 {% set langs = resume.get('languages', []) %}
 
+<!-- ── PROFILBILD UPLOAD (fristående form — ej inuti cv-form) ── -->
+<div class="form-section mb-3">
+  <div class="form-section-title">
+    <i class="bi bi-camera-fill"></i> Profilbild (visas i CV)
+  </div>
+  <div class="d-flex align-items-center gap-4">
+    <div>
+      {% if has_profile_photo %}
+        <img src="/cv/photo?t={{ now }}" alt="Profilbild"
+             id="photo-preview"
+             style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid var(--green);">
+      {% else %}
+        <div id="photo-preview"
+             style="width:90px;height:90px;border-radius:50%;background:#2C2C2C;border:2px dashed #555;display:flex;align-items:center;justify-content:center;">
+          <i class="bi bi-person-fill" style="font-size:2.5rem;color:#555;"></i>
+        </div>
+      {% endif %}
+    </div>
+    <div>
+      <form action="/cv/upload-photo" method="POST" enctype="multipart/form-data" id="photo-form">
+        <label class="form-label mb-1">Ladda upp foto (JPG, PNG, max 5 MB)</label>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="file" name="photo" id="photo-input" accept=".jpg,.jpeg,.png"
+                 class="form-control form-control-sm" style="max-width:280px;"
+                 onchange="previewPhoto(this)">
+          <button type="submit" class="btn btn-green btn-sm">
+            <i class="bi bi-upload me-1"></i>Spara bild
+          </button>
+          {% if has_profile_photo %}
+          <a href="/cv/delete-photo" class="btn btn-sm btn-outline-danger"
+             onclick="return confirm('Ta bort profilbilden?')">
+            <i class="bi bi-trash"></i>
+          </a>
+          {% endif %}
+        </div>
+        <small class="text-muted">Bilden används automatiskt i alla CV-designer som stöder profilbild.</small>
+      </form>
+    </div>
+  </div>
+</div>
+
 <form action="/cv/save" method="POST" id="cv-form">
 
   <!-- Save bar -->
@@ -17,47 +58,6 @@
     <button type="submit" class="btn btn-green">
       <i class="bi bi-floppy me-2"></i>Spara CV
     </button>
-  </div>
-
-  <!-- ── PROFILBILD UPLOAD ── -->
-  <div class="form-section mb-3">
-    <div class="form-section-title">
-      <i class="bi bi-camera-fill"></i> Profilbild (visas i CV)
-    </div>
-    <div class="d-flex align-items-center gap-4">
-      <div>
-        {% if has_profile_photo %}
-          <img src="/cv/photo?t={{ now }}" alt="Profilbild"
-               id="photo-preview"
-               style="width:90px;height:90px;object-fit:cover;border-radius:50%;border:2px solid var(--green);">
-        {% else %}
-          <div id="photo-preview"
-               style="width:90px;height:90px;border-radius:50%;background:#2C2C2C;border:2px dashed #555;display:flex;align-items:center;justify-content:center;">
-            <i class="bi bi-person-fill" style="font-size:2.5rem;color:#555;"></i>
-          </div>
-        {% endif %}
-      </div>
-      <div>
-        <form action="/cv/upload-photo" method="POST" enctype="multipart/form-data" id="photo-form">
-          <label class="form-label mb-1">Ladda upp foto (JPG, PNG, max 5 MB)</label>
-          <div class="d-flex gap-2 align-items-center">
-            <input type="file" name="photo" id="photo-input" accept=".jpg,.jpeg,.png"
-                   class="form-control form-control-sm" style="max-width:280px;"
-                   onchange="previewPhoto(this)">
-            <button type="submit" class="btn btn-green btn-sm">
-              <i class="bi bi-upload me-1"></i>Spara bild
-            </button>
-            {% if has_profile_photo %}
-            <a href="/cv/delete-photo" class="btn btn-sm btn-outline-danger"
-               onclick="return confirm('Ta bort profilbilden?')">
-              <i class="bi bi-trash"></i>
-            </a>
-            {% endif %}
-          </div>
-          <small class="text-muted">Bilden används automatiskt i alla CV-designer som stöder profilbild.</small>
-        </form>
-      </div>
-    </div>
   </div>
 
   <!-- ── PERSONLIG INFO ── -->
