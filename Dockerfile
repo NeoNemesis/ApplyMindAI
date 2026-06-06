@@ -34,4 +34,4 @@ USER appuser
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "web_app:app"]
+CMD ["sh", "-c", "flask db upgrade 2>/dev/null || true && gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 120 web_app:app"]

@@ -29,7 +29,7 @@ services:
     networks:
       - applymind-net
       - taskit-net
-    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--timeout", "300", "web_app:app"]
+    command: ["sh", "-c", "flask db upgrade 2>/dev/null || true && gunicorn --bind 0.0.0.0:5000 --workers 1 --threads 4 --timeout 300 web_app:app"]
     expose:
       - "5000"
     healthcheck:
