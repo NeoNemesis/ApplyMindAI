@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ============================================
-# ApplyMind AI — Auto-deploy (server-driven polling)
+# ApplyMind AI — Auto-deploy med automatisk rollback
 #
 # Triggas av systemd-timern auto-deploy-applymind.timer var 2:a minut.
 # Kollar om origin/master har nya commits — deploar om ja, annars exit 0.
 #
-# Zero-downtime: Docker startar nya containers innan gamla stängs.
-# Sidan är alltid uppe under deploy.
+# Säkerhet: om ny kod inte svarar på hälsokontroll inom 30s rullas
+# den automatiskt tillbaka till föregående fungerande version.
 #
 # Installera EN gång: bash scripts/install-auto-deploy.sh
 # Trigga manuellt:    systemctl start auto-deploy-applymind.service
@@ -23,10 +23,10 @@ BRANCH="${BRANCH:-master}"
 FORCE="${FORCE:-0}"
 SCRIPT_PATH="$(readlink -f "$0")"
 
-log()  { printf '[%s] %s\n' "$(date -Iseconds)" "$*" | tee -a "$LOG"; }
-fail() { log "❌ $*"; exit 1; }
+log()     { printf '[%s] %s\n' "$(date -Iseconds)" "$*" | tee -a "$LOG"; }
+fail()    { log "❌ $*"; exit 1; }
+success() { log "✅ $*"; }
 
-# Logga alla oväntade fel med radnummer
 trap 'log "❌ Fel på rad $LINENO — kommando: $BASH_COMMAND"' ERR
 
 # ── Lås mot parallella deploys ──────────────────────────────────────────
@@ -47,73 +47,97 @@ LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse "origin/$BRANCH")
 
 if [[ "$LOCAL" == "$REMOTE" && "$FORCE" != "1" ]]; then
-  exit 0   # Inget nytt — tyst exit (spammar inte loggen)
+  exit 0
 fi
 
 log "🚀 Ny commit hittad: ${LOCAL:0:7} → ${REMOTE:0:7}"
+
+# Spara föregående SHA för eventuell rollback
+PREV_SHA="$LOCAL"
+
 log "▶ Drar senaste koden från GitHub (hard reset)"
-# Använd fetch + reset istället för pull --ff-only så att lokala
-# ändringar (t.ex. direkta filediteringar på servern) aldrig blockerar deploy.
 git checkout -- .
 git clean -fd --quiet
 git reset --hard "origin/$BRANCH"
 
-# ── Om deploy-scriptet självt ändrades → exec om oss med ny version ────
+# ── Om deploy-scriptet självt ändrades → exec om med ny version ─────────
 SCRIPT_SHA_AFTER=$(sha256sum "$SCRIPT_PATH" | cut -d' ' -f1)
 if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
   log "🔄 Deploy-skriptet uppdaterades — startar om med ny version"
-  # FORCE=1 så att den omstartade körningen inte tidig-avbryter på
-  # LOCAL==REMOTE (koden är redan reset:ad) utan faktiskt kör deploy-stegen.
   exec env FORCE=1 bash "$SCRIPT_PATH"
 fi
 
-# ── Bygg bara om beroenden eller Dockerfile ändrats ────────────────────
+# ── Rollback-funktion ────────────────────────────────────────────────────
+rollback() {
+  log "🔄 RULLAR TILLBAKA till ${PREV_SHA:0:7}..."
+  git checkout -- .
+  git clean -fd --quiet
+  git reset --hard "$PREV_SHA"
+  docker compose --env-file "$ENV_FILE" up -d --force-recreate
+  sleep 6
+  if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
+    log "✅ Rollback lyckades — appen är uppe med föregående version (${PREV_SHA:0:7})"
+    log "⚠️  Ny kod (${REMOTE:0:7}) var trasig — undersök och fixa innan nästa deploy"
+  else
+    log "💥 KRITISKT: Rollback misslyckades också — manuell åtgärd krävs"
+    log "   Kör: docker compose logs applymind-web --tail=100"
+  fi
+  exit 1
+}
+
+# ── Hälsokontroll-funktion ───────────────────────────────────────────────
+wait_healthy() {
+  local label="$1"
+  log "▶ Väntar på hälsokontroll ($label)..."
+  for i in $(seq 1 20); do
+    if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
+# ── Bygg bara om beroenden ändrats sedan föregående deploy ──────────────
+# Jämför mot PREV_SHA (inte HEAD~1) för att fånga alla commits i pushen
 DEPS_CHANGED=0
 COMPOSE_CHANGED=0
-git diff HEAD~1..HEAD -- requirements.production.txt Dockerfile 2>/dev/null | grep -q '^+' && DEPS_CHANGED=1 || true
-git diff HEAD~1..HEAD -- docker-compose.yml 2>/dev/null | grep -q '^+' && COMPOSE_CHANGED=1 || true
+git diff "${PREV_SHA}..HEAD" -- requirements.production.txt Dockerfile 2>/dev/null \
+  | grep -q '^+' && DEPS_CHANGED=1 || true
+git diff "${PREV_SHA}..HEAD" -- docker-compose.yml 2>/dev/null \
+  | grep -q '^+' && COMPOSE_CHANGED=1 || true
 
 if [[ "$DEPS_CHANGED" -gt 0 ]]; then
-  log "📦 Beroenden ändrade — full rebuild (kort downtime möjlig)"
+  log "📦 Beroenden ändrade — full rebuild"
   docker compose --env-file "$ENV_FILE" build
-  docker compose --env-file "$ENV_FILE" up -d --wait
+  docker compose --env-file "$ENV_FILE" up -d --wait || true
 elif [[ "$COMPOSE_CHANGED" -gt 0 ]]; then
-  log "🔄 docker-compose.yml ändrad — återskapar container (applicerar nya volumes/env)"
+  log "🔄 docker-compose.yml ändrad — återskapar container"
   docker compose --env-file "$ENV_FILE" up -d --force-recreate
 else
-  log "⚡ Kod-ändring — återskapar container (kort downtime, binder om fil-mounts)"
-  # VIKTIGT: källkoden bind-mountas som ENSKILDA filer (./web_app.py m.fl.) som
-  # binder till filens inode. `git reset --hard` ger filerna NYA inodes, så
-  # `kill -HUP` (gunicorn reload) läser fortfarande GAMMAL kod — nya routes blir
-  # 404. --force-recreate skapar ny container som binder om mountsen till de nya
-  # inoderna. (Verifierat: PR #43:s /api/jobs/import-history gav 404 efter HUP.)
+  log "⚡ Kod-ändring — återskapar container (binder om fil-mounts)"
   docker compose --env-file "$ENV_FILE" up -d --force-recreate
 fi
 
-# ── Kör DB-migrationer om de finns ─────────────────────────────────────
+# ── Hälsokontroll — rulla tillbaka om ny kod är trasig ───────────────────
+if ! wait_healthy "ny version"; then
+  log "❌ Ny kod (${REMOTE:0:7}) svarar inte — startar rollback"
+  rollback
+fi
+
+# ── DB-migrationer ───────────────────────────────────────────────────────
 if docker compose exec -T applymind-web python -c "import flask_migrate" 2>/dev/null; then
   log "▶ Kör DB-migrationer"
-  docker compose exec -T applymind-web flask db upgrade || log "⚠️ Inga migrationer att köra"
+  docker compose exec -T applymind-web flask db upgrade 2>/dev/null \
+    || log "⚠️  Inga migrationer att köra (eller flask db ej konfigurerat)"
 else
-  # Enkel db.create_all() som fallback
   docker compose exec -T applymind-web python -c "
 from web_app import app
 from models import db
 with app.app_context():
     db.create_all()
 print('DB schema verifierat')
-" && log "✅ DB schema verifierat"
+" 2>/dev/null && log "✅ DB schema verifierat" || true
 fi
 
-# ── Hälsokontroll ───────────────────────────────────────────────────────
-log "▶ Väntar på hälsokontroll"
-for i in $(seq 1 15); do
-  if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
-    log "✅ Deploy klar — ApplyMind AI svarar på :5000"
-    exit 0
-  fi
-  sleep 2
-done
-
-log "⚠️ Hälsokontroll timeout — kontrollera: docker compose logs applymind-web"
-exit 1
+success "Deploy klar — ApplyMind AI kör ${REMOTE:0:7}"
