@@ -1342,9 +1342,13 @@ def search_stream():
     """Server-Sent Events stream for live search output"""
     def generate():
         yield 'data: {"type":"connected"}\n\n'
+        # Stäng direkt om ingen sökning körs — undviker 25s timeout-loop
+        if not search_state.get('running'):
+            yield 'data: {"type":"done"}\n\n'
+            return
         while True:
             try:
-                msg_type, msg = search_queue.get(timeout=25)
+                msg_type, msg = search_queue.get(timeout=20)
                 if msg_type == 'output':
                     data = json.dumps({'type': 'output', 'text': msg})
                     yield f'data: {data}\n\n'
@@ -1360,10 +1364,10 @@ def search_stream():
                     yield 'data: {"type":"done"}\n\n'
                     break
             except queue.Empty:
-                yield 'data: {"type":"ping"}\n\n'
                 if not search_state.get('running'):
                     yield 'data: {"type":"done"}\n\n'
                     break
+                yield 'data: {"type":"ping"}\n\n'
 
     return Response(
         stream_with_context(generate()),
