@@ -1379,9 +1379,8 @@ def search_stream():
         stream_with_context(generate()),
         mimetype='text/event-stream',
         headers={
-            'Cache-Control':    'no-cache',
+            'Cache-Control':     'no-cache',
             'X-Accel-Buffering': 'no',
-            'Connection':       'keep-alive',
         }
     )
 
