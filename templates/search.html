@@ -48,8 +48,10 @@
                data-design="{{ design_key }}"
                data-desc="{{ design_desc }}"
                onclick="selectCvDesign('{{ design_key }}')">
-            <div class="design-thumb-frame">
-              <iframe src="/preview/pdf/{{ design_key }}" loading="lazy"
+            <div class="design-thumb-frame"
+                 data-preview-src="/preview/pdf/{{ design_key }}"
+                 onmouseenter="lazyLoadThumb(this)">
+              <iframe src="about:blank"
                       scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
               <div class="thumb-overlay"></div>
             </div>
@@ -90,8 +92,10 @@
                data-letter="{{ letter_key }}"
                data-desc="{{ letter_desc }}"
                onclick="selectLetterTemplate('{{ letter_key }}')">
-            <div class="design-thumb-frame">
-              <iframe src="/cover-letter/template/preview/{{ letter_key }}" loading="lazy"
+            <div class="design-thumb-frame"
+                 data-preview-src="/cover-letter/template/preview/{{ letter_key }}"
+                 onmouseenter="lazyLoadThumb(this)">
+              <iframe src="about:blank"
                       scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
               <div class="thumb-overlay"></div>
             </div>
@@ -547,6 +551,22 @@ Tips:
 
 {% block scripts %}
 <script>
+// -------------------------------------------------------
+// Lazy iframe loader — prevents 6 simultaneous requests on page load
+// that triggered ERR_QUIC_PROTOCOL_ERROR
+// -------------------------------------------------------
+function lazyLoadThumb(frame) {
+  const iframe = frame.querySelector('iframe');
+  if (!iframe || iframe.dataset.loaded) return;
+  iframe.src = frame.dataset.previewSrc;
+  iframe.dataset.loaded = '1';
+}
+
+// Pre-load the selected cards so they show content without hover
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.design-card.selected .design-thumb-frame').forEach(lazyLoadThumb);
+});
+
 // -------------------------------------------------------
 // Design picker
 // -------------------------------------------------------
