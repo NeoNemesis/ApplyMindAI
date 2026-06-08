@@ -810,6 +810,7 @@ def cv_editor():
 
 
 @app.route('/cv/photo')
+@login_required
 def cv_photo():
     """Serve the profile photo"""
     photo_path = _u('profile.png')
@@ -1002,6 +1003,7 @@ def letter_template_select():
     return redirect(url_for('letter_templates'))
 
 @app.route('/cover-letter/template/preview/<template_key>')
+@login_required
 def letter_template_preview(template_key):
     """Renderar brev-mallen med användarens RIKTIGA data från plain_text_resume.yaml.
 
@@ -1031,12 +1033,17 @@ def letter_template_preview(template_key):
 
 
 def _build_letter_preview_content() -> dict:
-    """Bygger dict med alla brev-placeholders ifyllda med Victor's data."""
+    """Bygger dict med alla brev-placeholders ifyllda med inloggad användares data."""
     from datetime import datetime
     resume = load_yaml(RESUME_YAML()) or {}
     pi = resume.get('personal_information', {}) or {}
 
-    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
+    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Namn Saknas'
+
+    # Härled job_title från senaste erfarenhet
+    exp = (resume.get('experience_details') or [])
+    job_title = exp[0].get('position', '') if exp else ''
+
     email = pi.get('email', '')
     phone = pi.get('phone', '')
     address = pi.get('address', '')
@@ -1056,14 +1063,13 @@ def _build_letter_preview_content() -> dict:
     now = datetime.now()
     date_str = f"{now.day} {months_sv[now.month-1]} {now.year}"
 
-    # cover_letter_profile = full brevtext från YAML
-    body_text = resume.get('cover_letter_profile', '') or 'Här visas ditt personliga brev när du har fyllt i cover_letter_profile i CV-formuläret.'
+    body_text = resume.get('cover_letter_profile', '') or ''
     paragraphs = [p.strip() for p in body_text.split('\n\n') if p.strip()]
-    section1 = '\n'.join(f'<p>{p}</p>' for p in paragraphs)
+    section1 = '\n'.join(f'<p>{p}</p>' for p in paragraphs) or '<p>Fyll i ditt personliga brev under Mitt CV → Personligt brev.</p>'
 
     return {
         'full_name': full_name,
-        'job_title': 'Systemutvecklare | Fullstackutvecklare',
+        'job_title': job_title,
         'contact_info': contact_info,
         'date': date_str,
         'salutation': 'Bästa rekryteringsteam,',
@@ -2284,6 +2290,7 @@ def design_save():
 
 
 @app.route('/preview/pdf/<design_key>')
+@login_required
 def preview_design_pdf(design_key):
     """Renderar CV-mallen med Victor's RIKTIGA data från plain_text_resume.yaml.
 
@@ -2319,13 +2326,19 @@ def preview_design_pdf(design_key):
 
 
 def _build_cv_preview_content() -> dict:
-    """Bygger dict med alla CV-placeholders ifyllda med Victor's riktiga data."""
+    """Bygger dict med alla CV-placeholders ifyllda med inloggad användares data."""
     resume = load_yaml(RESUME_YAML()) or {}
     pi = resume.get('personal_information', {}) or {}
 
-    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Victor Vilches'
-    summary = resume.get('professional_summary', '') or 'Fullstack-utvecklare med erfarenhet av produktionssystem.'
-    job_title = 'Systemutvecklare | Fullstackutvecklare'
+    full_name = f"{pi.get('name', '')} {pi.get('surname', '')}".strip() or 'Namn Saknas'
+    summary = resume.get('professional_summary', '') or ''
+
+    # Härled job_title från senaste erfarenhet
+    exp = (resume.get('experience_details') or [])
+    job_title = exp[0].get('position', '') if exp else ''
+
+    # Profilfoto — inkludera om det finns
+    profile_image = '/cv/photo' if _u('profile.png').exists() else ''
 
     # Education
     edu_html = []
@@ -2342,7 +2355,7 @@ def _build_cv_preview_content() -> dict:
     skills_items = []
     for cert in (resume.get('certifications') or []):
         skills_items.append(f'<div style="margin-bottom:0.4rem">• {cert.get("name", "")}</div>')
-    skills_content = '\n'.join(skills_items) or '<div>• Webbutveckling I &amp; II</div><div>• Databasteknik i SQL</div><div>• B-Körkort</div>'
+    skills_content = '\n'.join(skills_items) or ''
 
     # Languages
     lang_html = []
@@ -2396,7 +2409,7 @@ def _build_cv_preview_content() -> dict:
     tech_html += '</ul>'
 
     return {
-        'profile_image': '',
+        'profile_image': profile_image,
         'full_name': full_name,
         'job_title': job_title,
         'summary': summary,
