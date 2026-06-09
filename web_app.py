@@ -202,19 +202,55 @@ def TRACKER_FILE()    -> Path: return _u('tracker_status.json')
 def SCHEDULER_FILE()  -> Path: return _u('scheduler_config.json')
 
 # ============================================================
-# SEARCH STATE (thread-safe via lock)
+# SEARCH STATE — per-user (keyed by user_id)
 # ============================================================
 _search_lock = threading.Lock()
-search_state = {
-    'running': False,
-    'output': [],
-    'error': None,
-    'progress': 0,
-    'started_at': None,
-    'finished_at': None,
-}
-search_queue = queue.Queue()
-_stop_requested = False  # Global stop flag — set by /search/stop
+_user_search_states: dict = {}   # uid -> state dict
+_user_search_queues: dict = {}   # uid -> Queue
+_user_stop_flags:    dict = {}   # uid -> bool
+
+
+def _get_uid() -> int | None:
+    try:
+        from flask_login import current_user as _cu
+        return _cu.id if _cu.is_authenticated else None
+    except Exception:
+        return None
+
+
+def _search_state(uid: int | None) -> dict:
+    if uid is None:
+        return {'running': False, 'output': [], 'error': None,
+                'progress': 0, 'started_at': None, 'finished_at': None}
+    if uid not in _user_search_states:
+        _user_search_states[uid] = {
+            'running': False, 'output': [], 'error': None,
+            'progress': 0, 'started_at': None, 'finished_at': None,
+        }
+    return _user_search_states[uid]
+
+
+def _search_queue(uid: int | None) -> queue.Queue:
+    if uid is None:
+        return queue.Queue()
+    if uid not in _user_search_queues:
+        _user_search_queues[uid] = queue.Queue()
+    return _user_search_queues[uid]
+
+
+def _is_stop_requested(uid: int | None) -> bool:
+    return bool(_user_stop_flags.get(uid, False))
+
+
+def _set_stop_flag(uid: int | None, value: bool) -> None:
+    if uid is not None:
+        _user_stop_flags[uid] = value
+
+
+# Legacy aliases — used in old code that referenced the global directly.
+# Routed to uid=None (anonymous fallback) to avoid NameError during migration.
+search_state = _search_state(None)
+search_queue  = _search_queue(None)
 
 
 # ============================================================
@@ -452,21 +488,20 @@ def _scheduler_loop():
 
                 def _sched_search(plats=platforms, mj=max_jobs, locs=locations,
                                    pos=positions, uid=sched_user_id):
-                    global search_state
+                    sq = _search_queue(uid)
+                    st = _search_state(uid)
                     old_out = sys.stdout
                     class _SC:
                         encoding = 'utf-8'
                         def write(self, t):
                             if t and t.strip():
-                                search_queue.put(('output', t))
+                                sq.put(('output', t))
                             old_out.write(t)
                         def flush(self): old_out.flush()
                         def reconfigure(self, **kw): pass
                     from job_master import JobMaster
                     try:
                         sys.stdout = _SC()
-                        # Scheduler kör utanför request-context — behöver app_context
-                        # för DB-access och rätt per-user sökvägar
                         with app.app_context():
                             if uid:
                                 _set_search_thread_llm_context(uid)
@@ -480,14 +515,14 @@ def _scheduler_loop():
                                 jm.generate_documents_for_job(job, i)
                             jm.cleanup()
                     except Exception as e:
-                        search_queue.put(('error', str(e)))
+                        sq.put(('error', str(e)))
                     finally:
                         sys.stdout = old_out
                         with _search_lock:
-                            search_state['running']     = False
-                            search_state['progress']    = 100
-                            search_state['finished_at'] = datetime.now().isoformat()
-                        search_queue.put(('done', None))
+                            st['running']     = False
+                            st['progress']    = 100
+                            st['finished_at'] = datetime.now().isoformat()
+                        sq.put(('done', None))
 
                 threading.Thread(target=_sched_search, daemon=True).start()
         except Exception:
@@ -801,6 +836,7 @@ MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 @app.route('/cv')
+@login_required
 def cv_editor():
     resume = load_yaml(RESUME_YAML())
     has_photo = _u('profile.png').exists()
@@ -820,6 +856,7 @@ def cv_photo():
 
 
 @app.route('/cv/upload-photo', methods=['POST'])
+@login_required
 def cv_upload_photo():
     """Upload and save profile photo per user"""
     if 'photo' not in request.files:
@@ -858,6 +895,7 @@ def cv_upload_photo():
 
 
 @app.route('/cv/delete-photo')
+@login_required
 def cv_delete_photo():
     """Delete profile photo"""
     photo_path = _u('profile.png')
@@ -868,6 +906,7 @@ def cv_delete_photo():
 
 
 @app.route('/cv/save', methods=['POST'])
+@login_required
 def cv_save():
     resume = load_yaml(RESUME_YAML())
 
@@ -974,6 +1013,7 @@ def cv_save():
 # ============================================================
 
 @app.route('/cover-letter')
+@login_required
 def cover_letter():
     content = COVER_LETTER().read_text(encoding='utf-8') if COVER_LETTER().exists() else ''
     resume  = load_yaml(RESUME_YAML())
@@ -995,6 +1035,7 @@ def letter_templates():
     return redirect(url_for('search') + '#letter-picker')
 
 @app.route('/cover-letter/template/select', methods=['POST'])
+@login_required
 def letter_template_select():
     tmpl = request.form.get('template', 'problem_solution')
     if tmpl in LETTER_TEMPLATE_NAMES:
@@ -1079,6 +1120,7 @@ def _build_letter_preview_content() -> dict:
     }
 
 @app.route('/cover-letter/save', methods=['POST'])
+@login_required
 def cover_letter_save():
     try:
         content = request.form.get('content', '')
@@ -1099,6 +1141,7 @@ def cover_letter_save():
 # ============================================================
 
 @app.route('/search')
+@login_required
 def search():
     prefs = load_yaml(PREFS_YAML())
     env = read_env()
@@ -1121,6 +1164,7 @@ ACTIVE_LETTER_DESIGNS = {'nordic_minimal', 'problem_solution', 'modern_tech'}
 
 
 @app.route('/api/design/save', methods=['POST'])
+@login_required
 def api_design_save():
     """AJAX-spar för CV-/brev-design-val på sökrutan."""
     kind = request.form.get('kind', '')
@@ -1135,12 +1179,15 @@ def api_design_save():
 
 
 @app.route('/search/run', methods=['POST'])
+@login_required
 @limiter.limit("20 per hour")
 def search_run():
-    global search_state
+    uid = _get_uid()
+    _st = _search_state(uid)
+    _q  = _search_queue(uid)
 
     with _search_lock:
-        if search_state['running']:
+        if _st['running']:
             return jsonify({'error': 'En sökning pågår redan. Vänta tills den är klar.'}), 400
 
         # Parse form
@@ -1188,47 +1235,47 @@ def search_run():
             prefs['positions'] = positions
         save_yaml(PREFS_YAML(), prefs)
 
-        # Reset state
-        search_state = {
+        # Reset per-user state
+        _st.update({
             'running':     True,
             'output':      [],
             'error':       None,
             'progress':    0,
             'started_at':  datetime.now().isoformat(),
             'finished_at': None,
-        }
+        })
 
-    # Drain queue
-    while not search_queue.empty():
+    # Drain this user's queue
+    while not _q.empty():
         try:
-            search_queue.get_nowait()
+            _q.get_nowait()
         except queue.Empty:
             break
 
-    # Fånga user_id innan tråden startar (current_user är inte tillgänglig i tråden)
-    _search_user_id = current_user.id if current_user.is_authenticated else None
+    # uid already captured above; current_user unavailable inside thread
+    _search_user_id = uid
 
     def run_search():
-        global search_state, _stop_requested
-        # Sätt per-user LLM-kontext i söktråden så att CV/brev-generering
-        # använder rätt API-nyckel (inte den globala .env-nyckeln)
+        # Use per-user queue/state captured from outer scope
+        q  = _search_queue(_search_user_id)
+        st = _search_state(_search_user_id)
+
         if _search_user_id:
             _set_search_thread_llm_context(_search_user_id)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
         class OutputCapture:
-            """Capture stdout/stderr and push to SSE queue"""
+            """Capture stdout/stderr and push to user's SSE queue"""
             encoding = 'utf-8'
 
             def write(self, text):
                 if text and text.strip():
-                    search_queue.put(('output', text))
+                    q.put(('output', text))
                 if old_stdout is not None:
                     try:
                         old_stdout.write(text)
                     except (UnicodeEncodeError, TypeError):
-                        # Windows cp1252 console can't handle Swedish/emoji chars — ignore
                         pass
 
             def flush(self):
@@ -1236,48 +1283,46 @@ def search_run():
                     old_stdout.flush()
 
             def reconfigure(self, **kwargs):
-                pass  # called by job_master on Windows — safe to ignore
+                pass
 
         try:
-            # Import inside try-finally so search_state is always reset even if import fails
             from job_master import JobMaster
 
             sys.stdout = OutputCapture()
             sys.stderr = OutputCapture()
 
-            _stop_requested = False
+            _set_stop_flag(_search_user_id, False)
             jm = JobMaster(output_dir=_user_output_dir(_search_user_id), data_dir=_user_data_dir(_search_user_id))
             jm.stop_requested = False
-            jm.initialize(platforms=platforms)  # Skip browser if only API platforms selected
+            jm.initialize(platforms=platforms)
 
-            search_queue.put(('output', f'\n🔍 Plattformar: {", ".join(platforms)}\n'))
-            search_queue.put(('output', f'📍 Platser: {", ".join(locations)}\n'))
-            search_queue.put(('output', f'🎯 Max jobb: {max_jobs}\n\n'))
+            q.put(('output', f'\n🔍 Plattformar: {", ".join(platforms)}\n'))
+            q.put(('output', f'📍 Platser: {", ".join(locations)}\n'))
+            q.put(('output', f'🎯 Max jobb: {max_jobs}\n\n'))
 
-            # Propagate stop flag from web_app global to jm instance during search
             def _sync_stop_flag():
                 import time as _time
-                while search_state.get('running') and not _stop_requested:
+                while st.get('running') and not _is_stop_requested(_search_user_id):
                     _time.sleep(0.3)
-                jm.stop_requested = True  # always signal jm when loop ends (either stop or finish)
+                jm.stop_requested = True
 
             threading.Thread(target=_sync_stop_flag, daemon=True).start()
 
             jobs = jm.search_jobs(platforms, max_jobs, locations=locations, positions=positions)
 
-            if _stop_requested:
-                search_queue.put(('output', '\n⛔ Sökning avbruten av användaren.\n'))
+            if _is_stop_requested(_search_user_id):
+                q.put(('output', '\n⛔ Sökning avbruten av användaren.\n'))
             elif jobs:
-                search_queue.put(('output', f'\n✅ Hittade {len(jobs)} jobb!\n'))
-                search_queue.put(('output', '\n📝 Genererar CV och personliga brev...\n'))
+                q.put(('output', f'\n✅ Hittade {len(jobs)} jobb!\n'))
+                q.put(('output', '\n📝 Genererar CV och personliga brev...\n'))
                 successful = 0
                 for i, job in enumerate(jobs, 1):
-                    if _stop_requested:
-                        search_queue.put(('output', '\n⛔ Dokumentgenerering avbruten.\n'))
+                    if _is_stop_requested(_search_user_id):
+                        q.put(('output', '\n⛔ Dokumentgenerering avbruten.\n'))
                         break
-                    search_queue.put(('progress', f'{i}/{len(jobs)}'))
-                    search_queue.put(('output', f'\n[{i}/{len(jobs)}] 📄 {job["title"]} @ {job["company"]}\n'))
-                    _enforce_job_quota()   # Radera äldst om kvot (50) uppnåtts
+                    q.put(('progress', f'{i}/{len(jobs)}'))
+                    q.put(('output', f'\n[{i}/{len(jobs)}] 📄 {job["title"]} @ {job["company"]}\n'))
+                    _enforce_job_quota()
                     ok = jm.generate_documents_for_job(
                         job, i,
                         ats_filter=ats_filter_enabled,
@@ -1286,13 +1331,10 @@ def search_run():
                     )
                     if ok:
                         successful += 1
-                        search_queue.put(('output', '   ✅ Klar!\n'))
+                        q.put(('output', '   ✅ Klar!\n'))
                     else:
-                        search_queue.put(('output', '   ⏭️  Hoppades över\n'))
+                        q.put(('output', '   ⏭️  Hoppades över\n'))
 
-                # Registrera ALLA hittade jobb i processed_jobs.json så nästa
-                # sökning inte återkommer med samma annonser — oavsett om
-                # genereringen lyckades. (Använd "rensa historik" för att söka om.)
                 try:
                     pj_path  = _user_output_dir(_search_user_id) / 'processed_jobs.json'
                     existing = json.loads(pj_path.read_text(encoding='utf-8')) if pj_path.exists() else []
@@ -1313,48 +1355,52 @@ def search_run():
                             added += 1
                     pj_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8')
                     if added:
-                        search_queue.put(('output', f'🔒 {added} jobb registrerade i historiken (hittas ej igen).\n'))
+                        q.put(('output', f'🔒 {added} jobb registrerade i historiken (hittas ej igen).\n'))
                 except Exception as _e:
-                    search_queue.put(('output', f'⚠️  Kunde inte uppdatera dubblett-historiken: {_e}\n'))
+                    q.put(('output', f'⚠️  Kunde inte uppdatera dubblett-historiken: {_e}\n'))
 
-                search_queue.put(('output', f'\n✅ KLART! {successful}/{len(jobs)} jobb processade.\n'))
-                search_queue.put(('output', f'📂 Filer sparade i: {jm.base_output_dir}\n'))
+                q.put(('output', f'\n✅ KLART! {successful}/{len(jobs)} jobb processade.\n'))
+                q.put(('output', f'📂 Filer sparade i: {jm.base_output_dir}\n'))
             else:
-                search_queue.put(('output', '\n❌ Inga nya jobb hittades. Prova att ändra sökkriterierna.\n'))
+                q.put(('output', '\n❌ Inga nya jobb hittades. Prova att ändra sökkriterierna.\n'))
 
             jm.cleanup()
 
         except Exception as e:
             import traceback
             err_msg = f'\n❌ Fel: {str(e)}\n{traceback.format_exc()}\n'
-            search_queue.put(('error', err_msg))
+            q.put(('error', err_msg))
             with _search_lock:
-                search_state['error'] = str(e)
+                st['error'] = str(e)
         finally:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
             with _search_lock:
-                search_state['running']     = False
-                search_state['progress']    = 100
-                search_state['finished_at'] = datetime.now().isoformat()
-            search_queue.put(('done', None))
+                st['running']     = False
+                st['progress']    = 100
+                st['finished_at'] = datetime.now().isoformat()
+            q.put(('done', None))
 
     threading.Thread(target=run_search, daemon=True).start()
     return jsonify({'status': 'started'})
 
 
 @app.route('/search/stream')
+@login_required
 def search_stream():
-    """Server-Sent Events stream for live search output"""
+    """Server-Sent Events stream for live search output — per user"""
+    uid = _get_uid()
+    st  = _search_state(uid)
+    q   = _search_queue(uid)
+
     def generate():
         yield 'data: {"type":"connected"}\n\n'
-        # Stäng direkt om ingen sökning körs — undviker 25s timeout-loop
-        if not search_state.get('running'):
+        if not st.get('running'):
             yield 'data: {"type":"done"}\n\n'
             return
         while True:
             try:
-                msg_type, msg = search_queue.get(timeout=20)
+                msg_type, msg = q.get(timeout=20)
                 if msg_type == 'output':
                     data = json.dumps({'type': 'output', 'text': msg})
                     yield f'data: {data}\n\n'
@@ -1370,7 +1416,7 @@ def search_stream():
                     yield 'data: {"type":"done"}\n\n'
                     break
             except queue.Empty:
-                if not search_state.get('running'):
+                if not st.get('running'):
                     yield 'data: {"type":"done"}\n\n'
                     break
                 yield 'data: {"type":"ping"}\n\n'
@@ -1386,43 +1432,51 @@ def search_stream():
 
 
 @app.route('/search/stop', methods=['POST'])
+@login_required
 def search_stop():
     """Stop an ongoing search gracefully"""
-    global _stop_requested
-    if not search_state.get('running'):
+    uid = _get_uid()
+    st  = _search_state(uid)
+    q   = _search_queue(uid)
+    if not st.get('running'):
         return jsonify({'status': 'not_running'})
-    _stop_requested = True
-    search_queue.put(('output', '\n⛔ Stoppsignal mottagen — avslutar pågående plattform...\n'))
+    _set_stop_flag(uid, True)
+    q.put(('output', '\n⛔ Stoppsignal mottagen — avslutar pågående plattform...\n'))
     return jsonify({'status': 'stopping'})
 
 
 @app.route('/search/status')
+@login_required
 def search_status():
-    return jsonify(search_state)
+    return jsonify(_search_state(_get_uid()))
 
 
 @app.route('/search/force-reset', methods=['POST'])
+@login_required
 def search_force_reset():
     """Force-reset search state if a previous search got stuck."""
-    global _stop_requested
+    uid = _get_uid()
+    st  = _search_state(uid)
+    q   = _search_queue(uid)
     with _search_lock:
-        _stop_requested = True
-        search_state.update({
+        _set_stop_flag(uid, True)
+        st.update({
             'running':     False,
             'output':      [],
             'error':       None,
             'progress':    0,
             'finished_at': datetime.now().isoformat(),
         })
-    while not search_queue.empty():
+    while not q.empty():
         try:
-            search_queue.get_nowait()
+            q.get_nowait()
         except queue.Empty:
             break
     return jsonify({'status': 'reset'})
 
 
 @app.route('/search/clear-history', methods=['POST'])
+@login_required
 def search_clear_history():
     """Rensa processed_jobs.json så att redan sedda jobb kan hittas igen."""
     p = PROCESSED_JOBS()
@@ -1441,7 +1495,9 @@ def batch_evaluate():
     """Utvärdera ALLA jobbmappar med EXAKT samma detaljerade ATS-pipeline som
     /jobs-sidans badge (_evaluate_job_ats) och radera mappar under tröskeln.
     Tröskel + force styrs från UI (samma standard som söksidan: 65)."""
-    global _stop_requested
+    uid = _get_uid()
+    _st = _search_state(uid)
+    _q  = _search_queue(uid)
 
     _body = request.get_json(silent=True) or {}
     try:
@@ -1451,10 +1507,10 @@ def batch_evaluate():
     _eval_force = bool(_body.get('force', True))
 
     with _search_lock:
-        if search_state.get('running'):
+        if _st.get('running'):
             return jsonify({'status': 'already_running'})
-        _stop_requested = False
-        search_state.update({
+        _set_stop_flag(uid, False)
+        _st.update({
             'running':      True,
             'output':       [],
             'error':        None,
@@ -1463,18 +1519,17 @@ def batch_evaluate():
             'finished_at':  None,
         })
 
-    # Fånga user_id innan tråden startar (current_user är inte tillgänglig i tråden)
-    _eval_user_id = current_user.id if current_user.is_authenticated else None
+    _eval_user_id = uid
 
-    # Flush queue
-    while not search_queue.empty():
+    while not _q.empty():
         try:
-            search_queue.get_nowait()
+            _q.get_nowait()
         except queue.Empty:
             break
 
     def run_evaluation():
-        global _stop_requested
+        q  = _search_queue(_eval_user_id)
+        st = _search_state(_eval_user_id)
         if _eval_user_id:
             _set_search_thread_llm_context(_eval_user_id)
         old_stdout = sys.stdout
@@ -1483,7 +1538,7 @@ def batch_evaluate():
         class OutputCapture:
             def write(self, text):
                 if text and text.strip():
-                    search_queue.put(('output', text))
+                    q.put(('output', text))
                 try:
                     old_stdout.write(text)
                 except Exception:
@@ -1510,12 +1565,12 @@ def batch_evaluate():
             )
 
             if not job_folders:
-                search_queue.put(('output', '❌ Inga jobbmappar hittades. Gör en sökning först.\n'))
-                search_queue.put(('done', None))
+                q.put(('output', '❌ Inga jobbmappar hittades. Gör en sökning först.\n'))
+                q.put(('done', None))
                 return
 
             sep = '=' * 60
-            search_queue.put(('output',
+            q.put(('output',
                 f'\n🔍 Utvärderar {len(job_folders)} jobbmappar med detaljerad ATS '
                 f'(tröskel: {_eval_threshold}%)...\n'
                 f'{sep}\n'
@@ -1526,13 +1581,12 @@ def batch_evaluate():
             skipped = 0
 
             for i, folder in enumerate(job_folders, 1):
-                if _stop_requested:
-                    search_queue.put(('output', '\n⛔ Avbruten av användaren.\n'))
+                if _is_stop_requested(_eval_user_id):
+                    q.put(('output', '\n⛔ Avbruten av användaren.\n'))
                     break
 
-                search_queue.put(('progress', f'{i}/{len(job_folders)}'))
+                q.put(('progress', f'{i}/{len(job_folders)}'))
 
-                # Läs titel för visning
                 display_name = folder.name
                 info_file = folder / 'job_info.txt'
                 if info_file.exists():
@@ -1541,34 +1595,30 @@ def batch_evaluate():
                             display_name = line.split('Titel:', 1)[1].strip()
                             break
 
-                search_queue.put(('output', f'\n[{i}/{len(job_folders)}] {display_name}\n'))
+                q.put(('output', f'\n[{i}/{len(job_folders)}] {display_name}\n'))
 
-                # Hoppa över mappar utan PDFs — misslyckade jobb
                 if not any(folder.glob('*.pdf')):
-                    search_queue.put(('output', '   ⚠️  Inga dokument — hoppar över\n'))
+                    q.put(('output', '   ⚠️  Inga dokument — hoppar över\n'))
                     skipped += 1
                     continue
 
-                # SAMMA detaljerade pipeline som /jobs-badgen → identisk poäng överallt.
-                # force=_eval_force: True = räkna om alla, False = återanvänd cache.
                 res = _evaluate_job_ats(folder, force=_eval_force)
                 if not res.get('ok'):
-                    # Gick ej att poängsätta (saknar beskrivning/CV eller LLM-fel) → BEHÅLL
                     err = (res.get('error') or 'okänt fel')[:60]
-                    search_queue.put(('output', f'   ⚠️  Kunde inte utvärdera — behålls ({err})\n'))
+                    q.put(('output', f'   ⚠️  Kunde inte utvärdera — behålls ({err})\n'))
                     skipped += 1
                     continue
 
                 score = res.get('score', 0)
-                search_queue.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
+                q.put(('output', f'   🎯 ATS-poäng: {score}/100\n'))
 
                 if score >= _eval_threshold:
                     passed += 1
-                    search_queue.put(('output', f'   ✅ Godkänd (≥ {_eval_threshold}%) — behålls\n'))
+                    q.put(('output', f'   ✅ Godkänd (≥ {_eval_threshold}%) — behålls\n'))
                 else:
                     failed += 1
                     summary = (res.get('summary') or '')[:80]
-                    search_queue.put(('output', f'   ❌ Under tröskeln — {summary}\n'))
+                    q.put(('output', f'   ❌ Under tröskeln — {summary}\n'))
                     _meta = parse_job_folder(folder)
                     _block_job_url(_meta.get('url', ''), _meta)
                     shutil.rmtree(folder, ignore_errors=True)
@@ -1597,7 +1647,7 @@ def batch_evaluate():
                 except Exception:
                     pass  # Non-critical
 
-            search_queue.put(('output',
+            q.put(('output',
                 f'\n{sep}\n'
                 f'📊 RESULTAT: {passed} behållna (≥{_eval_threshold}%), {failed} borttagna'
                 + (f', {skipped} ej utvärderade' if skipped else '')
@@ -1607,17 +1657,17 @@ def batch_evaluate():
         except Exception as e:
             import traceback
             err = f'\n❌ Fel: {str(e)}\n{traceback.format_exc()}\n'
-            search_queue.put(('error', err))
+            q.put(('error', err))
             with _search_lock:
-                search_state['error'] = str(e)
+                st['error'] = str(e)
         finally:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
             with _search_lock:
-                search_state['running']     = False
-                search_state['progress']    = 100
-                search_state['finished_at'] = datetime.now().isoformat()
-            search_queue.put(('done', None))
+                st['running']     = False
+                st['progress']    = 100
+                st['finished_at'] = datetime.now().isoformat()
+            q.put(('done', None))
 
     threading.Thread(target=run_evaluation, daemon=True).start()
     return jsonify({'status': 'started'})
@@ -1628,6 +1678,7 @@ def batch_evaluate():
 # ============================================================
 
 @app.route('/jobs')
+@login_required
 def jobs():
     from datetime import timedelta
     folders       = get_job_folders()
@@ -1640,6 +1691,7 @@ def jobs():
 
 
 @app.route('/download-pdf')
+@login_required
 def download_file():
     """Download a PDF document (query-param based to handle Swedish chars)"""
     folder   = request.args.get('folder',   '').strip()
@@ -1656,6 +1708,7 @@ def download_file():
 
 
 @app.route('/view-pdf')
+@login_required
 def view_pdf():
     """View a PDF in browser (query-param based to handle Swedish chars)"""
     folder   = request.args.get('folder',   '').strip()
@@ -1672,6 +1725,7 @@ def view_pdf():
 
 # Legacy path-based routes (redirect to query-param versions)
 @app.route('/download/<path:subpath>')
+@login_required
 def download_file_legacy(subpath):
     parts = subpath.split('/', 1)
     if len(parts) == 2:
@@ -1680,6 +1734,7 @@ def download_file_legacy(subpath):
 
 
 @app.route('/view/<path:subpath>')
+@login_required
 def view_pdf_legacy(subpath):
     parts = subpath.split('/', 1)
     if len(parts) == 2:
@@ -1779,6 +1834,7 @@ def api_job_quota():
 
 
 @app.route('/api/jobs')
+@login_required
 def api_jobs():
     """JSON API for jobs list"""
     folders  = get_job_folders()
@@ -1823,6 +1879,7 @@ def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected') -> No
 
 
 @app.route('/api/jobs/delete', methods=['POST'])
+@login_required
 def api_delete_job():
     """Radera ett jobb: ta bort mappen och blockera URL:en från framtida sökningar."""
     data   = request.get_json(silent=True) or {}
@@ -1846,6 +1903,7 @@ def api_delete_job():
 
 
 @app.route('/api/jobs/delete-expired', methods=['POST'])
+@login_required
 def api_delete_expired():
     """Radera alla jobb vars sista ansökningsdag har passerat (deadline < idag).
     Blockerar deras URL:er. Jobb utan sparad deadline (t.ex. Indeed/LinkedIn)
@@ -1868,6 +1926,7 @@ def api_delete_expired():
 
 
 @app.route('/api/jobs/import-history', methods=['POST'])
+@login_required
 def api_import_history():
     """Importera redan-sökta jobb till dedup-historiken (processed_jobs.json).
     Tar emot en uppladdad JSON-fil — en lista av jobb med minst 'url'. Slår ihop
@@ -1913,6 +1972,7 @@ def api_import_history():
 
 
 @app.route('/api/jobs/regenerate-docs', methods=['POST'])
+@login_required
 def api_regenerate_docs():
     """Bygg om CV och personligt brev för ett jobb med den aktuella grundfilen."""
     data   = request.get_json(silent=True) or {}
@@ -1974,11 +2034,13 @@ def api_regenerate_docs():
 
 
 @app.route('/api/stats')
+@login_required
 def api_stats():
     return jsonify(get_stats())
 
 
 @app.route('/api/stats/detailed')
+@login_required
 def api_stats_detailed():
     """Aggregated stats for dashboard charts."""
     try:
@@ -2103,6 +2165,7 @@ def api_scheduler_save():
 
 
 @app.route('/api/found-jobs')
+@login_required
 def api_found_jobs():
     """Return found_jobs.json + which have been processed"""
     found     = load_json(FOUND_JOBS())
