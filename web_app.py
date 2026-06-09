@@ -2001,15 +2001,26 @@ def api_regenerate_docs():
 
     job_description = desc_file.read_text(encoding='utf-8')
 
+    job_info = parse_job_folder(job_folder)
+    safe_company = ''.join(c for c in job_info.get('company', 'Foretag') if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_title   = ''.join(c for c in job_info.get('title', 'Jobb')[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
+
     try:
         from job_master import JobMaster
         jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
         jm.initialize(platforms=[])
 
-        # Bygg ett minimalt jobb-objekt med sparad beskrivning
+        # Bygg ett jobb-objekt med sparad data — facaden kräver company, role och location
+        _jc = job_info.get('company', 'Företag') or 'Företag'
+        _jt = job_info.get('title', 'Tjänst') or 'Tjänst'
+        _jl = job_info.get('location', 'Sverige') or 'Sverige'
+
         class _FakeJob:
             description = job_description
-            link = folder
+            link        = folder
+            company     = _jc
+            role        = _jt
+            location    = _jl
 
         jm.modern_facade.job = _FakeJob()
 
@@ -2020,10 +2031,6 @@ def api_regenerate_docs():
         # Ta bort gamla CV-filer och spara ny
         for old in job_folder.glob('CV_*.pdf'):
             old.unlink()
-
-        job = parse_job_folder(job_folder)
-        safe_company = ''.join(c for c in job.get('company', 'Foretag') if c.isalnum() or c in (' ', '-', '_')).strip()
-        safe_title   = ''.join(c for c in job.get('title', 'Jobb')[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
 
         cv_path = job_folder / f'CV_{safe_company}_{safe_title}_{_design}.pdf'
         cv_path.write_bytes(base64.b64decode(cv_base64))
