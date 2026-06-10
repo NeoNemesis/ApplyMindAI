@@ -301,7 +301,8 @@ class JobMaster:
             style_manager=style_manager,
             resume_generator=resume_generator,
             resume_object=self.resume_object,
-            output_path=self.base_output_dir
+            output_path=self.base_output_dir,
+            data_dir=self.base_data_dir
         )
         if self.driver:
             self.modern_facade.set_driver(self.driver)

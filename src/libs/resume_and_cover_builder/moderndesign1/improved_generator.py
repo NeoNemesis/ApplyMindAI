@@ -21,9 +21,11 @@ class ImprovedModernDesign1Generator:
     - Språkdetektering och automatisk översättning
     """
     
-    def __init__(self, resume_object: Any, api_key: str):
+    def __init__(self, resume_object: Any, api_key: str, data_dir: Optional[Path] = None):
         self.resume_object = resume_object
         self.api_key = api_key
+        # Per-user datakatalog (foton m.m.). None = desktop-läge med delad data_folder.
+        self.data_dir = Path(data_dir) if data_dir else None
         self.language = 'sv'  # Standard svenska
         try:
             self.llm = create_isolated_llm(api_key)
@@ -33,23 +35,25 @@ class ImprovedModernDesign1Generator:
         logger.info("🎯 ImprovedModernDesign1Generator initialiserad (FÖRBÄTTRAD VERSION)")
 
     def _get_profile_image_base64(self) -> str:
-        """Hämtar profilbild som base64"""
+        """Hämtar profilbild som base64.
+
+        Med data_dir satt (webbläget) söks ENBART i användarens egen katalog —
+        aldrig i den delade data_folder, annars hamnar admins foto i alla CV:n."""
         try:
-            possible_paths = [
-                "data_folder/profile.png",
-                "data_folder/profil_no_bg.png",
-                "data_folder/profil.jpg",
-                "data_folder/profile.jpg",
-            ]
-            
-            for path in possible_paths:
-                if Path(path).exists():
+            filenames = ["profile.png", "profil_no_bg.png", "profil.jpg", "profile.jpg"]
+            if self.data_dir:
+                candidates = [self.data_dir / f for f in filenames]
+            else:
+                candidates = [Path("data_folder") / f for f in filenames]
+
+            for path in candidates:
+                if path.exists():
                     logger.info(f"✅ Profilbild hittad: {path}")
-                    return image_to_base64(path)
-            
+                    return image_to_base64(str(path))
+
             logger.warning("⚠️ Ingen profilbild hittad")
             return ""
-            
+
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
             return ""
@@ -64,7 +68,6 @@ class ImprovedModernDesign1Generator:
                 'contact_title': 'KONTAKT',
                 'experience_title': 'YRKESERFARENHET & KOMPETENSER',
                 'technical_skills_title': 'Tekniska Färdigheter',
-                'job_title': 'SYSTEMUTVECKLARE | FULLSTACKUTVECKLARE',
                 'download_text': 'Ladda ner som PDF'
             },
             'en': {
@@ -74,66 +77,56 @@ class ImprovedModernDesign1Generator:
                 'contact_title': 'CONTACT',
                 'experience_title': 'PROFESSIONAL EXPERIENCE & COMPETENCIES',
                 'technical_skills_title': 'Technical Skills',
-                'job_title': 'SYSTEM DEVELOPER | FULLSTACK DEVELOPER',
                 'download_text': 'Download as PDF'
             }
         }
     
     def _generate_personal_info(self) -> tuple:
-        """Genererar personlig information från RIKTIG data"""
+        """Genererar personlig information från RIKTIG data — aldrig hårdkodade namn/titlar"""
         try:
             personal_info = self.resume_object.personal_information
             if not personal_info:
-                logger.warning("⚠️ Ingen personlig information hittad, använder fallback")
+                logger.warning("⚠️ Ingen personlig information hittad")
                 return self._get_fallback_personal_info()
-            
-            name = getattr(personal_info, 'name', 'Victor')
-            surname = getattr(personal_info, 'surname', 'Vilches')
-            full_name = f"{name} {surname} C."
-            
-            translations = self._get_translations()[self.language]
-            job_title = translations['job_title']
-            
-            # Generera sammanfattning baserat på språk
+
+            name = getattr(personal_info, 'name', '') or ''
+            surname = getattr(personal_info, 'surname', '') or ''
+            full_name = f"{name} {surname}".strip()
+
+            job_title = self._derive_job_title()
+
             summary = self._get_default_summary()
-            
+
             logger.info(f"✅ Personlig info genererad: {full_name}")
             return full_name, job_title, summary
-            
+
         except Exception as e:
             logger.error(f"❌ Fel vid personlig info: {e}")
             return self._get_fallback_personal_info()
-    
+
     def _get_fallback_personal_info(self) -> tuple:
-        """Fallback personlig info"""
-        translations = self._get_translations()[self.language]
-        return "", translations['job_title'], self._get_default_summary()
-    
-    def _get_default_summary(self) -> str:
-        """Returnerar sammanfattning från YAML professional_summary"""
+        """Fallback personlig info — tomt, aldrig en annan persons uppgifter"""
+        return "", self._derive_job_title(), self._get_default_summary()
+
+    def _derive_job_title(self) -> str:
+        """Titel från användarens senaste position i CV-datat — aldrig hårdkodad"""
         try:
-            # Hämta professional_summary från YAML
-            professional_summary = getattr(self.resume_object, 'professional_summary', '')
-            if professional_summary:
-                # Översätt till engelska om nödvändigt (eller använd som den är)
-                if self.language == 'en':
-                    # För engelska, översätt eller använd en engelsk version
-                    return "Curious system developer with broad foundational knowledge in several technical areas. Specialized in system integration and Windows environments with experience in programming, databases and web design. Values teamwork and knowledge sharing, works both independently and in collaboration with others. Driving force: continuous development and solving technical challenges."
-                else:
-                    return professional_summary
-            else:
-                # Fallback om professional_summary saknas
-                logger.warning("⚠️ Ingen professional_summary hittad, använder fallback")
-                if self.language == 'en':
-                    return "Curious system developer with broad foundational knowledge in several technical areas."
-                else:
-                    return "Nyfiken systemutvecklare med breda grundkunskaper inom flera tekniska områden."
+            exp = getattr(self.resume_object, 'experience_details', None) or []
+            pos = getattr(exp[0], 'position', '') if exp else ''
+            return str(pos).upper() if pos else ''
+        except Exception:
+            return ''
+
+    def _get_default_summary(self) -> str:
+        """Returnerar sammanfattning från YAML professional_summary — användarens egen text"""
+        try:
+            professional_summary = getattr(self.resume_object, 'professional_summary', '') or ''
+            if not professional_summary:
+                logger.warning("⚠️ Ingen professional_summary i CV-datat — lämnar tomt")
+            return professional_summary
         except Exception as e:
             logger.error(f"❌ Fel vid hämtning av professional_summary: {e}")
-            if self.language == 'en':
-                return "Curious system developer with broad foundational knowledge in several technical areas."
-            else:
-                return "Nyfiken systemutvecklare med breda grundkunskaper inom flera tekniska områden."
+            return ""
     
     def _generate_education_section(self) -> str:
         """Genererar utbildningssektion från RIKTIG data"""
@@ -191,33 +184,8 @@ class ImprovedModernDesign1Generator:
         return result
     
     def _get_fallback_education(self) -> str:
-        """Fallback utbildning"""
-        if self.language == 'en':
-            return '''<div class="education-item">
-                • Computer Engineering (ongoing)<br>
-                <div class="institution">Gävle University, Uppsala University</div>
-            </div>
-            <div class="education-item">
-                • Programming<br>
-                <div class="institution">Luleå University of Technology</div>
-            </div>
-            <div class="education-item">
-                • Nursing Assistant<br>
-                <div class="institution">Lundellska School</div>
-            </div>'''
-        else:
-            return '''<div class="education-item">
-                • Dataingenjörskap (pågående)<br>
-                <div class="institution">Gävle Universitet, Uppsala Universitet</div>
-            </div>
-            <div class="education-item">
-                • Programmering<br>
-                <div class="institution">Luleå Tekniska Högskolan</div>
-            </div>
-            <div class="education-item">
-                • Undersköterska<br>
-                <div class="institution">Lundellska skolan</div>
-            </div>'''
+        """Fallback utbildning — tomt, aldrig en annan persons meriter"""
+        return ""
     
     def _generate_skills_section(self) -> str:
         """Genererar kunskaper från RIKTIG data (certifications)"""
@@ -257,23 +225,8 @@ class ImprovedModernDesign1Generator:
         return translations.get(skill, skill)
     
     def _get_fallback_skills(self) -> str:
-        """Fallback kunskaper"""
-        if self.language == 'en':
-            return '''<div class="knowledge-item">• Programming in Python</div>
-            <div class="knowledge-item">• Programming in C#</div>
-            <div class="knowledge-item">• Programming in Java</div>
-            <div class="knowledge-item">• Database Technology in SQL</div>
-            <div class="knowledge-item">• Extra Course in Web Design I & II</div>
-            <div class="knowledge-item">• Microsoft Windows, Linux</div>
-            <div class="knowledge-item">• B Driver's License</div>'''
-        else:
-            return '''<div class="knowledge-item">• Programmering i Python</div>
-            <div class="knowledge-item">• Programmering i C#</div>
-            <div class="knowledge-item">• Programmering i Java</div>
-            <div class="knowledge-item">• Databas teknik i SQL</div>
-            <div class="knowledge-item">• Extra kurs inom Webbdesign I & II</div>
-            <div class="knowledge-item">• Microsoft Windows, Linux</div>
-            <div class="knowledge-item">• B-Körkort</div>'''
+        """Fallback kunskaper — tomt, aldrig en annan persons meriter"""
+        return ""
     
     def _generate_languages_section(self) -> str:
         """Genererar språk från RIKTIG data"""
@@ -322,15 +275,8 @@ class ImprovedModernDesign1Generator:
         return translations.get(prof, prof)
     
     def _get_fallback_languages(self) -> str:
-        """Fallback språk"""
-        if self.language == 'en':
-            return '''<div class="language-item">• Swedish (Native Language)</div>
-            <div class="language-item">• English (Fluent)</div>
-            <div class="language-item">• Spanish (Native Language)</div>'''
-        else:
-            return '''<div class="language-item">• Svenska (Modersmål)</div>
-            <div class="language-item">• Engelska (Flytande)</div>
-            <div class="language-item">• Spanska (Modersmål)</div>'''
+        """Fallback språk — tomt, aldrig en annan persons uppgifter"""
+        return ""
     
     def _generate_contact_section(self) -> str:
         """Genererar kontakt från RIKTIG data"""
@@ -370,16 +316,8 @@ class ImprovedModernDesign1Generator:
             return self._get_fallback_contact()
     
     def _get_fallback_contact(self) -> str:
-        """Fallback kontakt"""
-        return '''<div class="contact-item">
-            <span class="icon">📧</span>email@example.com
-        </div>
-        <div class="contact-item">
-            <span class="icon">📱</span>070-000 00 00
-        </div>
-        <div class="contact-item">
-            <span class="icon">📍</span>Stad, Sverige
-        </div>'''
+        """Fallback kontakt — tomt, aldrig påhittade uppgifter"""
+        return ""
     
     def _generate_experience_section(self, job_description: str) -> str:
         """
@@ -589,49 +527,8 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
         return translations.get(position, position)
     
     def _get_fallback_experience(self) -> str:
-        """Fallback erfarenhet"""
-        if self.language == 'en':
-            return '''<div class="experience-item">
-                <div class="experience-title">Web Development & System Integration</div>
-                <div class="experience-company">2022 - Current</div>
-                <div class="experience-description">
-                    • Developed and implemented fullstack web applications with modern technologies (JavaScript, HTML5, CSS3, PHP)<br>
-                    • Designed and built scalable database systems with client administration interfaces<br>
-                    • Completed two comprehensive courses in web development focusing on modern development methods<br>
-                    • Experience with version control and collaboration through GitHub, GitLab and integration with Copilot
-                </div>
-            </div>
-            <div class="experience-item">
-                <div class="experience-title">System Development & Programming</div>
-                <div class="experience-company">2021 - Current</div>
-                <div class="experience-description">
-                    • Practical experience with object-oriented programming in Java with completed courses and projects<br>
-                    • Developed applications in C# with focus on system integration and user interfaces<br>
-                    • Experience with Python programming with focus on automation and data processing<br>
-                    • Ongoing development of own AI agent for personal use
-                </div>
-            </div>'''
-        else:
-            return '''<div class="experience-item">
-                <div class="experience-title">Webbutveckling & Systemintegration</div>
-                <div class="experience-company">2022 - Nuvarande</div>
-                <div class="experience-description">
-                    • Utvecklat och implementerat fullstack-webbapplikationer med moderna teknologier (JavaScript, HTML5, CSS3, PHP)<br>
-                    • Designat och byggt skalbara databassystem med klientadministrationsgränssnitt<br>
-                    • Genomfört två omfattande kurser inom webbutveckling med fokus på moderna utvecklingsmetoder<br>
-                    • Erfarenhet av versionshantering och samarbete genom GitHub, GitLab och integration med Copilot
-                </div>
-            </div>
-            <div class="experience-item">
-                <div class="experience-title">Systemutveckling & Programmering</div>
-                <div class="experience-company">2021 - Nuvarande</div>
-                <div class="experience-description">
-                    • Praktisk erfarenhet av objektorienterad programmering i Java med genomförda kurser och projekt<br>
-                    • Utvecklat applikationer i C# med fokus på systemintegration och användargränssnitt<br>
-                    • Erfarenhet av Python-programmering med inriktning mot automation och databehandling<br>
-                    • Pågående utveckling av egen AI-agent för personligt bruk
-                </div>
-            </div>'''
+        """Fallback erfarenhet — tomt, aldrig en annan persons meriter"""
+        return ""
     
     def _generate_technical_skills(self) -> str:
         """Genererar tekniska färdigheter från RIKTIG data"""
@@ -682,23 +579,8 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
             return self._get_fallback_technical_skills()
     
     def _get_fallback_technical_skills(self) -> str:
-        """Fallback tekniska färdigheter"""
-        if self.language == 'en':
-            return '''<ul>
-                <li>• Programming Languages: JavaScript, HTML5, CSS3, PHP, Java, Python, C#</li>
-                <li>• Tools & Environments: Git, GitHub, GitLab, Copilot, Linux, Windows</li>
-                <li>• Databases & Systems: SQL, Relational Databases, Virtualization</li>
-                <li>• Network & Security: Network Protocols, Security Implementation, System Monitoring</li>
-                <li>• Mathematics: Single Variable Analysis, Logical Thinking, Problem Solving</li>
-            </ul>'''
-        else:
-            return '''<ul>
-                <li>• Programmeringsspråk: JavaScript, HTML5, CSS3, PHP, Java, Python, C#</li>
-                <li>• Verktyg & Miljöer: Git, GitHub, GitLab, Copilot, Linux, Windows</li>
-                <li>• Databaser & System: SQL, Relationsdatabaser, Virtualisering</li>
-                <li>• Nätverk & Säkerhet: Nätverksprotokoll, Säkerhetsimplementation, Systemövervakning</li>
-                <li>• Matematik: Envariabelanalys, Logiskt tänkande, Problemlösning</li>
-            </ul>'''
+        """Fallback tekniska färdigheter — tomt, aldrig en annan persons meriter"""
+        return ""
     
     def generate_complete_cv_html(
         self,

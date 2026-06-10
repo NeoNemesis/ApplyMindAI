@@ -17,9 +17,11 @@ class ModernDesign1CoverLetterGenerator:
     Generator för personliga brev med Modern Design 1 stil
     """
     
-    def __init__(self, resume_object: Any, api_key: str):
+    def __init__(self, resume_object: Any, api_key: str, data_dir: Optional[Path] = None):
         self.resume_object = resume_object
         self.api_key = api_key
+        # Per-user datakatalog (referensbrev m.m.). None = desktop-läge.
+        self.data_dir = Path(data_dir) if data_dir else None
         self.language = 'sv'
         try:
             self.llm = create_isolated_llm(api_key)
@@ -37,7 +39,6 @@ class ModernDesign1CoverLetterGenerator:
         """Översättningar för olika språk - CLEAN VERSION"""
         return {
             'sv': {
-                'job_title': 'Systemutvecklare | Fullstackutvecklare',
                 'recipient_title': 'Rekryteringsteam',
                 'job_application': 'Ansökan:',
                 'salutation': 'Bästa rekryteringsteam,',
@@ -45,7 +46,6 @@ class ModernDesign1CoverLetterGenerator:
                 'attachment': 'Bilaga: Curriculum Vitae'
             },
             'en': {
-                'job_title': 'System Developer',
                 'recipient_title': 'Recruitment Team',
                 'job_application': 'Application for:',
                 'salutation': 'Dear Hiring Manager,',
@@ -93,11 +93,17 @@ class ModernDesign1CoverLetterGenerator:
             return self._get_fallback_personal_info()
     
     def _get_fallback_personal_info(self) -> tuple:
-        """Fallback personlig info - CLEAN VERSION"""
-        contact_html = '''<div>email@example.com</div>
-                    <div>070-XXX XX XX</div>
-                    <div>Uppsala, Sverige</div>'''
-        return "", contact_html
+        """Fallback personlig info — tomt, aldrig påhittade/andras uppgifter"""
+        return "", ""
+
+    def _derive_job_title(self) -> str:
+        """Titel från användarens senaste position i CV-datat — aldrig hårdkodad"""
+        try:
+            exp = getattr(self.resume_object, 'experience_details', None) or []
+            pos = getattr(exp[0], 'position', '') if exp else ''
+            return str(pos) if pos else ''
+        except Exception:
+            return ''
 
     def _format_text_to_paragraphs(self, text: str) -> str:
         """Formaterar text till HTML-paragrafer - CLEAN VERSION"""
@@ -118,9 +124,13 @@ class ModernDesign1CoverLetterGenerator:
         return '\n'.join(html_paragraphs)
     
     def _load_reference_cover_letter(self) -> str:
-        """Laddar referens personligt brev för AI-guidning"""
+        """Laddar referens personligt brev för AI-guidning.
+
+        Med data_dir satt läses ENBART användarens eget referensbrev —
+        aldrig den delade data_folder (annars guidas AI:n av admins brev)."""
         try:
-            ref_path = Path("data_folder/reference_cover_letter.txt")
+            base = self.data_dir if self.data_dir else Path("data_folder")
+            ref_path = base / "reference_cover_letter.txt"
             if ref_path.exists():
                 with open(ref_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -258,23 +268,16 @@ ADAPTED COVER LETTER BODY (plain text with \\n\\n between paragraphs):"""
             return self._get_fallback_content(company_name, position_title)
     
     def _get_fallback_content(self, company_name: str, position_title: str) -> dict:
-        """Fallback innehåll - enkel och ärlig stil"""
+        """Fallback innehåll — neutralt, utan påhittad bakgrund.
+        Används bara när användaren saknar cover_letter_profile och AI är otillgänglig."""
         if self.language == 'en':
-            text = f"""I am a curious system developer with a strong interest in technology. I enjoy understanding how systems work and finding solutions to technical challenges.
+            text = f"""I am writing to apply for the {position_title} position at {company_name}.
 
-My background consists of higher education in computer engineering, programming, web development and databases at Gävle University, Uppsala University and Luleå University of Technology. Although I don't have formal work experience as a system developer, I have built up practical experience through self-developed projects.
-
-When I read about the {position_title} position at {company_name}, I recognize myself in the technologies you work with. I have practical experience through my projects where I have developed web applications, automation agents and security systems.
-
-I value working in a team where knowledge sharing and collaboration are in focus, as I believe you develop best when you can both give and receive knowledge. My drive is about continuous development and constantly learning new things."""
+Please find my CV attached, which describes my background and experience in more detail. I would welcome the opportunity to tell you more in an interview."""
         else:
-            text = f"""Jag är en nyfiken systemutvecklare med ett stort intresse för teknik. Jag gillar att förstå hur system fungerar och att hitta lösningar på tekniska utmaningar.
+            text = f"""Härmed ansöker jag om tjänsten som {position_title} hos {company_name}.
 
-Min bakgrund består av högskolestudier inom dataingenjörskap, programmering, webbutveckling och databaser vid Gävle högskola, Uppsala universitet och Luleå Tekniska Universitet. Även om jag inte har formell arbetslivserfarenhet som systemutvecklare har jag byggt upp mycket praktisk erfarenhet genom egenutvecklade projekt.
-
-När jag läser om {position_title}-positionen hos {company_name} känner jag igen mig i de teknologier ni arbetar med. Jag har praktisk erfarenhet genom mina projekt där jag utvecklat webbapplikationer, automatiseringsagenter och säkerhetssystem.
-
-Jag värdesätter att arbeta i team där kunskapsutbyte och samarbete står i fokus, eftersom jag tror att man utvecklas bäst när man får både ge och ta i form av kunskap. Min drivkraft handlar om kontinuerlig utveckling och att hela tiden lära mig nya saker."""
+Mitt CV finns bifogat och beskriver min bakgrund och erfarenhet i detalj. Jag berättar gärna mer vid en intervju."""
 
         formatted_text = self._format_text_to_paragraphs(text)
         return {
@@ -353,7 +356,7 @@ Jag värdesätter att arbeta i team där kunskapsutbyte och samarbete står i fo
 
             complete_html = template_obj.substitute(
                 full_name=full_name,
-                job_title=translations['job_title'],
+                job_title=self._derive_job_title(),
                 contact_info=contact_html,
                 date=date_str,
                 salutation=translations['salutation'],
