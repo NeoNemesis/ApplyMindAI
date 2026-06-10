@@ -339,6 +339,8 @@ Mitt CV finns bifogat och beskriver min bakgrund och erfarenhet i detalj. Jag be
                 'nordic_minimal':   'cover_letter_template_clean.html',
                 'problem_solution': 'cover_letter_template_problem_solution.html',
                 'modern_tech':      'cover_letter_template_modern_tech.html',
+                'executive':        'cover_letter_template_executive.html',
+                'elegant':          'cover_letter_template_elegant.html',
             }
             chosen_letter = os.getenv('LETTER_TEMPLATE', 'nordic_minimal')
             letter_filename = LETTER_TEMPLATE_MAP.get(chosen_letter, 'cover_letter_template_clean.html')

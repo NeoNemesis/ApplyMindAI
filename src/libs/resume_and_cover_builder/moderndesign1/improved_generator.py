@@ -619,8 +619,10 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
             # Ladda template — router baserat på CV_DESIGN env
             import os
             CV_TEMPLATE_MAP = {
+                'design_01_minimal':      'template_minimal.html',
                 'design_02_classic':      'improved_template.html',
                 'design_03_modern_green': 'template_modern_green.html',
+                'design_05_nordic_blue':  'template_nordic_blue.html',
                 'design_07_tech_modern':  'template_tech_modern.html',
             }
             chosen = os.getenv('CV_DESIGN', 'design_02_classic')
