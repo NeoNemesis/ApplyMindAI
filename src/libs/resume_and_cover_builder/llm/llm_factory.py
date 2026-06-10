@@ -37,6 +37,13 @@ def clear_user_llm_context():
     _user_llm_context.provider = ''
     _user_llm_context.model    = ''
 
+
+def has_user_llm_context() -> bool:
+    """True om en per-user LLM-kontext är satt i denna tråd.
+    Ollama har ingen nyckel — då räcker provider."""
+    return bool(getattr(_user_llm_context, 'api_key', '') or
+                getattr(_user_llm_context, 'provider', ''))
+
 # ── Tillgängliga modeller per leverantör ─────────────────────────────────────
 AVAILABLE_MODELS = {
     'openai': [
@@ -114,10 +121,10 @@ def get_model_name() -> str:
     return os.environ.get('LLM_MODEL', defaults.get(provider, 'gpt-4o-mini'))
 
 
-def get_llm(temperature: float = 0.4, timeout: int = 60,
-            api_key: str = '', provider: str = '', model: str = ''):
+def create_chat_model(temperature: float = 0.4, timeout: int = 60,
+                      api_key: str = '', provider: str = '', model: str = ''):
     """
-    Skapar och returnerar rätt LLM.
+    Skapar och returnerar rätt rå LangChain-chatmodell (utan LoggerChatModel-wrapper).
 
     Prioritetsordning för konfiguration:
       1. Explicit api_key/provider/model (skickas direkt)
@@ -137,37 +144,37 @@ def get_llm(temperature: float = 0.4, timeout: int = 60,
     try:
         if _provider == 'openai':
             from langchain_openai import ChatOpenAI
-            return LoggerChatModel(ChatOpenAI(
+            return ChatOpenAI(
                 model_name     = _model,
                 openai_api_key = _key('OPENAI_API_KEY'),
                 temperature    = temperature,
                 timeout        = timeout,
-            ))
+            )
 
         elif _provider == 'anthropic':
             from langchain_anthropic import ChatAnthropic
-            return LoggerChatModel(ChatAnthropic(
+            return ChatAnthropic(
                 model             = _model,
                 anthropic_api_key = _key('ANTHROPIC_API_KEY'),
                 temperature       = temperature,
                 timeout           = timeout,
                 max_tokens        = 4096,
-            ))
+            )
 
         elif _provider == 'google':
             from langchain_google_genai import ChatGoogleGenerativeAI
-            return LoggerChatModel(ChatGoogleGenerativeAI(
+            return ChatGoogleGenerativeAI(
                 model          = _model,
                 google_api_key = _key('GOOGLE_API_KEY'),
                 temperature    = temperature,
-            ))
+            )
 
         elif _provider == 'ollama':
             from langchain_ollama import ChatOllama
-            return LoggerChatModel(ChatOllama(
+            return ChatOllama(
                 model       = _model,
                 temperature = temperature,
-            ))
+            )
 
         else:
             raise ValueError(f"Okänd leverantör: {_provider}")
@@ -182,9 +189,18 @@ def get_llm(temperature: float = 0.4, timeout: int = 60,
             raise ValueError(
                 "API-nyckel saknas. Gå till Inställningar och konfigurera din LLM-leverantör."
             )
-        return LoggerChatModel(ChatOpenAI(
+        return ChatOpenAI(
             model_name     = 'gpt-4o-mini',
             openai_api_key = fallback_key,
             temperature    = temperature,
             timeout        = timeout,
-        ))
+        )
+
+
+def get_llm(temperature: float = 0.4, timeout: int = 60,
+            api_key: str = '', provider: str = '', model: str = ''):
+    """Som create_chat_model() men wrappad i LoggerChatModel (retry + loggning)."""
+    return LoggerChatModel(create_chat_model(
+        temperature=temperature, timeout=timeout,
+        api_key=api_key, provider=provider, model=model,
+    ))

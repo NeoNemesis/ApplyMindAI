@@ -21,7 +21,11 @@ class ModernDesign1CoverLetterGenerator:
         self.resume_object = resume_object
         self.api_key = api_key
         self.language = 'sv'
-        self.llm = create_isolated_llm(api_key) if api_key else None
+        try:
+            self.llm = create_isolated_llm(api_key)
+        except Exception as e:
+            logger.warning(f"⚠️ Ingen LLM tillgänglig — kör utan AI-anpassning: {e}")
+            self.llm = None
         logger.info("📧 ModernDesign1CoverLetterGenerator initialiserad")
     
     def _get_profile_image_base64(self) -> str:
