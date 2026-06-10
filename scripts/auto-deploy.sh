@@ -67,6 +67,38 @@ if [[ "$SCRIPT_SHA_BEFORE" != "$SCRIPT_SHA_AFTER" ]]; then
   exec env FORCE=1 bash "$SCRIPT_PATH"
 fi
 
+# ── Hälsokontroll-funktion ───────────────────────────────────────────────
+# VIKTIGT: containern publicerar INGEN port till hosten (expose, inte ports),
+# så `curl localhost:5000` från hosten misslyckas ALLTID. Det orsakade en
+# oändlig deploy→rollback-loop 2026-06-10 där containern återskapades varannan
+# minut och taskit-edge tappade upstream-IP:n → 502 för alla användare.
+# Fråga i stället Dockers egen healthcheck (curl INUTI containern, definierad
+# i docker-compose.yml). Samma fix som föreslogs i PR #56.
+wait_healthy() {
+  local label="$1"
+  log "▶ Väntar på hälsokontroll ($label)..."
+  for i in $(seq 1 30); do
+    status=$(docker inspect --format '{{.State.Health.Status}}' applymind-web 2>/dev/null || echo "absent")
+    if [[ "$status" == "healthy" ]]; then
+      return 0
+    fi
+    sleep 3
+  done
+  log "   Sista status: ${status:-okänd}"
+  return 1
+}
+
+# ── Nginx-reload — taskit-edge cachear upstream-IP:n vid config-laddning ──
+# Varje container-recreate ger applymind-web en ny IP på taskit-net; utan
+# reload pekar nginx på den gamla → 502. Reload efter varje recreate.
+reload_edge_nginx() {
+  if docker exec taskit-edge nginx -s reload 2>/dev/null; then
+    log "✅ taskit-edge nginx omladdad (ny upstream-IP)"
+  else
+    log "⚠️  Kunde inte ladda om taskit-edge nginx — kontrollera manuellt vid 502"
+  fi
+}
+
 # ── Rollback-funktion ────────────────────────────────────────────────────
 rollback() {
   log "🔄 RULLAR TILLBAKA till ${PREV_SHA:0:7}..."
@@ -74,8 +106,8 @@ rollback() {
   git clean -fd --quiet
   git reset --hard "$PREV_SHA"
   docker compose --env-file "$ENV_FILE" up -d --force-recreate
-  sleep 6
-  if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
+  if wait_healthy "rollback"; then
+    reload_edge_nginx
     log "✅ Rollback lyckades — appen är uppe med föregående version (${PREV_SHA:0:7})"
     log "⚠️  Ny kod (${REMOTE:0:7}) var trasig — undersök och fixa innan nästa deploy"
   else
@@ -83,19 +115,6 @@ rollback() {
     log "   Kör: docker compose logs applymind-web --tail=100"
   fi
   exit 1
-}
-
-# ── Hälsokontroll-funktion ───────────────────────────────────────────────
-wait_healthy() {
-  local label="$1"
-  log "▶ Väntar på hälsokontroll ($label)..."
-  for i in $(seq 1 20); do
-    if curl -sf http://localhost:5000/auth/login > /dev/null 2>&1; then
-      return 0
-    fi
-    sleep 3
-  done
-  return 1
 }
 
 # ── Bygg bara om beroenden ändrats sedan föregående deploy ──────────────
@@ -124,6 +143,9 @@ if ! wait_healthy "ny version"; then
   log "❌ Ny kod (${REMOTE:0:7}) svarar inte — startar rollback"
   rollback
 fi
+
+# Containern är frisk men har ny IP efter recreate — ladda om edge-nginx
+reload_edge_nginx
 
 # ── DB-migrationer ───────────────────────────────────────────────────────
 if docker compose exec -T applymind-web python -c "import flask_migrate" 2>/dev/null; then
