@@ -27,9 +27,11 @@ class ImprovedModernDesign2Generator:
     - Vågformad separator
     """
     
-    def __init__(self, resume_object: Any, api_key: str):
+    def __init__(self, resume_object: Any, api_key: str, data_dir: Optional[Path] = None):
         self.resume_object = resume_object
         self.api_key = api_key
+        # Per-user datakatalog (foton m.m.). None = desktop-läge.
+        self.data_dir = Path(data_dir) if data_dir else None
         self.language = 'sv'
         try:
             self.llm = create_isolated_llm(api_key)
@@ -39,31 +41,34 @@ class ImprovedModernDesign2Generator:
         logger.info("🎨 ImprovedModernDesign2Generator initialiserad (ELEGANT DESIGN)")
     
     def _get_profile_image_base64(self) -> str:
-        """Hämtar profilbild"""
+        """Hämtar profilbild — med data_dir satt söks ENBART användarens egen katalog"""
         try:
-            possible_paths = [
-                "data_folder/profile.png",
-                "data_folder/profil_no_bg.png",
-                "data_folder/profil.jpg",
-                "data_folder/profile.jpg",
-            ]
-            
-            for path in possible_paths:
-                if Path(path).exists():
+            filenames = ["profile.png", "profil_no_bg.png", "profil.jpg", "profile.jpg"]
+            base = self.data_dir if self.data_dir else Path("data_folder")
+            for path in (base / f for f in filenames):
+                if path.exists():
                     logger.info(f"✅ Profilbild hittad: {path}")
-                    return image_to_base64(path)
-            
+                    return image_to_base64(str(path))
+
             logger.warning("⚠️ Ingen profilbild hittad")
             return ""
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
             return ""
     
+    def _derive_job_title(self) -> str:
+        """Titel från användarens senaste position i CV-datat — aldrig hårdkodad"""
+        try:
+            exp = getattr(self.resume_object, 'experience_details', None) or []
+            pos = getattr(exp[0], 'position', '') if exp else ''
+            return str(pos) if pos else ''
+        except Exception:
+            return ''
+
     def _get_translations(self) -> dict:
         """Översättningar"""
         return {
             'sv': {
-                'job_title': 'Systemutvecklare • Fullstackutvecklare',
                 'experience_title': 'Arbetslivserfarenhet',
                 'education_title': 'Utbildning',
                 'skills_title': 'Tekniska Färdigheter',
@@ -72,7 +77,6 @@ class ImprovedModernDesign2Generator:
                 'accomplishments': 'Viktiga prestationer:'
             },
             'en': {
-                'job_title': 'Computer Engineer • System Developer',
                 'experience_title': 'Work Experience',
                 'education_title': 'Education',
                 'skills_title': 'Technical Skills',
@@ -107,10 +111,8 @@ class ImprovedModernDesign2Generator:
             return self._get_fallback_badges()
     
     def _get_fallback_badges(self) -> str:
-        """Fallback badges"""
-        return '''<div class="contact-badge"><span class="icon">📧</span>email@example.com</div>
-                        <div class="contact-badge"><span class="icon">📱</span>070-XXX XX XX</div>
-                        <div class="contact-badge"><span class="icon">📍</span>Uppsala</div>'''
+        """Fallback badges — tomt, aldrig påhittade uppgifter"""
+        return ""
     
     def _generate_experience_section(self, job_description: str) -> str:
         """Genererar experience"""
@@ -119,9 +121,8 @@ class ImprovedModernDesign2Generator:
             if not experience_details:
                 return self._get_fallback_experience()
             
-            # Top 3 relevanta jobb
-            tech_exp = [exp for exp in experience_details 
-                       if 'Undersköterska' not in getattr(exp, 'position', '')][:3]
+            # Top 3 senaste jobb — inga personspecifika filter
+            tech_exp = list(experience_details)[:3]
             
             html_parts = []
             for exp in tech_exp:
@@ -442,7 +443,7 @@ class ImprovedModernDesign2Generator:
             complete_html = template_obj.substitute(
                 profile_image=profile_image,
                 full_name=full_name,
-                job_title=translations['job_title'],
+                job_title=self._derive_job_title(),
                 contact_badges=contact_badges,
                 summary_section="",
                 experience_title=translations['experience_title'],

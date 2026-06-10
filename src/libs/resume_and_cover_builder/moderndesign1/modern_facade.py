@@ -20,7 +20,8 @@ class ModernDesign1Facade:
     Men använder Modern Design 1 komponenter internt
     """
     
-    def __init__(self, api_key: str, style_manager, resume_generator, resume_object, output_path: Path):
+    def __init__(self, api_key: str, style_manager, resume_generator, resume_object, output_path: Path,
+                 data_dir: Path = None):
         """
         Initialize ModernDesign1Facade - EXAKT SAMMA SIGNATURE SOM ResumeFacade
 
@@ -30,6 +31,8 @@ class ModernDesign1Facade:
             resume_generator: The ResumeGenerator instance
             resume_object: The resume object
             output_path (Path): The output path
+            data_dir (Path): Per-user datakatalog (foton, referensbrev).
+                             None = desktop-läge med delad data_folder.
         """
         # EXAKT SAMMA global_config INITIERING SOM ResumeFacade
         lib_directory = Path(__file__).resolve().parent.parent
@@ -42,6 +45,7 @@ class ModernDesign1Facade:
         global_config.API_KEY = api_key
 
         self.api_key = api_key
+        self.data_dir = Path(data_dir) if data_dir else None
         self.style_manager = style_manager
         self.resume_generator = resume_generator
         self.resume_generator.set_resume_object(resume_object)  # SAMMA SOM ResumeFacade
@@ -228,7 +232,8 @@ class ModernDesign1Facade:
         # Skapa generator som använder förbättrad template
         generator = ImprovedModernDesign1Generator(
             self.resume_generator.resume_object,
-            global_config.API_KEY
+            global_config.API_KEY,
+            data_dir=self.data_dir
         )
 
         # Använd FULL jobbtext för språkdetektering om tillgänglig
@@ -264,7 +269,8 @@ class ModernDesign1Facade:
 
         generator = ModernDesign1CoverLetterGenerator(
             self.resume_generator.resume_object,
-            self.api_key
+            self.api_key,
+            data_dir=self.data_dir
         )
 
         # Använd FULL jobbtext för språkdetektering om tillgänglig

@@ -21,9 +21,11 @@ class ModernDesign2CoverLetterGenerator:
     Generator för personliga brev med Modern Design 2 elegant gradient-stil
     """
     
-    def __init__(self, resume_object: Any, api_key: str):
+    def __init__(self, resume_object: Any, api_key: str, data_dir: Optional[Path] = None):
         self.resume_object = resume_object
         self.api_key = api_key
+        # Per-user datakatalog (foton, referensbrev). None = desktop-läge.
+        self.data_dir = Path(data_dir) if data_dir else None
         self.language = 'sv'
         try:
             self.llm = create_isolated_llm(api_key)
@@ -33,18 +35,14 @@ class ModernDesign2CoverLetterGenerator:
         logger.info("📧 ModernDesign2CoverLetterGenerator initialiserad")
     
     def _get_profile_image_base64(self) -> str:
-        """Hämtar profilbild"""
+        """Hämtar profilbild — med data_dir satt söks ENBART användarens egen katalog"""
         try:
-            possible_paths = [
-                "data_folder/profil_no_bg.png",
-                "data_folder/profil.jpg",
-                "data_folder/profile.png"
-            ]
-            
-            for path in possible_paths:
-                if Path(path).exists():
-                    return image_to_base64(path)
-            
+            filenames = ["profil_no_bg.png", "profil.jpg", "profile.png"]
+            base = self.data_dir if self.data_dir else Path("data_folder")
+            for path in (base / f for f in filenames):
+                if path.exists():
+                    return image_to_base64(str(path))
+
             return ""
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
@@ -54,7 +52,6 @@ class ModernDesign2CoverLetterGenerator:
         """Översättningar"""
         return {
             'sv': {
-                'job_title': 'DATAINGENJÖR • SYSTEMUTVECKLARE',
                 'recipient_title': 'Rekryteringsteam',
                 'job_application': 'Jobbansökan för',
                 'salutation': 'Bästa rekryteringsteam,',
@@ -66,7 +63,6 @@ class ModernDesign2CoverLetterGenerator:
                 'quote': 'Innovation är att se möjligheter där andra ser utmaningar.'
             },
             'en': {
-                'job_title': 'COMPUTER ENGINEER • SYSTEM DEVELOPER',
                 'recipient_title': 'Recruitment Team',
                 'job_application': 'Job Application for',
                 'salutation': 'Dear Hiring Manager,',
@@ -84,18 +80,18 @@ class ModernDesign2CoverLetterGenerator:
         try:
             personal_info = self.resume_object.personal_information
             if not personal_info:
-                return "[Name]", self._get_fallback_contact()
+                return "", self._get_fallback_contact()
             
-            name = getattr(personal_info, 'name', '')
-            surname = getattr(personal_info, 'surname', '')
-            full_name = f"{name} {surname} C."
-            
+            name = getattr(personal_info, 'name', '') or ''
+            surname = getattr(personal_info, 'surname', '') or ''
+            full_name = f"{name} {surname}".strip()
+
             email = getattr(personal_info, 'email', '')
             phone = getattr(personal_info, 'phone', '')
             address = getattr(personal_info, 'address', '')
-            city = getattr(personal_info, 'city', 'Uppsala')
-            zip_code = getattr(personal_info, 'zip_code', '75420')
-            country = getattr(personal_info, 'country', 'Sverige')
+            city = getattr(personal_info, 'city', '')
+            zip_code = getattr(personal_info, 'zip_code', '')
+            country = getattr(personal_info, 'country', '')
             website = getattr(personal_info, 'website', '')
             
             # Kontaktinfo med gradient ikoner
@@ -111,17 +107,26 @@ class ModernDesign2CoverLetterGenerator:
             
         except Exception as e:
             logger.error(f"❌ Fel vid personlig info: {e}")
-            return "[Name]", self._get_fallback_contact()
+            return "", self._get_fallback_contact()
     
     def _get_fallback_contact(self) -> str:
-        """Fallback kontakt"""
-        return '''<div><span class="icon">📍</span>Uppsala, Sverige</div>
-                    <div><span class="icon">📧</span>email@example.com</div>'''
+        """Fallback kontakt — tomt, aldrig påhittade/andras uppgifter"""
+        return ""
+
+    def _derive_job_title(self) -> str:
+        """Titel från användarens senaste position i CV-datat — aldrig hårdkodad"""
+        try:
+            exp = getattr(self.resume_object, 'experience_details', None) or []
+            pos = getattr(exp[0], 'position', '') if exp else ''
+            return str(pos).upper() if pos else ''
+        except Exception:
+            return ''
     
     def _load_reference_cover_letter(self) -> str:
-        """Laddar referens personligt brev för AI-guidning"""
+        """Laddar referens personligt brev — med data_dir satt ENBART användarens eget"""
         try:
-            ref_path = Path("data_folder/reference_cover_letter.txt")
+            base = self.data_dir if self.data_dir else Path("data_folder")
+            ref_path = base / "reference_cover_letter.txt"
             if ref_path.exists():
                 with open(ref_path, 'r', encoding='utf-8') as f:
                     return f.read()
@@ -211,18 +216,18 @@ Return JSON (no markdown):
             return self._get_fallback_content(company_name, position_title)
     
     def _get_fallback_content(self, company_name: str, position_title: str) -> dict:
-        """Fallback innehåll"""
+        """Fallback innehåll — neutralt, utan påhittad bakgrund"""
         if self.language == 'en':
             return {
-                "section1": f"I am writing to express my strong interest in the {position_title} position at {company_name}. As a Computer Engineering student with hands-on experience in system integration and full-stack development, I am excited to contribute to your team.",
-                "section2": f"I am particularly drawn to {company_name} because of your innovative approach to technology. Your focus on modern solutions aligns perfectly with my passion for system integration and development.",
-                "section3": "With my combination of academic knowledge and practical experience in web development, databases, and system administration, I am confident I can make valuable contributions. My entrepreneurial background has taught me project management and delivering quality results."
+                "section1": f"I am writing to apply for the {position_title} position at {company_name}.",
+                "section2": f"The role at {company_name} matches what I am looking for in my next position.",
+                "section3": "Please find my CV attached, which describes my background and experience in more detail. I would welcome the opportunity to tell you more in an interview."
             }
         else:
             return {
-                "section1": f"Jag skriver för att uttrycka mitt starka intresse för {position_title}-rollen hos {company_name}. Som Dataingenjörsstudent med praktisk erfarenhet av systemintegration och fullstack-utveckling ser jag fram emot att bidra till ert team.",
-                "section2": f"Jag är särskilt intresserad av {company_name} på grund av er innovativa approach till teknik. Ert fokus på moderna lösningar passar perfekt med min passion för systemintegration och utveckling.",
-                "section3": "Med min kombination av akademisk kunskap och praktisk erfarenhet av webbutveckling, databaser och systemadministration är jag övertygad om att jag kan göra värdefulla bidrag. Min entreprenörsbakgrund har lärt mig projektledning och att leverera kvalitet."
+                "section1": f"Härmed ansöker jag om tjänsten som {position_title} hos {company_name}.",
+                "section2": f"Rollen hos {company_name} stämmer väl överens med vad jag söker i mitt nästa steg.",
+                "section3": "Mitt CV finns bifogat och beskriver min bakgrund och erfarenhet i detalj. Jag berättar gärna mer vid en intervju."
             }
     
     def generate_cover_letter_html(self, job_description: str, company_name: str, 
@@ -277,7 +282,7 @@ Return JSON (no markdown):
             complete_html = template_obj.substitute(
                 profile_image=profile_image,
                 full_name=full_name,
-                job_title=translations['job_title'],
+                job_title=self._derive_job_title(),
                 contact_info=contact_html,
                 quote=translations['quote'],
                 date=date_str,
