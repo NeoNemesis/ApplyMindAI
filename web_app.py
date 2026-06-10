@@ -2337,8 +2337,15 @@ def _build_cv_preview_content() -> dict:
     exp = (resume.get('experience_details') or [])
     job_title = exp[0].get('position', '') if exp else ''
 
-    # Profilfoto — inkludera om det finns
-    profile_image = '/cv/photo' if _u('profile.png').exists() else ''
+    # Profilfoto — mallarna bäddar in som "data:image/png;base64,$profile_image",
+    # så värdet MÅSTE vara rå base64 (inte en URL). Tom sträng ger ogiltig
+    # data-URI (ERR_INVALID_URL) — använd transparent pixel när foto saknas.
+    from src.libs.resume_and_cover_builder.moderndesign1.isolated_utils import TRANSPARENT_PNG_B64
+    photo_path = _u('profile.png')
+    if photo_path.exists():
+        profile_image = base64.b64encode(photo_path.read_bytes()).decode('ascii')
+    else:
+        profile_image = TRANSPARENT_PNG_B64
 
     # Education
     edu_html = []
