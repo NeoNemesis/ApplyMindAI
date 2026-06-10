@@ -1133,6 +1133,13 @@ class JobMaster:
         print(f"\n🔍 SÖKER JOBB PÅ ARBETSFÖRMEDLINGEN (max {max_jobs})")
         print("="*80)
 
+        # AF-skrapning kräver browser (selenium) — finns inte i produktion.
+        # Utan denna guard kraschar self.driver.get() med "'NoneType' object
+        # has no attribute 'get'" per sökning. Jobtech API täcker samma annonser.
+        if self.driver is None:
+            print("   ⚠️  Browser saknas — hoppar över AF-skrapning (Jobtech API täcker Platsbanken)")
+            return []
+
         all_jobs = []
         seen_urls = set()
         seen_sigs: Set[JobSignature] = set()
@@ -1729,6 +1736,10 @@ class JobMaster:
                     return False
                 print(f"   ✅ ATS-poäng OK — fortsätter med generering")
 
+            if self.stop_requested:
+                print("⛔ Stopp begärt — avbryter före CV-generering")
+                return False
+
             # Generera jobbanpassat CV - AI anpassar automatiskt till jobbet
             _design = os.getenv("CV_DESIGN", "design_01_minimal")
             print(f"📝 Genererar jobbanpassat CV ({_design})...")
@@ -1740,6 +1751,10 @@ class JobMaster:
                 f.write(base64.b64decode(cv_base64))
 
             print(f"✅ CV sparat: {cv_path.name} ({cv_path.stat().st_size / 1024:.1f} KB)")
+
+            if self.stop_requested:
+                print("⛔ Stopp begärt — avbryter före brev-generering")
+                return False
 
             # Generera personligt brev
             print("💌 Genererar anpassat personligt brev...")
@@ -1799,6 +1814,10 @@ class JobMaster:
             return True
 
         except Exception as e:
+            from src.libs.resume_and_cover_builder.llm.stop_signal import SearchStopped
+            if isinstance(e, SearchStopped):
+                print("\n⛔ Stoppad av användaren — avbryter dokumentgenerering")
+                return False
             print(f"\n❌ Fel vid generering: {str(e)}")
             import traceback
             traceback.print_exc()
