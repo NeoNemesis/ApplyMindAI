@@ -9,9 +9,13 @@ import base64
 from datetime import datetime
 from typing import Any
 from pathlib import Path
-from langchain_openai import ChatOpenAI
 from langchain_core.messages.ai import AIMessage
 from loguru import logger
+
+from src.libs.resume_and_cover_builder.llm.llm_factory import (
+    create_chat_model,
+    has_user_llm_context,
+)
 
 # Gemensam loggfil (samma format som LLMParser)
 _CALLS_LOG = Path("data_folder/output/job_master/open_ai_calls.json")
@@ -43,8 +47,10 @@ def _log_ai_call(prompt: str, reply: str, model: str = "gpt-4o-mini") -> None:
 class IsolatedLoggerChatModel:
     """Isolerad ChatModel för Modern Design 1"""
 
-    def __init__(self, chat_model: ChatOpenAI):
+    def __init__(self, chat_model: Any):
         self.llm = chat_model
+        self.model_name = (getattr(chat_model, 'model_name', '') or
+                           getattr(chat_model, 'model', '') or 'unknown')
         self.max_retries = 15
         self.retry_delay = 10
 
@@ -62,7 +68,7 @@ class IsolatedLoggerChatModel:
 
                 result = response.content if isinstance(response, AIMessage) else str(response)
                 logger.info(f"✅ Modern Design 1: AI-svar mottaget ({len(result)} tecken)")
-                _log_ai_call(prompt_text, result)
+                _log_ai_call(prompt_text, result, self.model_name)
                 return result
 
             except Exception as e:
@@ -80,14 +86,16 @@ class IsolatedLoggerChatModel:
         return self.__call__(messages)
 
 
-def create_isolated_llm(api_key: str) -> IsolatedLoggerChatModel:
-    """Skapar en isolerad LLM för Modern Design 1"""
-    chat_model = ChatOpenAI(
-        model_name="gpt-4o-mini",
-        openai_api_key=api_key,
-        temperature=0.4,
-        timeout=60
-    )
+def create_isolated_llm(api_key: str = '') -> IsolatedLoggerChatModel:
+    """Skapar en isolerad LLM för Modern Design 1/2.
+
+    Provider och nyckel hämtas i första hand från thread-local-kontexten
+    (inloggad användares krypterade nyckel, satt av web_app) — api_key-argumentet
+    är bara fallback för desktop-läget utan inloggning. Det får INTE skickas
+    vidare när kontext finns: annars hamnar serverns OpenAI-nyckel i t.ex.
+    en Gemini-klient."""
+    fallback_key = '' if has_user_llm_context() else api_key
+    chat_model = create_chat_model(temperature=0.4, timeout=60, api_key=fallback_key)
     return IsolatedLoggerChatModel(chat_model)
 
 

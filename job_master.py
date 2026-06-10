@@ -148,6 +148,8 @@ class JobMaster:
         self.driver = None
         self.resume_object = None
         self.modern_facade = None
+        # Desktop-fallback. I webbläget ignoreras denna av generatorerna —
+        # de läser inloggad användares provider/nyckel via thread-local i llm_factory.
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.stop_requested = False  # Set to True by web_app to abort search
         self._browser_initialized = False  # Tracks if browser has been started
@@ -1434,8 +1436,13 @@ class JobMaster:
         Returnerar (score: int, reasoning: str).
         Vid fel returneras (50, beskrivning) så jobbet inte automatiskt godkänns."""
         try:
-            api_key = os.getenv('OPENAI_API_KEY', '')
-            if not api_key:
+            # Användarens egen provider/nyckel via thread-local (Gemini, Claude,
+            # Ollama eller OpenAI) — rå modell utan retry-wrapper så att ett
+            # nyckelfel inte hänger sökloopen i minuter per jobb.
+            from src.libs.resume_and_cover_builder.llm.llm_factory import create_chat_model
+            try:
+                llm = create_chat_model(temperature=0, timeout=30)
+            except Exception:
                 return (50, 'Ingen API-nyckel — ATS-filter inaktivt')
 
             # Bygg kompakt CV-sammanfattning
@@ -1451,21 +1458,14 @@ class JobMaster:
                 f"Experience: {len(exp)} positions\n"
             )
 
-            import openai
-            client = openai.OpenAI(api_key=api_key)
             prompt = (
                 f"Rate this CV against the job description. Reply with ONLY:\n"
                 f"Score: <0-100>\nReasoning: <one sentence>\n\n"
                 f"CV:\n{cv_summary}\n\n"
                 f"Job (first 1500 chars):\n{job_description[:1500]}"
             )
-            resp = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=60,
-                temperature=0,
-            )
-            text = resp.choices[0].message.content or ''
+            resp = llm.invoke([{"role": "user", "content": prompt}])
+            text = getattr(resp, 'content', None) or str(resp)
             import re
             m = re.search(r'Score:\s*(\d+)', text)
             score = int(m.group(1)) if m else 50
