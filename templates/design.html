@@ -18,18 +18,10 @@
 <!-- Tag color legend -->
 <div class="d-flex gap-2 flex-wrap mb-4">
   <small class="text-muted me-2">
-    {% if lang == 'sv' %}10 designer tillgängliga — välj din favorit:
-    {% elif lang == 'en' %}10 designs available — choose your favorite:
-    {% else %}10 diseños disponibles — elige tu favorito:{% endif %}
+    {% if lang == 'sv' %}{{ designs | length }} designer tillgängliga — välj din favorit:
+    {% elif lang == 'en' %}{{ designs | length }} designs available — choose your favorite:
+    {% else %}{{ designs | length }} diseños disponibles — elige tu favorito:{% endif %}
   </small>
-  {% if previews.values() | list | select | list | length == 0 %}
-  <span class="badge" style="background:rgba(255,193,7,.15);color:#ffc107">
-    <i class="bi bi-exclamation-triangle me-1"></i>
-    {% if lang == 'sv' %}Kör generate_design_previews.py för att se miniatyrer
-    {% elif lang == 'en' %}Run generate_design_previews.py to see thumbnails
-    {% else %}Ejecuta generate_design_previews.py para ver miniaturas{% endif %}
-  </span>
-  {% endif %}
 </div>
 
 <div class="row g-4">
@@ -156,9 +148,9 @@
           {% else %}Más diseños próximamente...{% endif %}
         </h6>
         <p class="text-muted small">
-          {% if lang == 'sv' %}Du kan ladda upp egna HTML-mallar under <code>static/design_templates/</code>
-          {% elif lang == 'en' %}You can upload custom HTML templates under <code>static/design_templates/</code>
-          {% else %}Puedes subir plantillas HTML en <code>static/design_templates/</code>{% endif %}
+          {% if lang == 'sv' %}Alla designer ovan fungerar fullt ut vid CV-generering.
+          {% elif lang == 'en' %}All designs above are fully functional for CV generation.
+          {% else %}Todos los diseños anteriores son totalmente funcionales.{% endif %}
         </p>
       </div>
     </div>

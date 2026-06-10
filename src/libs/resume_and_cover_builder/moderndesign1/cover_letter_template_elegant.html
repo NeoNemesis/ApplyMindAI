@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1000, initial-scale=1.0">
+    <title>Personligt Brev</title>
+    <style>
+        @page {
+            margin: 0;
+            size: A4;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #faf7f0; /* elfenben */
+            font-family: Georgia, 'Times New Roman', serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .letter-container {
+            width: 1000px;
+            max-width: 1000px;
+            background: #faf7f0;
+            margin: 0 auto;
+            padding: 65px 85px;
+        }
+
+        /* Sidhuvud med guldlinje till vänster */
+        .letter-header {
+            border-left: 4px solid #b3923e;
+            padding-left: 22px;
+            margin-bottom: 36px;
+        }
+
+        .letter-header h1 {
+            font-size: 24pt;
+            font-weight: normal;
+            color: #2b2722;
+            margin-bottom: 5px;
+        }
+
+        .letter-header h2 {
+            font-size: 10.5pt;
+            font-weight: normal;
+            font-style: italic;
+            color: #b3923e;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .contact-info {
+            font-size: 9pt;
+            color: #6b6357;
+            line-height: 1.6;
+            font-family: Arial, sans-serif;
+        }
+
+        .contact-info div {
+            display: inline-block;
+            margin-right: 18px;
+        }
+
+        .date {
+            text-align: right;
+            font-size: 9.5pt;
+            font-style: italic;
+            color: #8a8071;
+            margin-bottom: 28px;
+        }
+
+        .salutation {
+            font-size: 11pt;
+            color: #2b2722;
+            margin-bottom: 20px;
+        }
+
+        .content-section {
+            font-size: 11pt;
+            color: #3a352e;
+            line-height: 1.7;
+            text-align: left;
+        }
+
+        .content-section p {
+            margin-bottom: 14px;
+        }
+
+        /* Tunn guldlinje före avslutningen */
+        .closing-rule {
+            width: 90px;
+            border-top: 2px solid #b3923e;
+            margin: 30px 0 22px;
+        }
+
+        .closing .sincerely {
+            font-size: 11pt;
+            color: #3a352e;
+            margin-bottom: 42px;
+        }
+
+        .closing .signature {
+            font-size: 13pt;
+            color: #2b2722;
+            margin-bottom: 10px;
+        }
+
+        .closing .attachment {
+            font-size: 8.5pt;
+            font-style: italic;
+            color: #8a8071;
+            margin-top: 10px;
+        }
+
+        @media print {
+            body,
+            .letter-container {
+                background: #faf7f0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .letter-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 46px 65px;
+            }
+            .letter-header,
+            .closing-rule {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        .content-section {
+            page-break-inside: avoid;
+        }
+    </style>
+</head>
+<body>
+    <div class="letter-container">
+        <div class="letter-header">
+            <h1>$full_name</h1>
+            <h2>$job_title</h2>
+            <div class="contact-info">
+                $contact_info
+            </div>
+        </div>
+
+        <div class="date">$date</div>
+
+        <div class="salutation">$salutation</div>
+
+        <div class="content-section">
+            $section1_content
+        </div>
+
+        <div class="closing">
+            <div class="closing-rule"></div>
+            <div class="sincerely">$closing_text</div>
+            <div class="signature">$full_name</div>
+            <div class="attachment">$attachment_text</div>
+        </div>
+    </div>
+</body>
+</html>

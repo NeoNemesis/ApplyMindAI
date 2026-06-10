@@ -34,11 +34,13 @@
           <i class="bi bi-palette"></i> CV-design
         </div>
 
-        {# 3 designer som faktiskt fungerar (riktiga Jinja2-mallar i moderndesign1/) #}
+        {# Designer med riktiga genererings-mallar i moderndesign1/ — synka med ACTIVE_CV_DESIGNS #}
         {% set current_design = current_cv_design if current_cv_design is defined else 'design_02_classic' %}
         {% set design_list = [
+          ('design_01_minimal',       'Minimal',       'Enkolumn, ren vit layout. Maximalt ATS-vänlig.'),
           ('design_02_classic',       'Klassisk',      'Sidopanel + vit höger; standardlayout som funkar för alla ATS-system.'),
           ('design_03_modern_green',  'Modern Grön',   'Mörk vänsterpanel med gröna accenter. Tech- och IT-vänlig.'),
+          ('design_05_nordic_blue',   'Nordic Blue',   'Blått sidhuvud, skandinaviskt ren tvåkolumnslayout.'),
           ('design_07_tech_modern',   'Tech Modern',   'Dark theme, monospace + grön accent. För developer/devops-roller.')
         ] %}
 
@@ -83,7 +85,9 @@
         {% set letter_list = [
           ('nordic_minimal',   'Nordisk Minimal',  'Vit bakgrund, ren typografi. ATS-säker, passar alla branscher.'),
           ('problem_solution', 'Problem-Lösning',  'Strukturerat brev med grön accentlinje. Forskning visar mest svar.'),
-          ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.')
+          ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.'),
+          ('executive',        'Executive',        'Klassisk serif, centrerat sidhuvud. För senior- och ledarroller.'),
+          ('elegant',          'Elegant',          'Elfenbensvit med guldlinje och serif-typografi. Stilren premiumkänsla.')
         ] %}
 
         <div class="design-picker-grid" id="letter-picker">
@@ -571,14 +575,18 @@ document.addEventListener('DOMContentLoaded', () => {
 // Design picker
 // -------------------------------------------------------
 const DESIGN_LABELS = {
+  design_01_minimal:        'Minimal',
   design_02_classic:        'Klassisk',
   design_03_modern_green:   'Modern Grön',
+  design_05_nordic_blue:    'Nordic Blue',
   design_07_tech_modern:    'Tech Modern',
 };
 const LETTER_LABELS = {
   nordic_minimal:   'Nordisk Minimal',
   problem_solution: 'Problem-Lösning',
   modern_tech:      'Modern Tech',
+  executive:        'Executive',
+  elegant:          'Elegant',
 };
 
 async function autoSaveDesign(kind, value) {

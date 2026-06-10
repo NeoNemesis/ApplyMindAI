@@ -1031,27 +1031,11 @@ def cover_letter():
     return render_template('cover_letter.html', content=content, profile=profile)
 
 
-LETTER_TEMPLATE_NAMES = {
-    'problem_solution': 'Problem-Lösning',
-    'executive':        'Executive / Klassisk',
-    'modern_tech':      'Modern Tech',
-    'nordic_minimal':   'Nordisk Minimal',
-}
-
 @app.route('/cover-letter/templates')
 def letter_templates():
     # Brev-design integrerat på /search under CV-design.
     # Behåller routen för bakåtkompat men redirectar.
     return redirect(url_for('search') + '#letter-picker')
-
-@app.route('/cover-letter/template/select', methods=['POST'])
-@login_required
-def letter_template_select():
-    tmpl = request.form.get('template', 'problem_solution')
-    if tmpl in LETTER_TEMPLATE_NAMES:
-        write_env({'LETTER_TEMPLATE': tmpl})
-        flash(f'Brevmall vald: {LETTER_TEMPLATE_NAMES[tmpl]}', 'success')
-    return redirect(url_for('letter_templates'))
 
 @app.route('/cover-letter/template/preview/<template_key>')
 @login_required
@@ -1068,6 +1052,8 @@ def letter_template_preview(template_key):
         'nordic_minimal':   'cover_letter_template_clean.html',
         'problem_solution': 'cover_letter_template_problem_solution.html',
         'modern_tech':      'cover_letter_template_modern_tech.html',
+        'executive':        'cover_letter_template_executive.html',
+        'elegant':          'cover_letter_template_elegant.html',
     }
     template_file = LETTER_TEMPLATE_FILES.get(template_key)
     if not template_file:
@@ -1169,8 +1155,10 @@ def search():
 # Whitelist av designer som faktiskt har en motsvarande Jinja2/string.Template-fil.
 # Synka med CV_TEMPLATE_MAP i improved_generator.py och LETTER_TEMPLATE_MAP i
 # moderndesign1/cover_letter_generator.py.
-ACTIVE_CV_DESIGNS     = {'design_02_classic', 'design_03_modern_green', 'design_07_tech_modern'}
-ACTIVE_LETTER_DESIGNS = {'nordic_minimal', 'problem_solution', 'modern_tech'}
+ACTIVE_CV_DESIGNS     = {'design_01_minimal', 'design_02_classic', 'design_03_modern_green',
+                         'design_05_nordic_blue', 'design_07_tech_modern'}
+ACTIVE_LETTER_DESIGNS = {'nordic_minimal', 'problem_solution', 'modern_tech',
+                         'executive', 'elegant'}
 
 
 @app.route('/api/design/save', methods=['POST'])
@@ -2213,10 +2201,11 @@ def set_lang(lang):
 # ROUTES — DESIGN / LAYOUT
 # ============================================================
 
+# Endast designer med riktiga genererings-mallar i moderndesign1/ listas här.
+# Synka med ACTIVE_CV_DESIGNS + CV_TEMPLATE_MAP i improved_generator.py.
 DESIGNS = {
     'design_01_minimal': {
         'key':         'design_01_minimal',
-        'template':    'design_01_minimal.html',
         'name_sv':     'Minimal',
         'name_en':     'Minimal',
         'name_es':     'Minimalista',
@@ -2227,18 +2216,16 @@ DESIGNS = {
     },
     'design_02_classic': {
         'key':         'design_02_classic',
-        'template':    'design_02_classic.html',
         'name_sv':     'Klassisk',
         'name_en':     'Classic',
         'name_es':     'Clásico',
-        'desc_sv':     'Klassisk serif-typografi med svart sidhuvud. Tidlös professionell stil.',
-        'desc_en':     'Classic serif typography with black header. Timeless professional style.',
-        'desc_es':     'Tipografía serif clásica con cabecera negra. Estilo profesional atemporal.',
+        'desc_sv':     'Tvåkolumnslayout med mörkt sidhuvud. Tidlös professionell stil.',
+        'desc_en':     'Two-column layout with dark header. Timeless professional style.',
+        'desc_es':     'Diseño de dos columnas con cabecera oscura. Estilo profesional atemporal.',
         'tags':        [('Professionell', 'blue'), ('Tidlös', 'blue')],
     },
     'design_03_modern_green': {
         'key':         'design_03_modern_green',
-        'template':    'design_03_modern_green.html',
         'name_sv':     'Modern Grön',
         'name_en':     'Modern Green',
         'name_es':     'Verde Moderno',
@@ -2247,20 +2234,8 @@ DESIGNS = {
         'desc_es':     'Barra lateral oscura con acentos verdes. Ideal para tech e IT.',
         'tags':        [('Tech', 'green'), ('Sidopanel', 'green')],
     },
-    'design_04_dark_executive': {
-        'key':         'design_04_dark_executive',
-        'template':    'design_04_dark_executive.html',
-        'name_sv':     'Dark Executive',
-        'name_en':     'Dark Executive',
-        'name_es':     'Ejecutivo Oscuro',
-        'desc_sv':     'Mörk premiumdesign med gulddetaljer. För ledarskapsroller.',
-        'desc_en':     'Dark premium design with gold details. For leadership roles.',
-        'desc_es':     'Diseño premium oscuro con detalles dorados. Para roles de liderazgo.',
-        'tags':        [('Premium', 'gold'), ('Ledare', 'gold')],
-    },
     'design_05_nordic_blue': {
         'key':         'design_05_nordic_blue',
-        'template':    'design_05_nordic_blue.html',
         'name_sv':     'Nordic Blue',
         'name_en':     'Nordic Blue',
         'name_es':     'Azul Nórdico',
@@ -2269,20 +2244,8 @@ DESIGNS = {
         'desc_es':     'Diseño escandinavo con cabecera azul y diseño limpio.',
         'tags':        [('Skandinavisk', 'blue'), ('Ren', 'blue')],
     },
-    'design_06_creative_sidebar': {
-        'key':         'design_06_creative_sidebar',
-        'template':    'design_06_creative_sidebar.html',
-        'name_sv':     'Creative Sidebar',
-        'name_en':     'Creative Sidebar',
-        'name_es':     'Barra Creativa',
-        'desc_sv':     'Marinblå sidopanel med teal-accenter. Kreativ och modern.',
-        'desc_en':     'Navy sidebar with teal accents. Creative and modern.',
-        'desc_es':     'Barra lateral azul marino con acentos turquesa. Creativo y moderno.',
-        'tags':        [('Kreativ', 'teal'), ('Sidopanel', 'teal')],
-    },
     'design_07_tech_modern': {
         'key':         'design_07_tech_modern',
-        'template':    'design_07_tech_modern.html',
         'name_sv':     'Tech Modern',
         'name_en':     'Tech Modern',
         'name_es':     'Tech Moderno',
@@ -2290,39 +2253,6 @@ DESIGNS = {
         'desc_en':     'Dark theme with green monospace text. For developers and engineers.',
         'desc_es':     'Tema oscuro con texto monospace verde. Para desarrolladores e ingenieros.',
         'tags':        [('Developer', 'green'), ('Dark Mode', 'green')],
-    },
-    'design_08_timeline': {
-        'key':         'design_08_timeline',
-        'template':    'design_08_timeline.html',
-        'name_sv':     'Timeline',
-        'name_en':     'Timeline',
-        'name_es':     'Línea de Tiempo',
-        'desc_sv':     'Lila tidslinje-design med kortlayout. Visuell och strukturerad.',
-        'desc_en':     'Purple timeline design with card layout. Visual and structured.',
-        'desc_es':     'Diseño de línea de tiempo morada con tarjetas. Visual y estructurado.',
-        'tags':        [('Visuell', 'purple'), ('Tidslinje', 'purple')],
-    },
-    'design_09_infographic': {
-        'key':         'design_09_infographic',
-        'template':    'design_09_infographic.html',
-        'name_sv':     'Infografik',
-        'name_en':     'Infographic',
-        'name_es':     'Infografía',
-        'desc_sv':     'Gradientsidhuvud med kompetensgrafer. Kreativ och datadriven.',
-        'desc_en':     'Gradient header with skill bars. Creative and data-driven.',
-        'desc_es':     'Cabecera con degradado y barras de habilidades. Creativo y orientado a datos.',
-        'tags':        [('Infografik', 'orange'), ('Kompetenser', 'orange')],
-    },
-    'design_10_premium_gold': {
-        'key':         'design_10_premium_gold',
-        'template':    'design_10_premium_gold.html',
-        'name_sv':     'Premium Gold',
-        'name_en':     'Premium Gold',
-        'name_es':     'Oro Premium',
-        'desc_sv':     'Elfenbensvit med gulddetaljer och elegant serif-typografi.',
-        'desc_en':     'Ivory white with gold details and elegant serif typography.',
-        'desc_es':     'Blanco marfil con detalles dorados y elegante tipografía serif.',
-        'tags':        [('Lyx', 'gold'), ('Elegant', 'gold')],
     },
 }
 
@@ -2363,7 +2293,7 @@ def design_page():
 @app.route('/design/save', methods=['POST'])
 def design_save():
     design = request.form.get('design', 'design_01_minimal')
-    if design in DESIGNS:
+    if design in ACTIVE_CV_DESIGNS:
         write_env({'CV_DESIGN': design})
         flash(g.t.get('design_saved', 'Design saved!'), 'success')
     return redirect(url_for('design_page'))
@@ -2372,27 +2302,17 @@ def design_save():
 @app.route('/preview/pdf/<design_key>')
 @login_required
 def preview_design_pdf(design_key):
-    """Renderar CV-mallen med Victor's RIKTIGA data från plain_text_resume.yaml.
-
-    Förut: serverade en statisk dummy-HTML från static/design_templates/ med
-    "Anna Karlsson"-data, helt orelaterad till hur det faktiska CV:t ser ut.
-
-    Nu: laddar samma mall som improved_generator använder vid riktig generering,
-    substituerar med riktig CV-data, returnerar färdig HTML.
-    """
+    """Renderar CV-mallen med inloggad användares riktiga data från plain_text_resume.yaml.
+    Laddar samma mall som improved_generator använder vid riktig generering."""
     CV_TEMPLATE_FILES = {
+        'design_01_minimal':      'template_minimal.html',
         'design_02_classic':      'improved_template.html',
         'design_03_modern_green': 'template_modern_green.html',
+        'design_05_nordic_blue':  'template_nordic_blue.html',
         'design_07_tech_modern':  'template_tech_modern.html',
     }
     template_file = CV_TEMPLATE_FILES.get(design_key)
     if not template_file:
-        # Bakåtkompat: fallback till gamla statiska previews för okända keys
-        info = DESIGNS.get(design_key)
-        if info and info.get('template'):
-            tmpl = BASE_DIR / 'static' / 'design_templates' / info['template']
-            if tmpl.exists():
-                return send_file(str(tmpl.resolve()), mimetype='text/html')
         return 'Ingen förhandsgranskning tillgänglig', 404
 
     template_path = BASE_DIR / 'src' / 'libs' / 'resume_and_cover_builder' / 'moderndesign1' / template_file
