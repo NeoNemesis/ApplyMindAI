@@ -17,6 +17,8 @@ from .config import global_config
 from loguru import logger
 from requests.exceptions import HTTPError as HTTPStatusError
 
+from .llm.stop_signal import raise_if_stopped, SearchStopped
+
 
 class LLMLogger:
 
@@ -86,15 +88,18 @@ class LoggerChatModel:
         self.llm = llm
 
     def __call__(self, messages: List[Dict[str, str]]) -> str:
-        max_retries = 15
+        max_retries = 5
         retry_delay = 10
 
         for attempt in range(max_retries):
+            raise_if_stopped()  # användaren tryckte Stopp — avbryt direkt, ingen retry
             try:
                 reply = self.llm.invoke(messages)
                 parsed_reply = self.parse_llmresult(reply)
                 LLMLogger.log_request(prompts=messages, parsed_reply=parsed_reply)
                 return reply
+            except SearchStopped:
+                raise
             except (openai.RateLimitError, HTTPStatusError) as err:
                 if isinstance(err, HTTPStatusError) and err.response.status_code == 429:
                     logger.warning(f"HTTP 429 Too Many Requests: Waiting for {retry_delay} seconds before retrying (Attempt {attempt + 1}/{max_retries})...")

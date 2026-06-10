@@ -16,6 +16,7 @@ from src.libs.resume_and_cover_builder.llm.llm_factory import (
     create_chat_model,
     has_user_llm_context,
 )
+from src.libs.resume_and_cover_builder.llm.stop_signal import raise_if_stopped, SearchStopped
 
 # Gemensam loggfil (samma format som LLMParser)
 _CALLS_LOG = Path("data_folder/output/job_master/open_ai_calls.json")
@@ -51,13 +52,17 @@ class IsolatedLoggerChatModel:
         self.llm = chat_model
         self.model_name = (getattr(chat_model, 'model_name', '') or
                            getattr(chat_model, 'model', '') or 'unknown')
-        self.max_retries = 15
-        self.retry_delay = 10
+        # 3 försök, inte 15 — med 60s timeout + paus per försök blev 15 försök
+        # ~17 minuter där varken stopp-knappen eller felmeddelanden nådde användaren.
+        self.max_retries = 3
+        self.retry_delay = 5
 
     def __call__(self, messages: Any) -> str:
-        """Anropar AI med retry-logik och loggar anropet."""
+        """Anropar AI med retry-logik och loggar anropet.
+        Avbryter direkt (SearchStopped) om användaren tryckt Stopp."""
         prompt_text = messages if isinstance(messages, str) else str(messages)
         for attempt in range(self.max_retries):
+            raise_if_stopped()
             try:
                 logger.info(f"🤖 Modern Design 1: AI-anrop (försök {attempt + 1}/{self.max_retries})")
 
@@ -71,6 +76,8 @@ class IsolatedLoggerChatModel:
                 _log_ai_call(prompt_text, result, self.model_name)
                 return result
 
+            except SearchStopped:
+                raise  # användarstopp — bubbla upp utan retry
             except Exception as e:
                 logger.warning(f"⚠️ Modern Design 1: AI-anrop misslyckades (försök {attempt + 1}): {e}")
                 if attempt < self.max_retries - 1:

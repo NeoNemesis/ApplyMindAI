@@ -1290,6 +1290,12 @@ def search_run():
             sys.stderr = OutputCapture()
 
             _set_stop_flag(_search_user_id, False)
+
+            # Låt LLM-retry-looparna avbryta direkt vid Stopp — annars maler
+            # ett pågående AI-anrop vidare i minuter efter att flaggan satts.
+            from src.libs.resume_and_cover_builder.llm.stop_signal import set_stop_check
+            set_stop_check(lambda: _is_stop_requested(_search_user_id))
+
             jm = JobMaster(output_dir=_user_output_dir(_search_user_id), data_dir=_user_data_dir(_search_user_id))
             jm.stop_requested = False
             jm.initialize(platforms=platforms)
@@ -1530,6 +1536,8 @@ def batch_evaluate():
         st = _search_state(_eval_user_id)
         if _eval_user_id:
             _set_search_thread_llm_context(_eval_user_id)
+            from src.libs.resume_and_cover_builder.llm.stop_signal import set_stop_check
+            set_stop_check(lambda: _is_stop_requested(_eval_user_id))
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
