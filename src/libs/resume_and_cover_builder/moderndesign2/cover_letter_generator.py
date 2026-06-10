@@ -14,7 +14,7 @@ from loguru import logger
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "moderndesign1"))
 from language_detector import detect_job_language
-from ..moderndesign1.isolated_utils import create_isolated_llm, image_to_base64
+from ..moderndesign1.isolated_utils import create_isolated_llm, image_to_base64, TRANSPARENT_PNG_B64
 
 class ModernDesign2CoverLetterGenerator:
     """
@@ -43,10 +43,10 @@ class ModernDesign2CoverLetterGenerator:
                 if path.exists():
                     return image_to_base64(str(path))
 
-            return ""
+            return TRANSPARENT_PNG_B64
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
-            return ""
+            return TRANSPARENT_PNG_B64
     
     def _get_translations(self) -> dict:
         """Översättningar"""

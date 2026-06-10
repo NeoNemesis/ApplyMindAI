@@ -99,6 +99,14 @@ def create_isolated_llm(api_key: str = '') -> IsolatedLoggerChatModel:
     return IsolatedLoggerChatModel(chat_model)
 
 
+# 1x1 transparent PNG. Mallarna bäddar in fotot som "data:image/png;base64,$profile_image" —
+# en tom sträng ger en ogiltig data-URI (ERR_INVALID_URL). Använd denna när foto saknas.
+TRANSPARENT_PNG_B64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "YAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+)
+
+
 def image_to_base64(image_path: str) -> str:
     """Konverterar bild till base64."""
     try:

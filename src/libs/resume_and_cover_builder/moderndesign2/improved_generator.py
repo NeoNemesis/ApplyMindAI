@@ -16,7 +16,7 @@ from loguru import logger
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "moderndesign1"))
 from language_detector import detect_job_language
-from ..moderndesign1.isolated_utils import create_isolated_llm, image_to_base64
+from ..moderndesign1.isolated_utils import create_isolated_llm, image_to_base64, TRANSPARENT_PNG_B64
 
 class ImprovedModernDesign2Generator:
     """
@@ -50,11 +50,11 @@ class ImprovedModernDesign2Generator:
                     logger.info(f"✅ Profilbild hittad: {path}")
                     return image_to_base64(str(path))
 
-            logger.warning("⚠️ Ingen profilbild hittad")
-            return ""
+            logger.warning("⚠️ Ingen profilbild hittad — använder transparent platshållare")
+            return TRANSPARENT_PNG_B64
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
-            return ""
+            return TRANSPARENT_PNG_B64
     
     def _derive_job_title(self) -> str:
         """Titel från användarens senaste position i CV-datat — aldrig hårdkodad"""

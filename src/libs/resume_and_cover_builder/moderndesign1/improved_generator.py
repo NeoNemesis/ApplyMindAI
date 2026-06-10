@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, List, Dict
 from loguru import logger
 from .language_detector import detect_job_language
-from .isolated_utils import create_isolated_llm, image_to_base64
+from .isolated_utils import create_isolated_llm, image_to_base64, TRANSPARENT_PNG_B64
 
 class ImprovedModernDesign1Generator:
     """
@@ -51,12 +51,12 @@ class ImprovedModernDesign1Generator:
                     logger.info(f"✅ Profilbild hittad: {path}")
                     return image_to_base64(str(path))
 
-            logger.warning("⚠️ Ingen profilbild hittad")
-            return ""
+            logger.warning("⚠️ Ingen profilbild hittad — använder transparent platshållare")
+            return TRANSPARENT_PNG_B64
 
         except Exception as e:
             logger.error(f"❌ Fel vid profilbild: {e}")
-            return ""
+            return TRANSPARENT_PNG_B64
     
     def _get_translations(self) -> dict:
         """Returnerar översättningar för olika språk"""
