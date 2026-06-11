@@ -114,8 +114,10 @@ class ModernDesign1Facade:
             logger.debug(f"📄 Full jobbtext extraherad: {len(body_text)} tecken")
             logger.debug(f"📝 Första 200 tecken: {body_text[:200]}")
 
-            # Skapa LLMParser med timeout
-            self.llm_job_parser = LLMParser(openai_api_key=global_config.API_KEY)
+            # Skapa LLMParser — embeddings-nyckeln tas från användarkontexten
+            # (aldrig serverns env-nyckel för inloggade användare)
+            from src.libs.resume_and_cover_builder.llm.llm_factory import get_context_openai_key
+            self.llm_job_parser = LLMParser(openai_api_key=get_context_openai_key(global_config.API_KEY))
             self.llm_job_parser.set_body_html(body_element)
 
             self.job = Job()

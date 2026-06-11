@@ -44,6 +44,21 @@ def has_user_llm_context() -> bool:
     return bool(getattr(_user_llm_context, 'api_key', '') or
                 getattr(_user_llm_context, 'provider', ''))
 
+
+def get_context_openai_key(fallback: str = '') -> str:
+    """Nyckel som får användas för OpenAI-EMBEDDINGS (FAISS-vektorsökning).
+
+    Embeddings finns bara hos OpenAI. Med användarkontext satt: returnera
+    användarens egen nyckel om hens provider är openai, annars '' (embeddings
+    hoppas över — parsern fungerar utan). ALDRIG serverns env-nyckel för
+    inloggade användare — annars debiteras admins konto för t.ex.
+    Gemini-användares jobbparsning. Fallback är för desktop-läget utan kontext."""
+    if has_user_llm_context():
+        provider = (getattr(_user_llm_context, 'provider', '') or '').lower()
+        key = getattr(_user_llm_context, 'api_key', '')
+        return key if (provider == 'openai' and key) else ''
+    return fallback
+
 # ── Tillgängliga modeller per leverantör ─────────────────────────────────────
 AVAILABLE_MODELS = {
     'openai': [
