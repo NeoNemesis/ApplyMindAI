@@ -290,26 +290,71 @@ def decrypt_secret(value: str) -> str:
     except Exception:
         return ''
 
+_NO_OWN_KEY_MSG = (
+    "Ingen AI-nyckel kopplad till ditt konto — lägg in din egen under "
+    "Inställningar. Google Gemini har en gratis nivå (aistudio.google.com/app/apikey)."
+)
+_BROKEN_KEY_MSG = (
+    "Din sparade AI-nyckel kunde inte läsas — spara om den under Inställningar."
+)
+
+
+def _resolve_user_llm_config(user) -> tuple:
+    """Returnerar (key, provider, model) för en användare — eller kastar
+    LLMKeyRejected med tydligt meddelande.
+
+    POLICY (kostnadsisolering): inloggade icke-admin-användare får ALDRIG
+    tyst falla tillbaka på serverns env-nyckel (= admins OpenAI-konto).
+    Tidigare svaldes alla fel här (except: pass → env-fallback), vilket
+    gjorde att andra användares körningar fakturerades admin utan spår."""
+    from src.libs.resume_and_cover_builder.utils import LLMKeyRejected
+
+    provider = (user.llm_provider or '').lower()
+    model    = user.llm_model or ''
+
+    if provider == 'ollama':
+        return '', 'ollama', model
+
+    if user.llm_api_key:
+        try:
+            key = decrypt_secret(user.llm_api_key)
+        except Exception:
+            key = ''
+        if key:
+            return key, provider, model
+        raise LLMKeyRejected(_BROKEN_KEY_MSG)
+
+    if not user.is_admin:
+        raise LLMKeyRejected(_NO_OWN_KEY_MSG)
+
+    return '', '', ''  # admin utan egen nyckel → serverns env-konfiguration
+
+
 def get_user_llm(temperature: float = 0.4, timeout: int = 60):
     """
     Returnerar LLM med användarens nyckel OCH sätter thread-local context
     så att alla get_llm()-anrop i src/ (CV-generering, brev, jobbparser)
     också använder rätt nyckel för denna tråd.
+
+    Kastar LLMKeyRejected för icke-admin utan egen giltig nyckel — aldrig
+    tyst fallback till admins env-nyckel.
     """
     from src.libs.resume_and_cover_builder.llm.llm_factory import (
         get_llm, set_user_llm_context
     )
+    from flask_login import current_user as _cu
     try:
-        from flask_login import current_user as _cu
-        if _cu and _cu.is_authenticated and _cu.llm_api_key:
-            key      = decrypt_secret(_cu.llm_api_key)
-            provider = _cu.llm_provider or ''
-            model    = _cu.llm_model or ''
+        authed = bool(_cu and _cu.is_authenticated)
+    except Exception:
+        authed = False
+
+    if authed:
+        key, provider, model = _resolve_user_llm_config(_cu)
+        if key or provider:
             set_user_llm_context(key, provider, model)
             return get_llm(temperature=temperature, timeout=timeout,
                            api_key=key, provider=provider, model=model)
-    except Exception:
-        pass
+
     return get_llm(temperature=temperature, timeout=timeout)
 
 
@@ -317,23 +362,21 @@ def _set_search_thread_llm_context(user_id: int):
     """
     Sätts i söktrådarna (background threads) innan job_master körs.
     Säkerställer att CV- och brevgenerering använder rätt nyckel.
+
+    Kastar LLMKeyRejected (visas i sökloggen) för icke-admin utan egen
+    nyckel — i stället för tyst fallback till admins env-nyckel.
     """
     from src.libs.resume_and_cover_builder.llm.llm_factory import (
         set_user_llm_context, clear_user_llm_context
     )
-    try:
-        with app.app_context():
-            from models import User
-            u = User.query.get(user_id)
-            if u and u.llm_api_key:
-                set_user_llm_context(
-                    decrypt_secret(u.llm_api_key),
-                    u.llm_provider or '',
-                    u.llm_model or '',
-                )
+    with app.app_context():
+        from models import User
+        u = User.query.get(user_id)
+        if u:
+            key, provider, model = _resolve_user_llm_config(u)
+            if key or provider:
+                set_user_llm_context(key, provider, model)
                 return
-    except Exception:
-        pass
     clear_user_llm_context()
 
 def _validate_api_key(provider: str, api_key: str) -> str | None:
@@ -353,8 +396,12 @@ def _validate_api_key(provider: str, api_key: str) -> str | None:
             return 'Det ser ut som en Anthropic-nyckel. Välj "Anthropic" som leverantör.'
     if provider == 'anthropic' and not api_key.startswith('sk-ant-'):
         return 'Anthropic API-nycklar börjar med "sk-ant-". Kontrollera nyckeln.'
-    if provider == 'google' and len(api_key) < 20:
-        return 'Google API-nyckeln ser för kort ut. Kontrollera nyckeln.'
+    if provider == 'google':
+        if api_key.startswith('sk-'):
+            return ('Det ser ut som en OpenAI/Anthropic-nyckel ("sk-..."). '
+                    'Google-nycklar börjar med "AIza" — hämta din på aistudio.google.com/app/apikey.')
+        if not api_key.startswith('AIza'):
+            return 'Google API-nycklar börjar med "AIza". Kontrollera nyckeln.'
     return None
 
 # ============================================================
@@ -552,9 +599,13 @@ def is_setup_complete() -> bool:
                 decrypted = decrypt_secret(_cu.llm_api_key)
                 if decrypted and len(decrypted) > 10:
                     return True
+            # Icke-admin utan egen giltig nyckel: INTE redo — env-nyckeln är
+            # admins och får inte användas tyst (kostnadsisolering).
+            if not _cu.is_admin:
+                return False
     except Exception:
         pass
-    # 2. Fallback: global env (server-nyckel, bakåtkompatibilitet)
+    # 2. Fallback: global env (endast admin / oautentiserat desktop-läge)
     env = read_env()
     providers = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY']
     for k in providers:
@@ -2462,33 +2513,44 @@ def setup():
 
 
 @app.route('/setup/save-model', methods=['POST'])
+@login_required
 def setup_save_model():
+    """Sparar AI-val PER ANVÄNDARE (krypterat i DB) — precis som /settings/save.
+
+    Skrev tidigare till globala .env: en användares nyckel/leverantör blev då
+    ALLAS default, OCH .env ligger i containerns filsystem så valet raderades
+    vid varje deploy. Det var så mesutals Google-nyckel försvann och hans
+    körningar hamnade på admins OpenAI-nyckel."""
     provider   = request.form.get('provider', 'openai')
     model      = request.form.get('model', 'gpt-4o-mini')
     api_key    = request.form.get('api_key', '').strip()
 
-    updates = {
-        'LLM_PROVIDER': provider,
-        'LLM_MODEL':    model,
-    }
+    key_error = _validate_api_key(provider, api_key)
+    if key_error:
+        flash(key_error, 'danger')
+        return redirect(url_for('setup', step='1'))
 
-    key_map = {
-        'openai':    'OPENAI_API_KEY',
-        'anthropic': 'ANTHROPIC_API_KEY',
-        'google':    'GOOGLE_API_KEY',
-    }
-    if provider in key_map and api_key:
-        updates[key_map[provider]] = api_key
+    from models import db
+    current_user.llm_provider = provider
+    current_user.llm_model    = model
+    if api_key:
+        current_user.llm_api_key = encrypt_secret(api_key)
+    elif provider == 'ollama':
+        current_user.llm_api_key = None  # Ollama behöver ingen nyckel
+    db.session.commit()
 
+    # LinkedIn — fortfarande global i .env (delad browser-inloggning)
+    updates = {}
     linkedin_email    = request.form.get('linkedin_email', '').strip()
     linkedin_password = request.form.get('linkedin_password', '').strip()
     if linkedin_email:
         updates['LINKEDIN_EMAIL'] = linkedin_email
     if linkedin_password:
         updates['LINKEDIN_PASSWORD'] = linkedin_password
+    if updates:
+        write_env(updates)
 
-    write_env(updates)
-    flash('AI-modell och API-nyckel sparade!', 'success')
+    flash('AI-modell och API-nyckel sparade på ditt konto!', 'success')
     return redirect(url_for('setup', step='2'))
 
 
