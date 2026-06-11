@@ -79,6 +79,14 @@ class IsolatedLoggerChatModel:
             except SearchStopped:
                 raise  # användarstopp — bubbla upp utan retry
             except Exception as e:
+                from src.libs.resume_and_cover_builder.utils import (
+                    LLMKeyRejected, _is_permanent_key_error, _KEY_REJECTED_MSG,
+                )
+                if isinstance(e, LLMKeyRejected):
+                    raise
+                if _is_permanent_key_error(str(e)):
+                    logger.error(f"❌ API-nyckeln avvisas permanent — ingen retry: {str(e)[:300]}")
+                    raise LLMKeyRejected(_KEY_REJECTED_MSG) from e
                 logger.warning(f"⚠️ Modern Design 1: AI-anrop misslyckades (försök {attempt + 1}): {e}")
                 if attempt < self.max_retries - 1:
                     logger.info(f"🔄 Väntar {self.retry_delay}s...")
