@@ -5,6 +5,7 @@ This module contains utility functions for the Resume and Cover Letter Builder s
 # app/libs/resume_and_cover_builder/utils.py
 import json
 import openai
+import re
 import time
 import base64
 from datetime import datetime
@@ -116,6 +117,27 @@ class LoggerChatModel:
 
         logger.critical("Failed to get a response from the model after multiple attempts.")
         raise Exception("Failed to get a response from the model after multiple attempts.")
+
+    def parse_wait_time_from_error_message(self, error_message: str) -> int:
+        """Plocka ut väntetid ur leverantörens rate-limit-meddelande.
+
+        Anropas från __call__:s rate-limit-gren men har saknats i klassen
+        (försvann i forken) — varje rate limit gav då AttributeError i stället
+        för väntan+retry, vilket fällde t.ex. batch-ATS efter några anrop.
+        Fallback 20s om ingen tid hittas i texten."""
+        patterns = [
+            r'try again in (\d+(?:\.\d+)?)\s*s',           # OpenAI: "Please try again in 20s"
+            r'retry[_ ]?delay[^\d]*(\d+(?:\.\d+)?)',       # Gemini: "retry_delay { seconds: 7 }"
+            r'(\d+(?:\.\d+)?)\s*seconds',
+        ]
+        for pattern in patterns:
+            m = re.search(pattern, error_message, re.IGNORECASE)
+            if m:
+                try:
+                    return max(2, min(60, int(float(m.group(1))) + 1))
+                except ValueError:
+                    continue
+        return 20
 
     def parse_llmresult(self, llmresult: AIMessage) -> Dict[str, Dict]:
         # Parse the LLM result into a structured format.
