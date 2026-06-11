@@ -2502,11 +2502,18 @@ def _build_cv_preview_content() -> dict:
 @app.route('/setup')
 def setup():
     from src.libs.resume_and_cover_builder.llm.llm_factory import AVAILABLE_MODELS, PROVIDER_INFO
-    env = read_env()
+    # Skicka ALDRIG hela env till templaten — den innehåller serverns API-nycklar.
+    # Bara de icke-hemliga fält som setup.html faktiskt visar, och LLM-valen
+    # hämtas från användarens konto (per-user) i stället för global env.
+    safe_env = {
+        'LLM_PROVIDER':   (current_user.llm_provider if current_user.is_authenticated and current_user.llm_provider else 'openai'),
+        'LLM_MODEL':      (current_user.llm_model if current_user.is_authenticated and current_user.llm_model else 'gpt-4o-mini'),
+        'LINKEDIN_EMAIL': read_env().get('LINKEDIN_EMAIL', ''),
+    }
     step = request.args.get('step', '1')
     return render_template('setup.html',
                            step=step,
-                           env=env,
+                           env=safe_env,
                            available_models=AVAILABLE_MODELS,
                            provider_info=PROVIDER_INFO,
                            setup_complete=is_setup_complete())
