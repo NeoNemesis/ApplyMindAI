@@ -137,26 +137,34 @@
           </label>
 
           <label class="platform-card">
-            <input type="checkbox" name="platforms" value="linkedin">
-            <div>
-              <div class="fw-semibold">LinkedIn</div>
-              <small class="text-muted">linkedin.com — Kräver inloggning via .env</small>
-            </div>
-          </label>
-
-          <label class="platform-card">
             <input type="checkbox" name="platforms" value="af">
             <div>
               <div class="fw-semibold">Arbetsförmedlingen</div>
-              <small class="text-muted">af.se — Svenska statliga och kommunala jobb</small>
+              <small class="text-muted">Platsbanken — statliga, kommunala och privata jobb{% if not browser_available %} (hämtas via officiella Jobtech-API:t){% endif %}</small>
             </div>
           </label>
 
-          <label class="platform-card">
-            <input type="checkbox" name="platforms" value="indeed">
+          {% set _browser_ok = browser_available if browser_available is defined else true %}
+          <label class="platform-card {% if not _browser_ok %}opacity-50{% endif %}"
+                 {% if not _browser_ok %}title="Kräver browser (selenium) — endast tillgänglig i desktop-läge"{% endif %}>
+            <input type="checkbox" name="platforms" value="linkedin" {% if not _browser_ok %}disabled{% endif %}>
             <div>
-              <div class="fw-semibold">Indeed <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:#4AE54A;font-size:.65rem">STEALTH</span></div>
-              <small class="text-muted">indeed.com — Globalt jobbindex</small>
+              <div class="fw-semibold">LinkedIn
+                {% if not _browser_ok %}<span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.65rem">EJ PÅ SERVERN</span>{% endif %}
+              </div>
+              <small class="text-muted">linkedin.com — kräver browser + inloggning (desktop-läge)</small>
+            </div>
+          </label>
+
+          <label class="platform-card {% if not _browser_ok %}opacity-50{% endif %}"
+                 {% if not _browser_ok %}title="Kräver browser (selenium) — endast tillgänglig i desktop-läge"{% endif %}>
+            <input type="checkbox" name="platforms" value="indeed" {% if not _browser_ok %}disabled{% endif %}>
+            <div>
+              <div class="fw-semibold">Indeed
+                {% if not _browser_ok %}<span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.65rem">EJ PÅ SERVERN</span>
+                {% else %}<span class="badge ms-1" style="background:rgba(74,229,74,.15);color:#4AE54A;font-size:.65rem">STEALTH</span>{% endif %}
+              </div>
+              <small class="text-muted">indeed.com — kräver stealth-browser (desktop-läge)</small>
             </div>
           </label>
 
@@ -357,10 +365,10 @@ Konfigurera sökinställningarna till vänster och
 klicka på "Starta sökning" för att börja.
 
 Tips:
-  • Indeed är snabbast och kräver ingen inloggning
-  • LinkedIn ger tillgång till fler jobb men är långsammare
+  • Jobtech och Arbetsförmedlingen är samma officiella källa (Platsbanken) — fungerar alltid
+  • Indeed och LinkedIn kräver browser och fungerar bara i desktop-läge
   • AI:n genererar ett unikt CV + personligt brev per jobb
-  • Alla dokument sparas i data_folder/output/job_master/
+  • Alla dokument sparas under din egen kontomapp
         </div>
       </div>
     </div>

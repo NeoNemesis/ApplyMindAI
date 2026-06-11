@@ -1194,12 +1194,16 @@ def search():
     env = read_env()
     current_cv_design = env.get('CV_DESIGN', 'design_02_classic')
     current_letter_template = env.get('LETTER_TEMPLATE', 'nordic_minimal')
+    # Indeed/LinkedIn kräver selenium-browser — finns bara i desktop-läge
+    import importlib.util
+    browser_available = importlib.util.find_spec('selenium') is not None
     return render_template(
         'search.html',
         prefs=prefs,
         search_state=search_state,
         current_cv_design=current_cv_design,
         current_letter_template=current_letter_template,
+        browser_available=browser_available,
     )
 
 

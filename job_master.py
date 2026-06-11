@@ -1248,6 +1248,35 @@ class JobMaster:
         self.search_positions = positions or ['Junior Systemutvecklare', 'Webbutvecklare']
         all_jobs = []
 
+        # ── Plattforms-normalisering för serverdrift ─────────────────────
+        platforms = list(platforms or [])
+
+        # AF-skrapning kräver browser, men Platsbanken serveras av samma
+        # officiella Jobtech-API — så utan browser byter vi källa i stället
+        # för att tyst returnera 0 jobb.
+        if 'arbetsformedlingen' in platforms and self.driver is None:
+            print("\nℹ️  Arbetsförmedlingen körs via Jobtech API (samma Platsbanken-annonser, officiella källan).")
+            platforms = [p for p in platforms if p != 'arbetsformedlingen']
+            if 'jobtech' not in platforms:
+                platforms.append('jobtech')
+
+        # Indeed/LinkedIn kräver selenium-browser som medvetet inte finns
+        # i serverdrift — säg det tydligt i stället för modul-fel + 0 jobb.
+        try:
+            import selenium  # noqa: F401
+            _selenium_ok = True
+        except ImportError:
+            _selenium_ok = False
+        if not _selenium_ok:
+            for _p, _namn in (('indeed', 'Indeed'), ('linkedin', 'LinkedIn')):
+                if _p in platforms:
+                    print(f"\n⚠️  {_namn} kräver browser och är inte tillgänglig på servern — hoppas över.")
+                    platforms = [x for x in platforms if x != _p]
+
+        if not platforms:
+            print("\n❌ Ingen vald plattform fungerar på servern. Välj Jobtech eller Arbetsförmedlingen.")
+            return []
+
         import threading as _threading
 
         # LinkedIn (kräver inloggning, max 60s timeout)
