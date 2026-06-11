@@ -21,6 +21,35 @@ from requests.exceptions import HTTPError as HTTPStatusError
 from .llm.stop_signal import raise_if_stopped, SearchStopped
 
 
+class LLMKeyRejected(Exception):
+    """API-nyckeln avvisas permanent (slut på krediter / ogiltig nyckel).
+    Retry är meningslöst — felet ska direkt upp till användaren."""
+
+
+# Feltexter som betyder att nyckeln avvisas PERMANENT — retry hjälper aldrig.
+_PERMANENT_KEY_ERRORS = (
+    'insufficient_quota',
+    'exceeded your current quota',
+    'billing',
+    'invalid_api_key',
+    'incorrect api key',
+    'api key not valid',          # Gemini
+    'api_key_invalid',            # Gemini
+    'permission_denied',
+)
+
+
+def _is_permanent_key_error(error_text: str) -> bool:
+    low = error_text.lower()
+    return any(t in low for t in _PERMANENT_KEY_ERRORS)
+
+
+_KEY_REJECTED_MSG = (
+    "Din AI-nyckel avvisas av leverantören (slut på krediter eller ogiltig nyckel). "
+    "Kontrollera saldot hos leverantören eller byt leverantör under Inställningar."
+)
+
+
 class LLMLogger:
 
     def __init__(self, llm: ChatOpenAI):
@@ -99,24 +128,31 @@ class LoggerChatModel:
                 parsed_reply = self.parse_llmresult(reply)
                 LLMLogger.log_request(prompts=messages, parsed_reply=parsed_reply)
                 return reply
-            except SearchStopped:
+            except (SearchStopped, LLMKeyRejected):
                 raise
             except (openai.RateLimitError, HTTPStatusError) as err:
+                err_text = str(err)
+                if _is_permanent_key_error(err_text):
+                    logger.error(f"API-nyckeln avvisas permanent — ingen retry: {err_text[:300]}")
+                    raise LLMKeyRejected(_KEY_REJECTED_MSG) from err
                 if isinstance(err, HTTPStatusError) and err.response.status_code == 429:
                     logger.warning(f"HTTP 429 Too Many Requests: Waiting for {retry_delay} seconds before retrying (Attempt {attempt + 1}/{max_retries})...")
                     time.sleep(retry_delay)
                     retry_delay *= 2
                 else:
-                    wait_time = self.parse_wait_time_from_error_message(str(err))
-                    logger.warning(f"Rate limit exceeded or API error. Waiting for {wait_time} seconds before retrying (Attempt {attempt + 1}/{max_retries})...")
+                    wait_time = self.parse_wait_time_from_error_message(err_text)
+                    logger.warning(f"Rate limit/API-fel: {err_text[:200]} — väntar {wait_time}s (försök {attempt + 1}/{max_retries})")
                     time.sleep(wait_time)
             except Exception as e:
+                if _is_permanent_key_error(str(e)):
+                    logger.error(f"API-nyckeln avvisas permanent — ingen retry: {str(e)[:300]}")
+                    raise LLMKeyRejected(_KEY_REJECTED_MSG) from e
                 logger.error(f"Unexpected error occurred: {str(e)}, retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{max_retries})")
                 time.sleep(retry_delay)
                 retry_delay *= 2
 
         logger.critical("Failed to get a response from the model after multiple attempts.")
-        raise Exception("Failed to get a response from the model after multiple attempts.")
+        raise Exception("AI-leverantören svarade inte efter flera försök — testa igen om en stund.")
 
     def parse_wait_time_from_error_message(self, error_message: str) -> int:
         """Plocka ut väntetid ur leverantörens rate-limit-meddelande.
