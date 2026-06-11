@@ -74,7 +74,8 @@ class ResumeFacade:
         self.driver.implicitly_wait(10)
         body_element = self.driver.find_element("tag name", "body")
         body_element = body_element.get_attribute("outerHTML")
-        self.llm_job_parser = LLMParser(openai_api_key=global_config.API_KEY)
+        from src.libs.resume_and_cover_builder.llm.llm_factory import get_context_openai_key
+        self.llm_job_parser = LLMParser(openai_api_key=get_context_openai_key(global_config.API_KEY))
         self.llm_job_parser.set_body_html(body_element)
 
         self.job = Job()
