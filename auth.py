@@ -6,9 +6,14 @@ import smtplib
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from models import db, User, AuditLog, PasswordResetToken
+from models import db, User, AuditLog, PasswordResetToken, ph
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+# Dummy-hash för att svara lika långsamt när kontot INTE finns: utan den tar
+# ett okänt konto ~0 ms och ett känt ~100 ms (argon2), vilket låter en
+# angripare lista vilka e-postadresser som har konto via svarstiden.
+_DUMMY_HASH = ph.hash("applymind-dummy-timing-password")
 
 # Simple in-memory rate limiter: {ip: [timestamp, ...]}
 _login_attempts: dict = {}
@@ -65,14 +70,28 @@ def login():
                 user.last_login = datetime.utcnow()
                 db.session.commit()
                 next_page = request.args.get("next") or url_for("index")
-                # Block absolute URLs, protocol-relative URLs, and auth routes
+                # Endast interna paths: blockera absoluta URL:er, //host,
+                # backslash-varianter (webbläsare läser /\evil.com som
+                # //evil.com — urlparse gör det INTE, så netloc-kollen
+                # ensam räckte inte) och auth-rutter.
                 from urllib.parse import urlparse
                 parsed = urlparse(next_page)
-                _bad = parsed.netloc or parsed.scheme or next_page.startswith("/auth") or next_page == "/login"
+                _bad = (parsed.netloc or parsed.scheme
+                        or not next_page.startswith("/")
+                        or next_page.startswith("//")
+                        or "\\" in next_page
+                        or next_page.startswith("/auth") or next_page == "/login")
                 if _bad:
                     next_page = url_for("index")
                 return redirect(next_page)
             else:
+                # Kör argon2 även när kontot inte finns (samma svarstid →
+                # ingen user enumeration via timing).
+                if not user:
+                    try:
+                        ph.verify(_DUMMY_HASH, password)
+                    except Exception:
+                        pass
                 _record_attempt(ip)
                 error = "Fel e-post/användarnamn eller lösenord."
 
@@ -129,6 +148,16 @@ def forgot_password():
     error = None
 
     if request.method == "POST":
+        # Samma rate limit som login: annars kan vem som helst pumpa ut
+        # resetmail via vår SMTP (spam mot godtycklig adress + svartlistning).
+        ip = request.remote_addr or "unknown"
+        limited, _wait = _is_rate_limited(ip)
+        if limited:
+            # Visa "skickat" ändå: avslöjar varken konton eller limitern.
+            return render_template("auth/forgot_password.html",
+                                   sent=True, error=None)
+        _record_attempt(ip)
+
         email = request.form.get("email", "").strip().lower()
         user  = User.query.filter_by(email=email, is_active=True).first()
 
