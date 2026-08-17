@@ -131,6 +131,25 @@ app.register_blueprint(admin_bp)
 with app.app_context():
     (BASE_DIR / 'instance').mkdir(exist_ok=True)
     db.create_all()
+    # create_all() lägger ALDRIG till kolumner i befintliga tabeller och det
+    # finns ingen migrations-mapp — nya kolumner läggs till idempotent här,
+    # så deployen förblir helautomatisk (PR → merge → auto-deploy, ingen
+    # manuell DB-kirurgi på servern).
+    try:
+        from sqlalchemy import text as _sqltext
+        _existing = {
+            row[1] for row in
+            db.session.execute(_sqltext('PRAGMA table_info("user")')).fetchall()
+        }
+        for _col, _ddl in [
+            ('cv_design',       'ALTER TABLE "user" ADD COLUMN cv_design VARCHAR(64)'),
+            ('letter_template', 'ALTER TABLE "user" ADD COLUMN letter_template VARCHAR(64)'),
+        ]:
+            if _col not in _existing:
+                db.session.execute(_sqltext(_ddl))
+        db.session.commit()
+    except Exception as _e:
+        print(f'[schema] kunde inte lägga till kolumner: {_e}')
 
 # ── i18n helpers ─────────────────────────────────────────────
 from src.i18n import get_translations, LANGUAGE_NAMES
@@ -366,6 +385,23 @@ def get_user_llm(temperature: float = 0.4, timeout: int = 60):
     return get_llm(temperature=temperature, timeout=timeout)
 
 
+def _set_search_thread_design_context(user_id: int | None):
+    """
+    Sätts i sök-/schemaläggar-/regenereringstrådar innan job_master körs:
+    generatorerna läser designvalet ur thread-local (src/design_context) i
+    stället för det gamla globala CV_DESIGN i .env.
+    """
+    from src.design_context import set_design_context, clear_design_context
+    if user_id:
+        with app.app_context():
+            from models import User
+            u = User.query.get(user_id)
+            if u:
+                set_design_context(u.cv_design, u.letter_template)
+                return
+    clear_design_context()
+
+
 def _set_search_thread_llm_context(user_id: int):
     """
     Sätts i söktrådarna (background threads) innan job_master körs.
@@ -452,10 +488,15 @@ _SCHEDULER_DEFAULTS = {
     'last_run_date':  None,
 }
 
-def load_scheduler_config() -> dict:
+def _scheduler_file(uid: int | None = None) -> Path:
+    """Schemaläggarkonfig för en GIVEN användare (eller inloggad/legacy)."""
+    return _user_data_dir(uid) / 'scheduler_config.json'
+
+def load_scheduler_config(uid: int | None = None) -> dict:
     try:
-        if SCHEDULER_FILE().exists():
-            data = json.loads(SCHEDULER_FILE().read_text(encoding='utf-8'))
+        f = _scheduler_file(uid)
+        if f.exists():
+            data = json.loads(f.read_text(encoding='utf-8'))
             cfg = dict(_SCHEDULER_DEFAULTS)
             cfg.update(data)
             return cfg
@@ -463,10 +504,10 @@ def load_scheduler_config() -> dict:
         pass
     return dict(_SCHEDULER_DEFAULTS)
 
-def save_scheduler_config(updates: dict):
-    cfg = load_scheduler_config()
+def save_scheduler_config(updates: dict, uid: int | None = None):
+    cfg = load_scheduler_config(uid)
     cfg.update(updates)
-    SCHEDULER_FILE().write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
+    _scheduler_file(uid).write_text(json.dumps(cfg, indent=2, ensure_ascii=False), encoding='utf-8')
 
 def _next_run_label(cfg: dict) -> str:
     """Compute a human-readable 'nästa sökning' string from scheduler config."""
@@ -499,97 +540,103 @@ def _next_run_label(cfg: dict) -> str:
             return f'{day_names_sv[candidate.weekday()]} {sched_time}'
     return sched_time
 
+def _maybe_fire_scheduled_search(uid: int, now: datetime) -> None:
+    """Kör EN användares schemalagda sökning om det är dags. Konfig, prefs,
+    state, LLM- och designkontext är alla den användarens — tidigare läste
+    loopen den delade legacy-mappen (utan inloggad användare) så schemat
+    varken hittade rätt konfig eller rätt sökpreferenser."""
+    cfg = load_scheduler_config(uid)
+    if not cfg.get('enabled'):
+        return
+
+    day_map = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
+    allowed_days = [day_map[d] for d in cfg.get('days', []) if d in day_map]
+    if now.weekday() not in allowed_days:
+        return
+
+    try:
+        h, m = map(int, cfg.get('time', '08:00').split(':'))
+    except Exception:
+        return
+
+    scheduled_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    today_str = now.strftime('%Y-%m-%d')
+    if now < scheduled_dt or cfg.get('last_run_date') == today_str:
+        return
+
+    st = _search_state(uid)
+    with _search_lock:
+        if st.get('running'):
+            return
+        st.update({
+            'running': True, 'output': [], 'error': None,
+            'progress': 0, 'started_at': now.isoformat(), 'finished_at': None,
+        })
+    save_scheduler_config({'last_run_date': today_str}, uid)
+
+    # ANVÄNDARENS sparade sökpreferenser (inte den delade legacy-mappen)
+    prefs = load_yaml(_user_data_dir(uid) / 'work_preferences.yaml') or {}
+    platforms  = prefs.get('platforms', ['jobtech'])
+    max_jobs   = prefs.get('max_jobs', 10)
+    locations  = prefs.get('locations', ['Uppsala'])
+    positions  = prefs.get('positions', [])
+
+    def _sched_search(plats=platforms, mj=max_jobs, locs=locations,
+                       pos=positions, _uid=uid):
+        sq = _search_queue(_uid)
+        _st = _search_state(_uid)
+        old_out = sys.stdout
+        class _SC:
+            encoding = 'utf-8'
+            def write(self, t):
+                if t and t.strip():
+                    sq.put(('output', t))
+                old_out.write(t)
+            def flush(self): old_out.flush()
+            def reconfigure(self, **kw): pass
+        from job_master import JobMaster
+        try:
+            sys.stdout = _SC()
+            with app.app_context():
+                _set_search_thread_llm_context(_uid)
+                _set_search_thread_design_context(_uid)
+                jm = JobMaster(
+                    output_dir = _user_output_dir(_uid),
+                    data_dir   = _user_data_dir(_uid),
+                )
+                jm.initialize()
+                jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
+                for i, job in enumerate(jobs or [], 1):
+                    jm.generate_documents_for_job(job, i)
+                jm.cleanup()
+        except Exception as e:
+            sq.put(('error', str(e)))
+        finally:
+            sys.stdout = old_out
+            with _search_lock:
+                _st['running']     = False
+                _st['progress']    = 100
+                _st['finished_at'] = datetime.now().isoformat()
+            sq.put(('done', None))
+
+    threading.Thread(target=_sched_search, daemon=True).start()
+
+
 def _scheduler_loop():
-    """Background thread: fires search at the scheduled time each day."""
+    """Background thread: kollar varje minut ALLA användares scheman och kör
+    de som är förfallna — var och en med sin egen konfig/prefs/nyckel/design."""
     while True:
         try:
             time.sleep(60)
-            cfg = load_scheduler_config()
-            if not cfg.get('enabled'):
-                continue
-
-            day_map = {'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6}
-            allowed_days = [day_map[d] for d in cfg.get('days', []) if d in day_map]
+            with app.app_context():
+                from models import User
+                user_ids = [u.id for u in User.query.filter_by(is_active=True).all()]
             now = datetime.now()
-
-            if now.weekday() not in allowed_days:
-                continue
-
-            sched_time = cfg.get('time', '08:00')
-            try:
-                h, m = map(int, sched_time.split(':'))
-            except Exception:
-                continue
-
-            scheduled_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
-            today_str = now.strftime('%Y-%m-%d')
-
-            if now >= scheduled_dt and cfg.get('last_run_date') != today_str:
-                with _search_lock:
-                    if search_state.get('running'):
-                        continue
-
-                save_scheduler_config({'last_run_date': today_str})
-
-                # Hämta scheduler-ägaren (sparas av api_scheduler_save)
-                uid = cfg.get('user_id')
-
-                # Load saved preferences and fire search
-                prefs = load_yaml(PREFS_YAML()) or {}
-                platforms  = prefs.get('platforms', ['indeed', 'jobtech'])
-                max_jobs   = prefs.get('max_jobs', 10)
-                locations  = prefs.get('locations', ['Uppsala'])
-                positions  = prefs.get('positions', [])
-
-                # Reuse the same closure pattern as search_run
-                with _search_lock:
-                    search_state.update({
-                        'running': True, 'output': [], 'error': None,
-                        'progress': 0, 'started_at': now.isoformat(), 'finished_at': None,
-                    })
-
-                # Hämta scheduler-ägaren från config (user_id sparas när schema ställs in)
-                sched_user_id = cfg.get('user_id')
-
-                def _sched_search(plats=platforms, mj=max_jobs, locs=locations,
-                                   pos=positions, uid=sched_user_id):
-                    sq = _search_queue(uid)
-                    st = _search_state(uid)
-                    old_out = sys.stdout
-                    class _SC:
-                        encoding = 'utf-8'
-                        def write(self, t):
-                            if t and t.strip():
-                                sq.put(('output', t))
-                            old_out.write(t)
-                        def flush(self): old_out.flush()
-                        def reconfigure(self, **kw): pass
-                    from job_master import JobMaster
-                    try:
-                        sys.stdout = _SC()
-                        with app.app_context():
-                            if uid:
-                                _set_search_thread_llm_context(uid)
-                            jm = JobMaster(
-                                output_dir = _user_output_dir(uid),
-                                data_dir   = _user_data_dir(uid),
-                            )
-                            jm.initialize()
-                            jobs = jm.search_jobs(plats, mj, locations=locs, positions=pos)
-                            for i, job in enumerate(jobs or [], 1):
-                                jm.generate_documents_for_job(job, i)
-                            jm.cleanup()
-                    except Exception as e:
-                        sq.put(('error', str(e)))
-                    finally:
-                        sys.stdout = old_out
-                        with _search_lock:
-                            st['running']     = False
-                            st['progress']    = 100
-                            st['finished_at'] = datetime.now().isoformat()
-                        sq.put(('done', None))
-
-                threading.Thread(target=_sched_search, daemon=True).start()
+            for uid in user_ids:
+                try:
+                    _maybe_fire_scheduled_search(uid, now)
+                except Exception:
+                    pass
         except Exception:
             pass
 
@@ -1221,9 +1268,10 @@ def cover_letter_save():
 @login_required
 def search():
     prefs = load_yaml(PREFS_YAML())
+    # Per-user designval ur DB; env är bara fallback för den som aldrig valt.
     env = read_env()
-    current_cv_design = env.get('CV_DESIGN', 'design_02_classic')
-    current_letter_template = env.get('LETTER_TEMPLATE', 'nordic_minimal')
+    current_cv_design = current_user.cv_design or env.get('CV_DESIGN', 'design_02_classic')
+    current_letter_template = current_user.letter_template or env.get('LETTER_TEMPLATE', 'nordic_minimal')
     # Indeed/LinkedIn kräver selenium-browser — finns bara i desktop-läge
     import importlib.util
     browser_available = importlib.util.find_spec('selenium') is not None
@@ -1252,11 +1300,15 @@ def api_design_save():
     """AJAX-spar för CV-/brev-design-val på sökrutan."""
     kind = request.form.get('kind', '')
     value = request.form.get('value', '')
+    # Sparas PER ANVÄNDARE i DB — write_env här ändrade designen för ALLA
+    # användare och nollställdes dessutom vid varje deploy.
     if kind == 'cv' and value in ACTIVE_CV_DESIGNS:
-        write_env({'CV_DESIGN': value})
+        current_user.cv_design = value
+        db.session.commit()
         return jsonify({'ok': True, 'kind': kind, 'value': value})
     if kind == 'letter' and value in ACTIVE_LETTER_DESIGNS:
-        write_env({'LETTER_TEMPLATE': value})
+        current_user.letter_template = value
+        db.session.commit()
         return jsonify({'ok': True, 'kind': kind, 'value': value})
     return jsonify({'ok': False, 'error': 'invalid kind or value'}), 400
 
@@ -1288,7 +1340,13 @@ def search_run():
         if not platforms:
             platforms = ['indeed']
 
-        max_jobs = int(request.form.get('max_jobs', 10))
+        # Validera + begränsa: icke-numeriskt gav 500, och utan tak kunde en
+        # sökning dra igång dokumentgenerering för godtyckligt många jobb.
+        try:
+            max_jobs = int(request.form.get('max_jobs', 10))
+        except (TypeError, ValueError):
+            max_jobs = 10
+        max_jobs = max(1, min(max_jobs, 50))
         remote   = 'remote' in request.form
         hybrid   = 'hybrid' in request.form
         onsite   = 'onsite' in request.form
@@ -1300,13 +1358,14 @@ def search_run():
         # Auto-apply alternativ
         auto_apply_enabled = 'auto_apply' in request.form
 
-        # Save selected CV design + letter template to .env
+        # Spara valt CV-/brevdesign PER ANVÄNDARE (DB, inte global .env)
         cv_design = request.form.get('cv_design', 'design_02_classic')
         if cv_design in ACTIVE_CV_DESIGNS:
-            write_env({'CV_DESIGN': cv_design})
+            current_user.cv_design = cv_design
         letter_template = request.form.get('letter_template', 'nordic_minimal')
         if letter_template in ACTIVE_LETTER_DESIGNS:
-            write_env({'LETTER_TEMPLATE': letter_template})
+            current_user.letter_template = letter_template
+        db.session.commit()
 
         # Update preferences YAML
         prefs = load_yaml(PREFS_YAML())
@@ -1345,6 +1404,7 @@ def search_run():
 
         if _search_user_id:
             _set_search_thread_llm_context(_search_user_id)
+        _set_search_thread_design_context(_search_user_id)
         old_stdout = sys.stdout
         old_stderr = sys.stderr
 
@@ -2088,6 +2148,10 @@ def api_regenerate_docs():
 
     try:
         from job_master import JobMaster
+        # Generatorerna läser designvalet ur thread-local: sätt användarens val
+        # innan facaden anropas (request-tråden kör genereringen synkront).
+        _set_search_thread_design_context(current_user.id)
+        from src.design_context import get_cv_design
         jm = JobMaster(output_dir=_user_output_dir(), data_dir=_user_data_dir())
         jm.initialize(platforms=[])
 
@@ -2106,7 +2170,7 @@ def api_regenerate_docs():
         jm.modern_facade.job = _FakeJob()
 
         # Generera CV
-        _design = os.getenv('CV_DESIGN', 'design_01_minimal')
+        _design = get_cv_design('design_01_minimal')
         cv_base64, _ = jm.modern_facade.create_resume_pdf_job_tailored()
 
         # Ta bort gamla CV-filer och spara ny
@@ -2367,7 +2431,10 @@ def generate_pdf_preview(pdf_path: Path, out_path: Path, width: int = 400):
 
 @app.route('/design')
 def design_page():
-    current = read_env().get('CV_DESIGN', 'design_01_minimal')
+    current = (
+        (current_user.is_authenticated and current_user.cv_design)
+        or read_env().get('CV_DESIGN', 'design_01_minimal')
+    )
     previews = {}
 
     preview_dir = BASE_DIR / 'static' / 'previews'
@@ -2384,10 +2451,14 @@ def design_page():
 
 
 @app.route('/design/save', methods=['POST'])
+@login_required
 def design_save():
     design = request.form.get('design', 'design_01_minimal')
     if design in ACTIVE_CV_DESIGNS:
-        write_env({'CV_DESIGN': design})
+        # Per-user i DB — inte global .env (som drabbade alla och nollställdes
+        # vid deploy).
+        current_user.cv_design = design
+        db.session.commit()
         flash(g.t.get('design_saved', 'Design saved!'), 'success')
     return redirect(url_for('design_page'))
 
