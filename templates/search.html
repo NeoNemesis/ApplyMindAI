@@ -24,172 +24,37 @@
 
 <div class="row g-4">
 
-  <!-- Left: Search form -->
+  <!-- Left: Search form — VAD du söker överst; design och specialval hopfällda -->
   <div class="col-lg-5">
     <form id="search-form" onsubmit="return false;">
 
-      <!-- CV Design Picker — TOP of left column -->
+      {% set _browser_ok = browser_available if browser_available is defined else true %}
+      {% set current_design = current_cv_design if current_cv_design is defined else 'design_02_classic' %}
+      {% set current_letter = current_letter_template if current_letter_template is defined else 'nordic_minimal' %}
+      {% set design_list = [
+        ('design_01_minimal',       'Minimal',       'Enkolumn, ren vit layout. Maximalt ATS-vänlig.'),
+        ('design_02_classic',       'Klassisk',      'Sidopanel + vit höger; standardlayout som funkar för alla ATS-system.'),
+        ('design_03_modern_green',  'Modern Grön',   'Mörk vänsterpanel med gröna accenter. Tech- och IT-vänlig.'),
+        ('design_05_nordic_blue',   'Nordic Blue',   'Blått sidhuvud, skandinaviskt ren tvåkolumnslayout.'),
+        ('design_07_tech_modern',   'Tech Modern',   'Dark theme, monospace + grön accent. För developer/devops-roller.')
+      ] %}
+      {% set letter_list = [
+        ('nordic_minimal',   'Nordisk Minimal',  'Vit bakgrund, ren typografi. ATS-säker, passar alla branscher.'),
+        ('problem_solution', 'Problem-Lösning',  'Strukturerat brev med grön accentlinje. Forskning visar mest svar.'),
+        ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.'),
+        ('executive',        'Executive',        'Klassisk serif, centrerat sidhuvud. För senior- och ledarroller.'),
+        ('elegant',          'Elegant',          'Elfenbensvit med guldlinje och serif-typografi. Stilren premiumkänsla.')
+      ] %}
+      {% set current_design_label = (design_list | selectattr('0', 'equalto', current_design) | map(attribute='1') | first) or current_design %}
+      {% set current_letter_label = (letter_list | selectattr('0', 'equalto', current_letter) | map(attribute='1') | first) or current_letter %}
+
+      <!-- 1. Jobbtitlar — det viktigaste först -->
       <div class="form-section">
         <div class="form-section-title">
-          <i class="bi bi-palette"></i> CV-design
+          <i class="bi bi-tags"></i> Vad söker du?
         </div>
-
-        {# Designer med riktiga genererings-mallar i moderndesign1/ — synka med ACTIVE_CV_DESIGNS #}
-        {% set current_design = current_cv_design if current_cv_design is defined else 'design_02_classic' %}
-        {% set design_list = [
-          ('design_01_minimal',       'Minimal',       'Enkolumn, ren vit layout. Maximalt ATS-vänlig.'),
-          ('design_02_classic',       'Klassisk',      'Sidopanel + vit höger; standardlayout som funkar för alla ATS-system.'),
-          ('design_03_modern_green',  'Modern Grön',   'Mörk vänsterpanel med gröna accenter. Tech- och IT-vänlig.'),
-          ('design_05_nordic_blue',   'Nordic Blue',   'Blått sidhuvud, skandinaviskt ren tvåkolumnslayout.'),
-          ('design_07_tech_modern',   'Tech Modern',   'Dark theme, monospace + grön accent. För developer/devops-roller.')
-        ] %}
-
-        <div class="design-picker-grid" id="design-picker">
-          {% for design_key, design_label, design_desc in design_list %}
-          <div class="design-card {% if current_design == design_key %}selected{% endif %}"
-               data-design="{{ design_key }}"
-               data-desc="{{ design_desc }}"
-               onclick="selectCvDesign('{{ design_key }}')">
-            <div class="design-thumb-frame"
-                 data-preview-src="/preview/pdf/{{ design_key }}"
-                 onmouseenter="lazyLoadThumb(this)">
-              <iframe src="about:blank"
-                      scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
-              <div class="thumb-overlay"></div>
-            </div>
-            <div class="design-name">{{ design_label }}</div>
-            <div class="design-desc">{{ design_desc }}</div>
-            <button type="button" class="design-preview-btn"
-                    onclick="event.stopPropagation();openDesignPreview('cv','{{ design_key }}','{{ design_label }}')">
-              <i class="bi bi-eye"></i> Förhandsgranska
-            </button>
-          </div>
-          {% endfor %}
-        </div>
-
-        <input type="hidden" name="cv_design" id="cv-design-input" value="{{ current_design }}">
-        <small class="text-muted d-block mt-2">
-          <i class="bi bi-info-circle me-1"></i>
-          Aktivt val sparas direkt och används vid alla framtida CV-genereringar:
-          <span class="tag-pill ms-1" id="selected-design-label">{{ current_design }}</span>
-        </small>
-      </div>
-
-      <!-- Cover Letter Template Picker — UNDER CV Design -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-envelope-paper"></i> Personligt brev — design
-        </div>
-
-        {% set current_letter = current_letter_template if current_letter_template is defined else 'nordic_minimal' %}
-        {% set letter_list = [
-          ('nordic_minimal',   'Nordisk Minimal',  'Vit bakgrund, ren typografi. ATS-säker, passar alla branscher.'),
-          ('problem_solution', 'Problem-Lösning',  'Strukturerat brev med grön accentlinje. Forskning visar mest svar.'),
-          ('modern_tech',      'Modern Tech',      'Dark theme, monospace-accenter och grön bar. För tech-roller.'),
-          ('executive',        'Executive',        'Klassisk serif, centrerat sidhuvud. För senior- och ledarroller.'),
-          ('elegant',          'Elegant',          'Elfenbensvit med guldlinje och serif-typografi. Stilren premiumkänsla.')
-        ] %}
-
-        <div class="design-picker-grid" id="letter-picker">
-          {% for letter_key, letter_label, letter_desc in letter_list %}
-          <div class="design-card {% if current_letter == letter_key %}selected{% endif %}"
-               data-letter="{{ letter_key }}"
-               data-desc="{{ letter_desc }}"
-               onclick="selectLetterTemplate('{{ letter_key }}')">
-            <div class="design-thumb-frame"
-                 data-preview-src="/cover-letter/template/preview/{{ letter_key }}"
-                 onmouseenter="lazyLoadThumb(this)">
-              <iframe src="about:blank"
-                      scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
-              <div class="thumb-overlay"></div>
-            </div>
-            <div class="design-name">{{ letter_label }}</div>
-            <div class="design-desc">{{ letter_desc }}</div>
-            <button type="button" class="design-preview-btn"
-                    onclick="event.stopPropagation();openDesignPreview('letter','{{ letter_key }}','{{ letter_label }}')">
-              <i class="bi bi-eye"></i> Förhandsgranska
-            </button>
-          </div>
-          {% endfor %}
-        </div>
-
-        <input type="hidden" name="letter_template" id="letter-template-input" value="{{ current_letter }}">
-        <small class="text-muted d-block mt-2">
-          <i class="bi bi-info-circle me-1"></i>
-          Aktivt val:
-          <span class="tag-pill ms-1" id="selected-letter-label">{{ current_letter }}</span>
-        </small>
-      </div>
-
-      <!-- Plattformar -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-globe"></i> Jobbplattformar
-        </div>
-        <div class="d-flex flex-column gap-2">
-
-          <label class="platform-card selected">
-            <input type="checkbox" name="platforms" value="jobtech" checked>
-            <div>
-              <div class="fw-semibold">Jobtech <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.65rem">REKOMMENDERAS</span></div>
-              <small class="text-muted">Sveriges officiella jobbdatabas — ingen inloggning, alltid tillgänglig</small>
-            </div>
-          </label>
-
-          <label class="platform-card">
-            <input type="checkbox" name="platforms" value="af">
-            <div>
-              <div class="fw-semibold">Arbetsförmedlingen</div>
-              <small class="text-muted">Platsbanken — statliga, kommunala och privata jobb{% if not browser_available %} (hämtas via officiella Jobtech-API:t){% endif %}</small>
-            </div>
-          </label>
-
-          {% set _browser_ok = browser_available if browser_available is defined else true %}
-          <label class="platform-card {% if not _browser_ok %}opacity-50{% endif %}"
-                 {% if not _browser_ok %}title="Kräver browser (selenium) — endast tillgänglig i desktop-läge"{% endif %}>
-            <input type="checkbox" name="platforms" value="linkedin" {% if not _browser_ok %}disabled{% endif %}>
-            <div>
-              <div class="fw-semibold">LinkedIn
-                {% if not _browser_ok %}<span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.65rem">EJ PÅ SERVERN</span>{% endif %}
-              </div>
-              <small class="text-muted">linkedin.com — kräver browser + inloggning (desktop-läge)</small>
-            </div>
-          </label>
-
-          <label class="platform-card {% if not _browser_ok %}opacity-50{% endif %}"
-                 {% if not _browser_ok %}title="Kräver browser (selenium) — endast tillgänglig i desktop-läge"{% endif %}>
-            <input type="checkbox" name="platforms" value="indeed" {% if not _browser_ok %}disabled{% endif %}>
-            <div>
-              <div class="fw-semibold">Indeed
-                {% if not _browser_ok %}<span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.65rem">EJ PÅ SERVERN</span>
-                {% else %}<span class="badge ms-1" style="background:rgba(74,229,74,.15);color:#4AE54A;font-size:.65rem">STEALTH</span>{% endif %}
-              </div>
-              <small class="text-muted">indeed.com — kräver stealth-browser (desktop-läge)</small>
-            </div>
-          </label>
-
-        </div>
-      </div>
-
-      <!-- Platser -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-geo-alt"></i> Sökplatser
-        </div>
-        <label class="form-label">Städer / regioner (kommaseparerat)</label>
-        <input type="text" name="locations" class="form-control"
-          value="{{ (prefs.get('locations', ['Uppsala']) | join(', ')) if prefs else 'Uppsala' }}"
-          placeholder="Uppsala, Stockholm, Remote">
-        <small class="text-muted mt-1 d-block">T.ex. <code>Uppsala, Stockholm, Remote</code></small>
-      </div>
-
-      <!-- Jobbtitlar -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-tags"></i> Jobbtitlar / sökord
-        </div>
-        <label class="form-label">En titel per rad</label>
-        <textarea name="positions" class="form-control" rows="5"
+        <label class="form-label">Jobbtitlar / sökord — en per rad</label>
+        <textarea name="positions" class="form-control" rows="4"
           placeholder="Software Engineer&#10;Systemutvecklare&#10;IT Support&#10;DevOps Engineer">{% if prefs and prefs.get('positions') %}{% for p in prefs.get('positions', []) %}{{ p }}
 {% endfor %}{% endif %}</textarea>
         <small class="text-muted mt-1 d-block">
@@ -197,12 +62,15 @@
         </small>
       </div>
 
-      <!-- Arbetsform -->
+      <!-- 2. Var -->
       <div class="form-section">
         <div class="form-section-title">
-          <i class="bi bi-house-heart"></i> Arbetsform
+          <i class="bi bi-geo-alt"></i> Var?
         </div>
-        <div class="d-flex gap-3 flex-wrap">
+        <input type="text" name="locations" class="form-control"
+          value="{{ (prefs.get('locations', ['Uppsala']) | join(', ')) if prefs else 'Uppsala' }}"
+          placeholder="Uppsala, Stockholm, Remote">
+        <div class="d-flex gap-3 flex-wrap mt-2">
           <label class="d-flex align-items-center gap-2 cursor-pointer">
             <input type="checkbox" name="remote" class="form-check-input"
               {% if not prefs or prefs.get('remote', True) %}checked{% endif %}
@@ -222,17 +90,18 @@
             <span>På plats</span>
           </label>
         </div>
+        <small class="text-muted mt-1 d-block">Städer kommaseparerade, t.ex. <code>Uppsala, Stockholm, Remote</code></small>
       </div>
 
-      <!-- Antal jobb -->
+      <!-- 3. Hur många -->
       <div class="form-section">
         <div class="form-section-title">
-          <i class="bi bi-list-ol"></i> Antal jobb att söka
+          <i class="bi bi-list-ol"></i> Antal jobb
         </div>
         <div class="d-flex gap-2 flex-wrap">
           {% for n, label in [(5,'5 – Snabbt'),(10,'10 – Rekommenderat'),(20,'20 – Omfattande'),(30,'30 – Maximum')] %}
           <label class="platform-card flex-grow-1 {% if n == 10 %}selected{% endif %}"
-                 style="min-width: 120px;">
+                 style="min-width: 110px;">
             <input type="radio" name="max_jobs" value="{{ n }}"
               {% if n == 10 %}checked{% endif %}
               style="accent-color: var(--green);">
@@ -242,47 +111,173 @@
         </div>
       </div>
 
-      <!-- ATS-filter -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-funnel"></i> ATS-filter <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.7rem">Valfritt</span>
-        </div>
-        <label class="d-flex align-items-center gap-2 cursor-pointer mb-2">
-          <input type="checkbox" name="ats_filter" id="ats-filter-check" class="form-check-input"
-            style="accent-color: var(--green); width:16px;height:16px;"
-            onchange="document.getElementById('ats-threshold-row').style.display=this.checked?'flex':'none'">
-          <span>Generera bara dokument för jobb med hög ATS-matchning</span>
-        </label>
-        <div id="ats-threshold-row" class="d-none align-items-center gap-2 mt-1">
-          <label class="text-muted small mb-0">Minsta poäng:</label>
-          <input type="number" name="ats_threshold" value="65" min="0" max="100"
-            class="form-control form-control-sm"
-            style="width:80px;background:var(--card);border-color:var(--border);color:var(--text)">
-          <span class="text-muted small">/100</span>
-        </div>
-        <small class="text-muted d-block mt-1">
-          AI bedömer matchning innan dokument genereras. Sparar tid och API-kostnad.
-          Stäng av för att alltid generera oavsett matchning.
+      <!-- Källa: på servern finns EN källa (Platsbanken via Jobtech) — inget val
+           att göra, så inga kort. I desktop-läge visas alla plattformsval under
+           Fler alternativ. -->
+      {% if not _browser_ok %}
+      <input type="hidden" name="platforms" value="jobtech">
+      <div class="form-section py-2">
+        <small class="text-muted">
+          <i class="bi bi-database-check me-1 text-green"></i>
+          Källa: <strong>Platsbanken (Jobtech)</strong> — Sveriges officiella jobbdatabas.
+          Indeed och LinkedIn kräver browser och finns bara i desktop-läget.
         </small>
       </div>
+      {% endif %}
 
-      <!-- Auto-apply -->
-      <div class="form-section">
-        <div class="form-section-title">
-          <i class="bi bi-send"></i> Auto-ansök
-          <span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.7rem">BETA</span>
+      <!-- Fler alternativ — hopfällt: ATS-filter, auto-ansök, plattformar (desktop) -->
+      <details class="form-section collapsible-section">
+        <summary>
+          <i class="bi bi-sliders"></i> Fler alternativ
+          <span class="text-muted small ms-1">ATS-filter{% if _browser_ok %}, plattformar{% endif %}, auto-ansök</span>
+        </summary>
+
+        {% if _browser_ok %}
+        <div class="mt-3">
+          <div class="form-section-title"><i class="bi bi-globe"></i> Jobbplattformar</div>
+          <div class="d-flex flex-column gap-2">
+            <label class="platform-card selected">
+              <input type="checkbox" name="platforms" value="jobtech" checked>
+              <div>
+                <div class="fw-semibold">Jobtech <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.65rem">REKOMMENDERAS</span></div>
+                <small class="text-muted">Sveriges officiella jobbdatabas — ingen inloggning, alltid tillgänglig</small>
+              </div>
+            </label>
+            <label class="platform-card">
+              <input type="checkbox" name="platforms" value="af">
+              <div>
+                <div class="fw-semibold">Arbetsförmedlingen</div>
+                <small class="text-muted">Platsbanken — statliga, kommunala och privata jobb</small>
+              </div>
+            </label>
+            <label class="platform-card">
+              <input type="checkbox" name="platforms" value="linkedin">
+              <div>
+                <div class="fw-semibold">LinkedIn</div>
+                <small class="text-muted">linkedin.com — kräver browser + inloggning</small>
+              </div>
+            </label>
+            <label class="platform-card">
+              <input type="checkbox" name="platforms" value="indeed">
+              <div>
+                <div class="fw-semibold">Indeed <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:#4AE54A;font-size:.65rem">STEALTH</span></div>
+                <small class="text-muted">indeed.com — kräver stealth-browser</small>
+              </div>
+            </label>
+          </div>
         </div>
-        <label class="d-flex align-items-center gap-2 cursor-pointer mb-1">
-          <input type="checkbox" name="auto_apply" class="form-check-input"
-            style="accent-color: var(--green); width:16px;height:16px;">
-          <span>Försök skicka ansökan automatiskt (Indeed &amp; Arbetsförmedlingen)</span>
-        </label>
-        <small class="text-muted d-block">
-          Fungerar bäst för jobb med enkel ansökningsprocess. Externa arbetsgivarsidor
-          hoppas över. Sätt <code>AUTO_APPLY_DRY_RUN=false</code> i .env för att aktivera
-          faktisk inlämning — annars fylls formulär i utan att skickas.
+        {% endif %}
+
+        <div class="mt-3">
+          <div class="form-section-title">
+            <i class="bi bi-funnel"></i> ATS-filter <span class="badge ms-1" style="background:rgba(74,229,74,.15);color:var(--green);font-size:.7rem">Valfritt</span>
+          </div>
+          <label class="d-flex align-items-center gap-2 cursor-pointer mb-2">
+            <input type="checkbox" name="ats_filter" id="ats-filter-check" class="form-check-input"
+              style="accent-color: var(--green); width:16px;height:16px;"
+              onchange="document.getElementById('ats-threshold-row').style.display=this.checked?'flex':'none'">
+            <span>Generera bara dokument för jobb med hög ATS-matchning</span>
+          </label>
+          <div id="ats-threshold-row" class="d-none align-items-center gap-2 mt-1">
+            <label class="text-muted small mb-0">Minsta poäng:</label>
+            <input type="number" name="ats_threshold" value="65" min="0" max="100"
+              class="form-control form-control-sm"
+              style="width:80px;background:var(--card);border-color:var(--border);color:var(--text)">
+            <span class="text-muted small">/100</span>
+          </div>
+          <small class="text-muted d-block mt-1">
+            AI bedömer matchning innan dokument genereras — sparar tid och API-kostnad.
+          </small>
+        </div>
+
+        {% if _browser_ok %}
+        <div class="mt-3">
+          <div class="form-section-title">
+            <i class="bi bi-send"></i> Auto-ansök
+            <span class="badge ms-1" style="background:rgba(255,193,7,.15);color:#ffc107;font-size:.7rem">BETA</span>
+          </div>
+          <label class="d-flex align-items-center gap-2 cursor-pointer mb-1">
+            <input type="checkbox" name="auto_apply" class="form-check-input"
+              style="accent-color: var(--green); width:16px;height:16px;">
+            <span>Försök skicka ansökan automatiskt (Indeed &amp; Arbetsförmedlingen)</span>
+          </label>
+          <small class="text-muted d-block">
+            Fungerar bäst för jobb med enkel ansökningsprocess. Sätt
+            <code>AUTO_APPLY_DRY_RUN=false</code> i .env för faktisk inlämning.
+          </small>
+        </div>
+        {% endif %}
+      </details>
+
+      <!-- Design — hopfällt: valet sparas per användare och behöver sällan ändras -->
+      <details class="form-section collapsible-section">
+        <summary>
+          <i class="bi bi-palette"></i> Design på CV &amp; brev
+          <span class="text-muted small ms-1">
+            <span id="selected-design-label">{{ current_design_label }}</span> ·
+            <span id="selected-letter-label">{{ current_letter_label }}</span>
+          </span>
+        </summary>
+
+        <div class="mt-3">
+          <div class="form-section-title"><i class="bi bi-file-person"></i> CV-design</div>
+          <div class="design-picker-grid" id="design-picker">
+            {% for design_key, design_label, design_desc in design_list %}
+            <div class="design-card {% if current_design == design_key %}selected{% endif %}"
+                 data-design="{{ design_key }}"
+                 data-desc="{{ design_desc }}"
+                 onclick="selectCvDesign('{{ design_key }}')">
+              <div class="design-thumb-frame"
+                   data-preview-src="/preview/pdf/{{ design_key }}"
+                   onmouseenter="lazyLoadThumb(this)">
+                <iframe src="about:blank"
+                        scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+                <div class="thumb-overlay"></div>
+              </div>
+              <div class="design-name">{{ design_label }}</div>
+              <div class="design-desc">{{ design_desc }}</div>
+              <button type="button" class="design-preview-btn"
+                      onclick="event.stopPropagation();openDesignPreview('cv','{{ design_key }}','{{ design_label }}')">
+                <i class="bi bi-eye"></i> Förhandsgranska
+              </button>
+            </div>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="cv_design" id="cv-design-input" value="{{ current_design }}">
+        </div>
+
+        <div class="mt-3">
+          <div class="form-section-title"><i class="bi bi-envelope-paper"></i> Personligt brev — design</div>
+          <div class="design-picker-grid" id="letter-picker">
+            {% for letter_key, letter_label, letter_desc in letter_list %}
+            <div class="design-card {% if current_letter == letter_key %}selected{% endif %}"
+                 data-letter="{{ letter_key }}"
+                 data-desc="{{ letter_desc }}"
+                 onclick="selectLetterTemplate('{{ letter_key }}')">
+              <div class="design-thumb-frame"
+                   data-preview-src="/cover-letter/template/preview/{{ letter_key }}"
+                   onmouseenter="lazyLoadThumb(this)">
+                <iframe src="about:blank"
+                        scrolling="no" tabindex="-1" aria-hidden="true"></iframe>
+                <div class="thumb-overlay"></div>
+              </div>
+              <div class="design-name">{{ letter_label }}</div>
+              <div class="design-desc">{{ letter_desc }}</div>
+              <button type="button" class="design-preview-btn"
+                      onclick="event.stopPropagation();openDesignPreview('letter','{{ letter_key }}','{{ letter_label }}')">
+                <i class="bi bi-eye"></i> Förhandsgranska
+              </button>
+            </div>
+            {% endfor %}
+          </div>
+          <input type="hidden" name="letter_template" id="letter-template-input" value="{{ current_letter }}">
+        </div>
+
+        <small class="text-muted d-block mt-2">
+          <i class="bi bi-info-circle me-1"></i>
+          Valet sparas direkt på ditt konto och används vid alla framtida genereringar.
         </small>
-      </div>
+      </details>
 
       <!-- Start + Stop buttons -->
       <div class="d-flex gap-2">
@@ -361,14 +356,13 @@
         <div class="terminal" id="terminal">
 Välkommen till ApplyMind AI!
 
-Konfigurera sökinställningarna till vänster och
-klicka på "Starta sökning" för att börja.
+Skriv vad du söker och var, och klicka på "Starta sökning".
 
 Tips:
-  • Jobtech och Arbetsförmedlingen är samma officiella källa (Platsbanken) — fungerar alltid
-  • Indeed och LinkedIn kräver browser och fungerar bara i desktop-läge
+  • Jobben hämtas från Platsbanken (Jobtech) — Sveriges officiella jobbdatabas
   • AI:n genererar ett unikt CV + personligt brev per jobb
-  • Alla dokument sparas under din egen kontomapp
+  • Utgångna jobb städas bort automatiskt en dag efter sista ansökningsdag
+  • Design och specialinställningar hittar du under de hopfällbara sektionerna
         </div>
       </div>
     </div>
@@ -439,6 +433,31 @@ Tips:
 </div>
 
 <style>
+/* Hopfällbara sektioner (Fler alternativ / Design) */
+.collapsible-section > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.collapsible-section > summary::-webkit-details-marker { display: none; }
+.collapsible-section > summary::after {
+  content: '';
+  margin-left: auto;
+  width: 8px; height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform .18s;
+}
+.collapsible-section[open] > summary::after { transform: rotate(-135deg); }
+.collapsible-section > summary i { color: var(--green); }
+.collapsible-section > summary:hover { color: var(--green); }
+
 /* Picker grid — verkligt responsiv */
 .design-picker-grid {
   display: grid;
