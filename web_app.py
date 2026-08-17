@@ -89,6 +89,14 @@ app.config['SESSION_COOKIE_SECURE']    = _is_prod
 app.config['SESSION_COOKIE_SAMESITE']  = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY']  = True
 
+# Bakom nginx är request.remote_addr annars proxyns IP: rate-limitern i auth.py
+# skulle klumpa ihop ALLA besökare i en och samma hink (5 felförsök av vem som
+# helst låser inloggningen för alla). ProxyFix läser X-Forwarded-For från vår
+# egen nginx — aktiveras bara i produktion där proxyn är betrodd.
+if _is_prod:
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
 db.init_app(app)
 migrate = Migrate(app, db)
 
@@ -810,7 +818,7 @@ def get_stats():
 # ============================================================
 # AUTH CHECK — require login for all app routes
 # ============================================================
-_PUBLIC_ENDPOINTS = {'auth.login', 'auth.logout', 'landing', 'static'}
+_PUBLIC_ENDPOINTS = {'auth.login', 'auth.logout', 'landing', 'static', 'robots_txt'}
 _PUBLIC_PREFIXES  = ['/auth/', '/static/']
 
 @app.before_request
@@ -823,6 +831,28 @@ def require_login():
     if not current_user.is_authenticated:
         return redirect(url_for('auth.login', next=request.path))
     return None
+
+
+# ============================================================
+# OCULTAMIENTO — appen är privat: inget ska indexeras eller synas
+# ============================================================
+# Appen är ett privat verktyg. X-Robots-Tag på VARJE svar (även login,
+# redirects och felsidor) håller den ute ur Google/Bing oavsett vad enskilda
+# templates säger, och robots.txt stänger dörren för artiga crawlers.
+# Auth-sidorna får dessutom no-store så inloggningsformulär och resetsidor
+# aldrig hamnar i delade cachar eller i webbläsarhistorikens cache.
+
+@app.after_request
+def hide_from_public(response):
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow, noarchive'
+    if request.path.startswith('/auth/'):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    return "User-agent: *\nDisallow: /\n", 200, {'Content-Type': 'text/plain; charset=utf-8'}
 
 
 # ============================================================
