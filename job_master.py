@@ -253,7 +253,8 @@ class JobMaster:
                    None = starta alltid browser (bakåtkompatibelt).
         """
         print("\n" + "="*80)
-        cv_design = os.getenv("CV_DESIGN", "design_01_minimal")
+        from src.design_context import get_cv_design
+        cv_design = get_cv_design("design_01_minimal")
         print("ApplyMind AI — Jobbsoknings- och ansokningssystem")
         print("="*80)
 
@@ -1770,11 +1771,13 @@ class JobMaster:
                 return False
 
             # Generera jobbanpassat CV - AI anpassar automatiskt till jobbet
-            _design = os.getenv("CV_DESIGN", "design_01_minimal")
+            # (per-user designval via thread-local; env är bara fallback)
+            from src.design_context import get_cv_design
+            _design = get_cv_design("design_01_minimal")
             print(f"📝 Genererar jobbanpassat CV ({_design})...")
             cv_base64, _ = self.modern_facade.create_resume_pdf_job_tailored()
 
-            _cv_design_slug = os.getenv("CV_DESIGN", "design_01_minimal")
+            _cv_design_slug = _design
             cv_path = job_folder / f"CV_{safe_company}_{safe_title}_{_cv_design_slug}.pdf"
             with open(cv_path, 'wb') as f:
                 f.write(base64.b64decode(cv_base64))

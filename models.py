@@ -27,6 +27,12 @@ class User(UserMixin, db.Model):
     llm_api_key   = db.Column(db.Text, nullable=True)   # stored as-is; encrypt in prod
     language      = db.Column(db.String(8), default="sv")
 
+    # Per-user design val (CV + personligt brev). NULL = env/default-fallback.
+    # Ersätter det gamla globala CV_DESIGN/LETTER_TEMPLATE i .env, som (1) delades
+    # av ALLA användare och (2) nollställdes vid varje deploy.
+    cv_design       = db.Column(db.String(64), nullable=True)
+    letter_template = db.Column(db.String(64), nullable=True)
+
     # LinkedIn (optional)
     linkedin_email    = db.Column(db.String(120), nullable=True)
     linkedin_password = db.Column(db.Text, nullable=True)

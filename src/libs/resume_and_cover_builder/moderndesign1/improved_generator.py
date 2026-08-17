@@ -616,8 +616,8 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
             # Profilbild
             profile_image_base64 = self._get_profile_image_base64()
             
-            # Ladda template — router baserat på CV_DESIGN env
-            import os
+            # Ladda template — router via per-user design-kontext (thread-local,
+            # satt av web_app; env CV_DESIGN är bara fallback)
             CV_TEMPLATE_MAP = {
                 'design_01_minimal':      'template_minimal.html',
                 'design_02_classic':      'improved_template.html',
@@ -625,7 +625,8 @@ Return ONLY the HTML in {"Swedish" if self.language == 'sv' else "English"}.
                 'design_05_nordic_blue':  'template_nordic_blue.html',
                 'design_07_tech_modern':  'template_tech_modern.html',
             }
-            chosen = os.getenv('CV_DESIGN', 'design_02_classic')
+            from src.design_context import get_cv_design
+            chosen = get_cv_design('design_02_classic')
             template_filename = CV_TEMPLATE_MAP.get(chosen, 'improved_template.html')
             template_path = Path(__file__).parent / template_filename
             if not template_path.exists():

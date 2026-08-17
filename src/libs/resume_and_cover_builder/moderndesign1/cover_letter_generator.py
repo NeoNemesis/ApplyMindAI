@@ -333,8 +333,8 @@ Mitt CV finns bifogat och beskriver min bakgrund och erfarenhet i detalj. Jag be
             else:
                 content = self._get_fallback_content(company_name, position_title)
             
-            # Ladda CLEAN template — router baserat på LETTER_TEMPLATE env
-            import os
+            # Ladda CLEAN template — router via per-user design-kontext
+            # (thread-local, satt av web_app; env LETTER_TEMPLATE = fallback)
             LETTER_TEMPLATE_MAP = {
                 'nordic_minimal':   'cover_letter_template_clean.html',
                 'problem_solution': 'cover_letter_template_problem_solution.html',
@@ -342,7 +342,8 @@ Mitt CV finns bifogat och beskriver min bakgrund och erfarenhet i detalj. Jag be
                 'executive':        'cover_letter_template_executive.html',
                 'elegant':          'cover_letter_template_elegant.html',
             }
-            chosen_letter = os.getenv('LETTER_TEMPLATE', 'nordic_minimal')
+            from src.design_context import get_letter_template
+            chosen_letter = get_letter_template('nordic_minimal')
             letter_filename = LETTER_TEMPLATE_MAP.get(chosen_letter, 'cover_letter_template_clean.html')
             template_path = Path(__file__).parent / letter_filename
             if not template_path.exists():
