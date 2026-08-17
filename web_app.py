@@ -1354,7 +1354,8 @@ def search_run():
         platform_map  = {'linkedin': 'linkedin', 'indeed': 'indeed', 'af': 'arbetsformedlingen', 'jobtech': 'jobtech'}
         platforms     = [platform_map[p] for p in platforms_raw if p in platform_map]
         if not platforms:
-            platforms = ['indeed']
+            # Server-säker default: Jobtech kräver ingen browser (indeed gör det)
+            platforms = ['jobtech']
 
         # Validera + begränsa: icke-numeriskt gav 500, och utan tak kunde en
         # sökning dra igång dokumentgenerering för godtyckligt många jobb.
