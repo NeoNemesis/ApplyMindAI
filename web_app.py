@@ -622,9 +622,16 @@ def _maybe_fire_scheduled_search(uid: int, now: datetime) -> None:
     threading.Thread(target=_sched_search, daemon=True).start()
 
 
+# uid -> 'YYYY-MM-DD' för senast körda auto-städning av utgångna jobb.
+# Bara i minnet: efter omstart körs städningen på nytt (idempotent och billig).
+_expired_cleanup_done: dict = {}
+
+
 def _scheduler_loop():
     """Background thread: kollar varje minut ALLA användares scheman och kör
-    de som är förfallna — var och en med sin egen konfig/prefs/nyckel/design."""
+    de som är förfallna — var och en med sin egen konfig/prefs/nyckel/design.
+    Kör dessutom EN daglig auto-städning per användare av jobb vars
+    ansökningsdeadline passerats med mer än en dag."""
     while True:
         try:
             time.sleep(60)
@@ -632,11 +639,20 @@ def _scheduler_loop():
                 from models import User
                 user_ids = [u.id for u in User.query.filter_by(is_active=True).all()]
             now = datetime.now()
+            today = now.strftime('%Y-%m-%d')
             for uid in user_ids:
                 try:
                     _maybe_fire_scheduled_search(uid, now)
                 except Exception:
                     pass
+                if _expired_cleanup_done.get(uid) != today:
+                    _expired_cleanup_done[uid] = today
+                    try:
+                        n = _cleanup_expired_jobs(uid)
+                        if n:
+                            print(f'[cleanup] user {uid}: raderade {n} utgångna jobb (deadline > 1 dag passerad)')
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -1993,14 +2009,18 @@ def api_jobs():
     return jsonify(job_list)
 
 
-def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected') -> None:
+def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected',
+                   uid: int | None = None) -> None:
     """Lägg/markera en jobb-URL i processed_jobs.json så den inte hittas igen.
-    Delad av per-jobb-radering, batch-utvärdering och radering av utgångna jobb."""
+    Delad av per-jobb-radering, batch-utvärdering och radering av utgångna jobb.
+    `uid` behövs när anropet sker UTAN request-kontext (auto-städningen i
+    schemaläggartråden) — annars per-user via inloggad användare som förr."""
     job_url = (job_url or '').strip()
     if not job_url:
         return
+    pj = _user_output_dir(uid) / 'processed_jobs.json' if uid else PROCESSED_JOBS()
     try:
-        existing = json.loads(PROCESSED_JOBS().read_text(encoding='utf-8')) if PROCESSED_JOBS().exists() else []
+        existing = json.loads(pj.read_text(encoding='utf-8')) if pj.exists() else []
     except Exception:
         existing = []
 
@@ -2014,7 +2034,7 @@ def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected') -> No
             'status':         status,
             'processed_date': datetime.now().isoformat(),
         })
-        PROCESSED_JOBS().write_text(
+        pj.write_text(
             json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
         )
     else:
@@ -2024,9 +2044,37 @@ def _block_job_url(job_url: str, job_meta: dict, status: str = 'rejected') -> No
                 j['status'] = status
                 changed = True
         if changed:
-            PROCESSED_JOBS().write_text(
+            pj.write_text(
                 json.dumps(existing, ensure_ascii=False, indent=2), encoding='utf-8'
             )
+
+
+def _cleanup_expired_jobs(uid: int | None) -> int:
+    """Radera användarens jobb vars sista ansökningsdag passerats med MER än en
+    dag — de går inte längre att söka, så de ska försvinna själva från /jobs.
+    En dags marginal efter deadline (ansökan kan i praktiken gå in på slutdagen
+    och användaren hinner se vad som föll bort). URL:erna blockeras så samma
+    annons inte hittas igen. Jobb UTAN sparad deadline rörs aldrig.
+    Körs dagligen per användare från schemaläggartråden; den manuella
+    "Radera utgångna"-knappen (deadline < idag, utan marginal) finns kvar."""
+    out_dir = _user_output_dir(uid)
+    if not out_dir.exists():
+        return 0
+    cutoff = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    removed = 0
+    for folder in out_dir.iterdir():
+        if not (folder.is_dir() and folder.name.startswith('Job_')):
+            continue
+        try:
+            job = parse_job_folder(folder)
+        except Exception:
+            continue
+        deadline = (job.get('deadline') or '').strip()
+        if deadline and deadline < cutoff:
+            _block_job_url(job.get('url', ''), job, status='expired', uid=uid)
+            shutil.rmtree(str(folder), ignore_errors=True)
+            removed += 1
+    return removed
 
 
 @app.route('/api/jobs/delete', methods=['POST'])
