@@ -1246,7 +1246,32 @@ class JobMaster:
         """Sök jobb på valda plattformar med användarens platser och jobbtitlar"""
         # Store user's search criteria for use by individual search methods
         self.search_locations = locations or ['Uppsala']
-        self.search_positions = positions or ['Junior Systemutvecklare', 'Webbutvecklare']
+
+        # CV-profil (Jobtech-taxonomi) — gratis, cachas och byggs bara om när
+        # CV:t ändrats. Används för (1) automatiska söktermer när användaren
+        # inte angett några titlar och (2) pre-score/rankning av träffarna.
+        self.taxonomy_profile = None
+        try:
+            from src.taxonomy_profile import get_or_build_profile
+            self.taxonomy_profile = get_or_build_profile(self.base_data_dir)
+        except Exception:
+            self.taxonomy_profile = None
+        if self.taxonomy_profile:
+            _n_comp = len(self.taxonomy_profile.get('competencies', []))
+            _n_occ = len(self.taxonomy_profile.get('occupations', []))
+            print(f"\n🧠 CV-profil: {_n_occ} yrken + {_n_comp} kompetenser extraherade ur ditt CV")
+
+        if positions:
+            self.search_positions = positions
+        else:
+            # Inga titlar angivna: sök på yrkena ur CV:t i stället för
+            # hårdkodade standardtitlar.
+            _occ = [o.get('label', '') for o in
+                    (self.taxonomy_profile or {}).get('occupations', [])[:4]]
+            _occ = [o for o in _occ if o]
+            if _occ:
+                print(f"🎯 Söktermer från din CV-profil: {', '.join(_occ)}")
+            self.search_positions = _occ or ['Junior Systemutvecklare', 'Webbutvecklare']
         all_jobs = []
 
         # ── Plattforms-normalisering för serverdrift ─────────────────────
@@ -1360,12 +1385,17 @@ class JobMaster:
         positions = self.search_positions[:5] or ['Systemutvecklare', 'Webbutvecklare']
         locations = self.search_locations[:3] or ['Uppsala']
 
+        # Med CV-profil: samla FLER kandidater än max_jobs och ranka dem mot
+        # profilen efteråt — de bästa behålls. Utan profil: som förut.
+        profile = getattr(self, 'taxonomy_profile', None)
+        candidate_cap = min(max_jobs * 4, 60) if profile else max_jobs
+
         # Bygg kombination position × plats
         searches = [(pos, loc) for pos in positions for loc in locations]
         print(f"Söker {len(searches)} kombinationer: {positions} x {locations}")
 
         for position, location in searches:  # noqa: E501
-            if len(all_jobs) >= max_jobs or self.stop_requested:
+            if len(all_jobs) >= candidate_cap or self.stop_requested:
                 break
             try:
                 # Inkludera orten i frågesträngen — verifierat fungerar för Jobtech API
@@ -1386,7 +1416,7 @@ class JobMaster:
                 print(f"   📋 {len(hits)} träffar (totalt {total} i Sverige)")
 
                 for hit in hits:
-                    if len(all_jobs) >= max_jobs or self.stop_requested:
+                    if len(all_jobs) >= candidate_cap or self.stop_requested:
                         break
 
                     # Extrahera URL
@@ -1442,6 +1472,8 @@ class JobMaster:
                                 _extras.extend(str(x) for x in _items if x)
                         if _extras:
                             _desc_text = (_desc_text + '\n' + ' '.join(_extras)).strip()
+                    else:
+                        _must, _nice = {}, {}
 
                     job = {
                         'title': title,
@@ -1454,6 +1486,12 @@ class JobMaster:
                         'deadline': deadline_date,
                         'description': _desc_text,  # Sparas direkt från Jobtech API
                     }
+                    if profile:
+                        # Strukturerade krav/meriter behövs för poängsättningen
+                        # nedan — tas bort ur dicten efter rankningen.
+                        from src.taxonomy_profile import extract_skill_labels
+                        job['_must_labels'] = extract_skill_labels(_must)
+                        job['_nice_labels'] = extract_skill_labels(_nice)
                     if self._job_is_duplicate(job, seen_urls, seen_sigs):
                         continue
 
@@ -1465,6 +1503,47 @@ class JobMaster:
             except Exception as e:
                 print(f"   ⚠️  Jobtech-fel för '{position} i {location}': {e}")
                 continue
+
+        # ── Pre-score mot CV-profilen: ranka kandidaterna, behåll de bästa ──
+        if profile and all_jobs:
+            try:
+                from src.taxonomy_profile import score_job
+                for job in all_jobs:
+                    verdict = score_job(
+                        profile,
+                        job.get('title', ''),
+                        job.get('description', ''),
+                        job.pop('_must_labels', []),
+                        job.pop('_nice_labels', []),
+                    )
+                    job['match_score'] = verdict.get('score')
+                    job['_matched'] = verdict.get('matched', [])
+                    job['_missing'] = verdict.get('missing_must', [])
+                all_jobs.sort(key=lambda j: (j.get('match_score') or 0), reverse=True)
+                kept = all_jobs[:max_jobs]
+                print(f"\n🎯 Rankade {len(all_jobs)} kandidater mot din CV-profil — behåller topp {len(kept)}:")
+                for job in kept:
+                    _m = ', '.join(job.pop('_matched', [])[:4])
+                    _x = ', '.join(job.pop('_missing', [])[:3])
+                    _parts = []
+                    if _m:
+                        _parts.append(f"matchar: {_m}")
+                    if _x:
+                        _parts.append(f"saknar krav: {_x}")
+                    _detail = f"  ({' · '.join(_parts)})" if _parts else ''
+                    print(f"   {str(job.get('match_score', '—')).rjust(3)}p  {job['title']} @ {job['company']}{_detail}")
+                for job in all_jobs[max_jobs:]:
+                    job.pop('_matched', None)
+                    job.pop('_missing', None)
+                all_jobs = kept
+            except Exception as e:
+                print(f"   ⚠️  Kunde inte ranka mot CV-profilen: {e}")
+                for job in all_jobs:
+                    job.pop('_must_labels', None)
+                    job.pop('_nice_labels', None)
+                    job.pop('_matched', None)
+                    job.pop('_missing', None)
+                all_jobs = all_jobs[:max_jobs]
 
         print(f"\n📊 Jobtech: {len(all_jobs)} jobb hittade")
         return all_jobs
